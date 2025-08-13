@@ -1,0 +1,234 @@
+/* gmed-components.css - Reusable UI Components */
+
+/* ============================================================================
+   RESIDENT INFO PANELS
+   ============================================================================ */
+.gmed-resident-panel {
+  background: linear-gradient(135deg, var(--ssm-light-gray) 0%, var(--ssm-white) 100%);
+  border-left: 4px solid var(--ssm-secondary-blue);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-radius: 0 12px 12px 0;
+  box-shadow: 0 4px 16px rgba(0, 61, 92, 0.08);
+}
+
+.gmed-resident-panel h4 {
+  color: var(--ssm-primary-blue);
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.gmed-resident-panel .row {
+  align-items: center;
+}
+
+/* ============================================================================
+   PROGRESS INDICATORS
+   ============================================================================ */
+.gmed-progress {
+  height: 12px;
+  border-radius: 8px;
+  background: #e9ecef;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.gmed-progress-bar {
+  background: linear-gradient(90deg, var(--ssm-secondary-blue), var(--ssm-light-blue));
+  transition: width 0.6s ease;
+  border-radius: 8px;
+  position: relative;
+}
+
+.gmed-progress-bar.animated {
+  background: linear-gradient(90deg, var(--ssm-secondary-blue), var(--ssm-light-blue), var(--ssm-secondary-blue));
+  background-size: 200% 100%;
+  animation: gmedProgressShimmer 2s infinite;
+}
+
+@keyframes gmedProgressShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.gmed-step-indicator {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--ssm-secondary-blue);
+  text-align: center;
+}
+
+/* ============================================================================
+   STATUS BADGES
+   ============================================================================ */
+.gmed-status-badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gmed-status-complete {
+  background: linear-gradient(135deg, var(--ssm-success-green), #26a69a);
+  color: var(--ssm-white);
+}
+
+.gmed-status-incomplete {
+  background: linear-gradient(135deg, var(--ssm-error-red), #f44336);
+  color: var(--ssm-white);
+}
+
+.gmed-status-in-progress {
+  background: linear-gradient(135deg, var(--ssm-warning-orange), #ff9800);
+  color: var(--ssm-white);
+}
+
+.gmed-status-pending {
+  background: linear-gradient(135deg, var(--ssm-neutral-gray), #9e9e9e);
+  color: var(--ssm-white);
+}
+
+/* ============================================================================
+   DATA TABLES
+   ============================================================================ */
+.gmed-datatable {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 61, 92, 0.08);
+}
+
+.gmed-datatable thead th {
+  background: linear-gradient(135deg, var(--ssm-primary-blue), var(--ssm-secondary-blue));
+  color: var(--ssm-white);
+  border: none;
+  padding: 1rem;
+  font-weight: 600;
+}
+
+.gmed-datatable tbody tr {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.gmed-datatable tbody tr:hover {
+  background: linear-gradient(135deg, rgba(0, 102, 161, 0.05), rgba(74, 144, 164, 0.05));
+  cursor: pointer;
+  transform: translateY(-1px);
+}
+
+.gmed-datatable tbody tr.selected {
+  background: linear-gradient(135deg, rgba(0, 102, 161, 0.1), rgba(74, 144, 164, 0.1));
+  border-left: 4px solid var(--ssm-secondary-blue);
+}
+
+.gmed-datatable tbody td {
+  padding: 1rem;
+  vertical-align: middle;
+}
+
+/* ============================================================================
+   SELECTION INTERFACES
+   ============================================================================ */
+.gmed-selector-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+.gmed-selector-container .selectize-control {
+  width: 80%;
+  max-width: 600px;
+}
+
+.gmed-selector-container .selectize-input {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--ssm-secondary-blue);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 102, 161, 0.1);
+  transition: all 0.3s ease;
+}
+
+.gmed-selector-container .selectize-input:focus {
+  border-color: var(--ssm-primary-blue);
+  box-shadow: 0 0 0 0.2rem rgba(0, 61, 92, 0.25);
+}
+
+.gmed-selector-container label {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ssm-primary-blue);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+/* ============================================================================
+   PLUS/DELTA DISPLAYS
+   ============================================================================ */
+.gmed-plus-delta-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.gmed-plus-section {
+  background: linear-gradient(135deg, #f8fff9, #e8f5e8);
+  border-left: 4px solid var(--ssm-success-green);
+  padding: 1.5rem;
+  border-radius: 0 12px 12px 0;
+  box-shadow: 0 4px 16px rgba(0, 166, 81, 0.1);
+}
+
+.gmed-delta-section {
+  background: linear-gradient(135deg, #fff8f8, #fde8e8);
+  border-left: 4px solid var(--ssm-error-red);
+  padding: 1.5rem;
+  border-radius: 0 12px 12px 0;
+  box-shadow: 0 4px 16px rgba(220, 53, 69, 0.1);
+}
+
+.gmed-plus-section h5,
+.gmed-delta-section h5 {
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.gmed-plus-section h5 {
+  color: var(--ssm-success-green);
+}
+
+.gmed-delta-section h5 {
+  color: var(--ssm-error-red);
+}
+
+/* ============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================ */
+@media (max-width: 768px) {
+  .gmed-plus-delta-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .gmed-selector-container .selectize-control {
+    width: 95%;
+  }
+  
+  .gmed-datatable {
+    font-size: 0.9rem;
+  }
+  
+  .gmed-datatable thead th,
+  .gmed-datatable tbody td {
+    padding: 0.75rem 0.5rem;
+  }
+}

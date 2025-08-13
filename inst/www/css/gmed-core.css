@@ -1,0 +1,206 @@
+/* gmed-core.css - Core SSM Health Brand System */
+
+/* ============================================================================
+   BRAND COLORS & TYPOGRAPHY
+   ============================================================================ */
+:root {
+  /* SSM Health Primary Colors */
+  --ssm-primary-blue: #003d5c;
+  --ssm-secondary-blue: #0066a1;
+  --ssm-light-blue: #4a90a4;
+  --ssm-accent-blue: #2196f3;
+  
+  /* Legacy Coaching Colors (mapped to SSM) */
+  --coach-primary: var(--ssm-secondary-blue);    /* Was #0072B2 */
+  --coach-secondary: var(--ssm-light-blue);      /* Was #56B4E9 */
+  
+  /* Status Colors */
+  --ssm-success-green: #00a651;
+  --ssm-warning-orange: #ff8c00;
+  --ssm-error-red: #dc3545;
+  --ssm-neutral-gray: #6c757d;
+  --ssm-light-gray: #f8f9fa;
+  --ssm-white: #ffffff;
+  
+  /* Text Colors */
+  --ssm-text-primary: #2c3e50;
+  --ssm-text-secondary: #546e7a;
+  --ssm-text-muted: #6c757d;
+}
+
+/* Base Typography */
+body {
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  color: var(--ssm-text-primary);
+  line-height: 1.6;
+  font-size: 16px;
+}
+
+/* ============================================================================
+   CARD SYSTEM
+   ============================================================================ */
+.gmed-card {
+  background: var(--ssm-white);
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 61, 92, 0.08);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.gmed-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--ssm-primary-blue), var(--ssm-secondary-blue));
+}
+
+.gmed-card-header {
+  background: linear-gradient(135deg, var(--ssm-primary-blue) 0%, var(--ssm-secondary-blue) 100%);
+  color: var(--ssm-white);
+  padding: 2rem;
+  border-radius: 16px 16px 0 0;
+  margin: -2rem -2rem 2rem -2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.gmed-card-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.75rem;
+  letter-spacing: -0.5px;
+}
+
+/* ============================================================================
+   NAVIGATION & HEADER
+   ============================================================================ */
+.gmed-navbar-brand {
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--ssm-primary-blue) !important;
+  letter-spacing: -0.5px;
+}
+
+.gmed-nav-tabs .nav-link.active {
+  background: linear-gradient(135deg, var(--ssm-secondary-blue), var(--ssm-light-blue));
+  color: var(--ssm-white);
+  border: none;
+  border-radius: 8px 8px 0 0;
+}
+
+.gmed-nav-tabs .nav-link {
+  color: var(--ssm-secondary-blue);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.gmed-nav-tabs .nav-link:hover {
+  color: var(--ssm-primary-blue);
+  border-color: var(--ssm-light-blue);
+}
+
+/* ============================================================================
+   BUTTONS
+   ============================================================================ */
+.btn-gmed-primary {
+  background: linear-gradient(135deg, var(--ssm-primary-blue), var(--ssm-secondary-blue));
+  border: none;
+  color: var(--ssm-white);
+  padding: 0.75rem 2rem;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(0, 61, 92, 0.2);
+}
+
+.btn-gmed-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 61, 92, 0.3);
+  color: var(--ssm-white);
+}
+
+.btn-gmed-secondary {
+  background: linear-gradient(135deg, var(--ssm-light-blue), var(--ssm-accent-blue));
+  border: none;
+  color: var(--ssm-white);
+  padding: 0.75rem 2rem;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+/* ============================================================================
+   FORMS
+   ============================================================================ */
+.gmed-form-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ssm-text-primary);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.gmed-form-label.required::after {
+  content: ' *';
+  color: var(--ssm-error-red);
+  font-weight: 600;
+}
+
+.gmed-form-control {
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.gmed-form-control:focus {
+  border-color: var(--ssm-secondary-blue);
+  box-shadow: 0 0 0 0.2rem rgba(0, 102, 161, 0.25);
+}
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+@keyframes gmedSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gmed-slide-in {
+  animation: gmedSlideIn 0.3s ease-out;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+@media (max-width: 768px) {
+  .gmed-card {
+    padding: 1.5rem;
+    border-radius: 12px;
+  }
+  
+  .gmed-card-header {
+    padding: 1.5rem;
+    margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+    border-radius: 12px 12px 0 0;
+  }
+  
+  .gmed-card-title {
+    font-size: 1.5rem;
+  }
+}
