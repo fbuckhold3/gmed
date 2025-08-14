@@ -232,3 +232,330 @@
     padding: 0.75rem 0.5rem;
   }
 }
+
+/* Additional CSS to add to gmed-components.css */
+
+/* ============================================================================
+   LOADING STATES
+   ============================================================================ */
+.gmed-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.gmed-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  color: var(--ssm-secondary-blue);
+  font-size: 1.5rem;
+}
+
+/* ============================================================================
+   ENHANCED SELECTOR CONTAINER
+   ============================================================================ */
+.gmed-selector-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  transition: all 0.3s ease;
+}
+
+.gmed-selector-container:hover {
+  transform: translateY(-2px);
+}
+
+.gmed-selector-container .selectize-control {
+  width: 80%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.gmed-selector-container .selectize-input {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--ssm-secondary-blue);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 102, 161, 0.1);
+  transition: all 0.3s ease;
+  background: var(--ssm-white);
+}
+
+.gmed-selector-container .selectize-input:focus {
+  border-color: var(--ssm-primary-blue);
+  box-shadow: 0 0 0 0.2rem rgba(0, 61, 92, 0.25);
+  outline: none;
+}
+
+.gmed-selector-container .selectize-input.focus {
+  border-color: var(--ssm-primary-blue);
+  box-shadow: 0 0 0 0.2rem rgba(0, 61, 92, 0.25);
+}
+
+.gmed-selector-container label {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ssm-primary-blue);
+  margin-bottom: 1rem;
+  text-align: center;
+  display: block;
+  width: 100%;
+}
+
+/* ============================================================================
+   ENHANCED CARDS
+   ============================================================================ */
+.gmed-card {
+  background: var(--ssm-white);
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 61, 92, 0.08);
+  margin-bottom: 2rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.gmed-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 61, 92, 0.12);
+}
+
+.gmed-card .card-body {
+  padding: 2rem;
+}
+
+/* ============================================================================
+   ENHANCED PROGRESS BARS
+   ============================================================================ */
+.gmed-progress {
+  height: 12px;
+  border-radius: 8px;
+  background: #e9ecef;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.gmed-progress-bar {
+  background: linear-gradient(90deg, var(--ssm-secondary-blue), var(--ssm-light-blue));
+  transition: width 0.6s ease;
+  border-radius: 8px;
+  position: relative;
+  height: 100%;
+}
+
+.gmed-progress-bar.animated {
+  background: linear-gradient(90deg, var(--ssm-secondary-blue), var(--ssm-light-blue), var(--ssm-secondary-blue));
+  background-size: 200% 100%;
+  animation: gmedProgressShimmer 2s infinite;
+}
+
+/* ============================================================================
+   ENHANCED STATUS BADGES
+   ============================================================================ */
+.gmed-status-badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.gmed-status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.gmed-status-complete {
+  background: linear-gradient(135deg, var(--ssm-success-green), #26a69a);
+  color: var(--ssm-white);
+}
+
+.gmed-status-incomplete {
+  background: linear-gradient(135deg, var(--ssm-error-red), #f44336);
+  color: var(--ssm-white);
+}
+
+.gmed-status-in-progress {
+  background: linear-gradient(135deg, var(--ssm-warning-orange), #ff9800);
+  color: var(--ssm-white);
+}
+
+.gmed-status-pending {
+  background: linear-gradient(135deg, var(--ssm-neutral-gray), #9e9e9e);
+  color: var(--ssm-white);
+}
+
+/* ============================================================================
+   ENHANCED RESIDENT PANEL
+   ============================================================================ */
+.gmed-resident-panel {
+  background: linear-gradient(135deg, var(--ssm-light-gray) 0%, var(--ssm-white) 100%);
+  border-left: 4px solid var(--ssm-secondary-blue);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-radius: 0 12px 12px 0;
+  box-shadow: 0 4px 16px rgba(0, 61, 92, 0.08);
+  transition: all 0.3s ease;
+}
+
+.gmed-resident-panel:hover {
+  transform: translateX(4px);
+  box-shadow: 0 6px 20px rgba(0, 61, 92, 0.12);
+}
+
+.gmed-resident-panel h4 {
+  color: var(--ssm-primary-blue);
+  margin-bottom: 1rem;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.gmed-resident-panel .row {
+  align-items: center;
+}
+
+.gmed-resident-panel strong {
+  color: var(--ssm-secondary-blue);
+  font-weight: 600;
+}
+
+/* ============================================================================
+   STEP INDICATOR
+   ============================================================================ */
+.gmed-step-indicator {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--ssm-secondary-blue);
+  text-align: center;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 102, 161, 0.1);
+  border-radius: 20px;
+  display: inline-block;
+  margin: 0 auto;
+}
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+@keyframes gmedSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gmedProgressShimmer {
+  0% { 
+    background-position: 200% 0; 
+  }
+  100% { 
+    background-position: -200% 0; 
+  }
+}
+
+@keyframes gmedPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes gmedFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+.gmed-slide-in {
+  animation: gmedSlideIn 0.3s ease-out;
+}
+
+.gmed-fade-in {
+  animation: gmedFadeIn 0.3s ease-out;
+}
+
+.gmed-pulse {
+  animation: gmedPulse 2s infinite;
+}
+
+/* ============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================ */
+@media (max-width: 768px) {
+  .gmed-selector-container {
+    padding: 1.5rem 1rem;
+  }
+  
+  .gmed-selector-container .selectize-control {
+    width: 95%;
+  }
+  
+  .gmed-selector-container label {
+    font-size: 1.1rem;
+  }
+  
+  .gmed-resident-panel {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .gmed-resident-panel h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .gmed-card .card-body {
+    padding: 1.5rem;
+  }
+  
+  .gmed-status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .gmed-step-indicator {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .gmed-plus-delta-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .gmed-card .card-body {
+    padding: 1rem;
+  }
+  
+  .gmed-resident-panel {
+    padding: 0.75rem;
+    border-radius: 0 8px 8px 0;
+  }
+}
