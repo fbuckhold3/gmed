@@ -298,7 +298,7 @@ create_gmed_datatable <- function(data,
         paginate = list(
           first = "First",
           last = "Last",
-          next = "Next",
+          `next` = "Next",
           previous = "Previous"
         )
       )
