@@ -454,3 +454,52 @@ generate_plus_delta_rdm2 <- function(data, resident_record_id) {
 `%||%` <- function(x, y) {
   if (is.null(x)) y else x
 }
+
+#' Get Record ID from Resident Name
+#' 
+#' Looks up resident record_id from name in REDCap data
+#' @param resident_name Name of resident
+#' @param redcap_url REDCap API URL
+#' @param redcap_token REDCap API token
+#' @return Character record_id or NULL if not found
+#' @export
+get_record_id_from_name <- function(resident_name, redcap_url, redcap_token) {
+  
+  tryCatch({
+    # Query REDCap for resident data
+    response <- httr::POST(
+      url = redcap_url,
+      body = list(
+        token = redcap_token,
+        content = "record",
+        action = "export",
+        format = "json",
+        type = "flat", 
+        fields = "record_id,name",
+        returnFormat = "json"
+      ),
+      encode = "form",
+      httr::timeout(30)
+    )
+    
+    if (httr::status_code(response) == 200) {
+      content <- httr::content(response, "text", encoding = "UTF-8")
+      data <- jsonlite::fromJSON(content)
+      
+      if (is.data.frame(data) && nrow(data) > 0) {
+        # Look for exact name match
+        matching_record <- data[data$name == resident_name, ]
+        
+        if (nrow(matching_record) > 0) {
+          return(as.character(matching_record$record_id[1]))
+        }
+      }
+    }
+    
+    return(NULL)
+    
+  }, error = function(e) {
+    message("Error looking up record ID: ", e$message)
+    return(NULL)
+  })
+}

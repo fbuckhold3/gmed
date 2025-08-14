@@ -334,3 +334,49 @@ map_milestone_period_to_instance <- function(period_text) {
   
   return(unname(instance))
 }
+
+#' Get Current Review Period
+#' 
+#' Determines current review period based on date
+#' @return Character string of current period
+#' @export
+get_current_period <- function() {
+  current_date <- Sys.Date()
+  month <- lubridate::month(current_date)
+  
+  # Basic period mapping based on academic year
+  if (month >= 7 && month <= 11) {
+    return("Intern Intro")  # July-November
+  } else if (month >= 12 || month <= 2) {
+    return("Mid Review")    # December-February  
+  } else if (month >= 3 && month <= 6) {
+    return("End Review")    # March-June
+  } else {
+    return("Mid Review")    # Default fallback
+  }
+}
+
+#' Get Previous Review Period
+#' 
+#' Gets the previous review period for comparison purposes
+#' @param current_period Current period (optional, will auto-detect if NULL)
+#' @return Character string of previous period
+#' @export
+get_previous_period <- function(current_period = NULL) {
+  if (is.null(current_period)) {
+    current_period <- get_current_period()
+  }
+  
+  period_sequence <- c("Intern Intro", "Mid Review", "End Review")
+  current_index <- which(period_sequence == current_period)
+  
+  if (length(current_index) == 0) {
+    return("Mid Review")  # Default fallback
+  }
+  
+  if (current_index == 1) {
+    return(period_sequence[length(period_sequence)])  # Wrap around
+  } else {
+    return(period_sequence[current_index - 1])
+  }
+}
