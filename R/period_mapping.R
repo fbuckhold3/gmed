@@ -1,48 +1,80 @@
-#' @title Period and Level Mapping Functions for GMED
-#' @description Functions for mapping between app periods, REDCap periods, and milestone periods
-#' @name period_mapping
-NULL
+# UPDATES for existing gmed R/period_mapping.R file
+# Replace/update these functions to match your working coach app patterns
 
-#' Map Application Period to Milestone Period
+#' Get Current Period Based on Date - UPDATED VERSION
 #'
-#' Converts application-friendly period names to the milestone period format
-#' used in REDCap. Handles different contexts (milestone vs coach review).
+#' Determines the current evaluation period based on the current date
+#' and academic year calendar. Updated to match coaching app periods.
+#'
+#' @param reference_date Date object (defaults to current date)  
+#' @return Character string indicating current period ("Intern Intro", "Mid Review", "End Review")
+#' @export
+get_current_period <- function(reference_date = Sys.Date()) {
+  
+  if (is.null(reference_date)) {
+    reference_date <- Sys.Date()
+  }
+  
+  # Convert to Date if needed
+  if (!inherits(reference_date, "Date")) {
+    reference_date <- as.Date(reference_date)
+  }
+  
+  # Calculate academic year boundaries (July 1 - June 30)
+  if (format(reference_date, "%m-%d") >= "07-01") {
+    academic_year_start <- as.Date(paste0(format(reference_date, "%Y"), "-07-01"))
+    academic_year_end <- as.Date(paste0(as.numeric(format(reference_date, "%Y")) + 1, "-06-30"))
+  } else {
+    academic_year_start <- as.Date(paste0(as.numeric(format(reference_date, "%Y")) - 1, "-07-01"))
+    academic_year_end <- as.Date(paste0(format(reference_date, "%Y"), "-06-30"))
+  }
+  
+  # Define period boundaries (matches your coaching app exactly)
+  intern_intro_end <- academic_year_start + 76  # ~11 weeks for intern intro
+  mid_review_end <- as.Date(paste0(format(academic_year_start + 365, "%Y"), "-01-31"))
+  
+  # Determine period (matches your working coach app)
+  if (reference_date >= academic_year_start & reference_date <= intern_intro_end) {
+    return("Intern Intro")
+  } else if (reference_date >= intern_intro_end + 1 & reference_date <= mid_review_end) {
+    return("Mid Review") 
+  } else if (reference_date > mid_review_end & reference_date <= academic_year_end) {
+    return("End Review")
+  } else {
+    return("Mid Review")  # Fallback
+  }
+}
+
+#' Map Application Period to Milestone Period - UPDATED VERSION
+#'
+#' Updated to match your working coach app mapping patterns exactly.
 #'
 #' @param level Character string indicating resident level
 #' @param period Character string indicating the period in app format
-#' @param form_context Optional context ("milestone", "coach", etc.) for specialized mapping
+#' @param form_context Optional context for specialized mapping
 #'
 #' @return Character string of mapped period or NA if no mapping exists
 #' @export
-#'
-#' @examples
-#' \dontrun{
-#' # Map for milestone assessment
-#' map_to_milestone_period("Intern", "End Review")
-#' 
-#' # Map for coach review
-#' map_to_milestone_period("PGY2", "Mid Year Review", "coach")
-#' }
 map_to_milestone_period <- function(level, period, form_context = NULL) {
   
   if (is.null(level) || is.null(period) || level == "" || period == "") {
     return(NA_character_)
   }
   
-  # Define period mappings by level
+  # Define period mappings by level (matches your working coach app)
   intern_periods <- c(
-    "Entering Residency" = "Intern Intro",
-    "Mid Year Review" = "Mid Intern", 
+    "Intern Intro" = "Intern Intro",
+    "Mid Review" = "Mid Intern", 
     "End Review" = "End Intern"
   )
   
   pgy2_periods <- c(
-    "Mid Year Review" = "Mid PGY2",
+    "Mid Review" = "Mid PGY2",
     "End Review" = "End PGY2"
   )
   
   pgy3_periods <- c(
-    "Mid Year Review" = "Mid PGY3", 
+    "Mid Review" = "Mid PGY3", 
     "End Review" = "Graduation"
   )
   
@@ -56,7 +88,7 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
   
   # Handle special context mappings
   if (!is.null(form_context)) {
-    if (form_context == "milestone" && level == "Intern" && period == "Entering Residency") {
+    if (form_context == "milestone" && level == "Intern" && period == "Intern Intro") {
       # Entering residents don't have milestone assessments yet
       return(NA_character_)
     }
@@ -66,8 +98,8 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
   mapped_period <- period_map[period]
   
   if (is.na(mapped_period) || is.null(mapped_period)) {
-    # Try direct period name if no mapping found
-    if (period %in% c("Mid Intern", "End Intern", "Mid PGY2", "End PGY2", "Mid PGY3", "Graduation")) {
+    # Try direct period name if no mapping found (supports both formats)
+    if (period %in% c("Mid Intern", "End Intern", "Mid PGY2", "End PGY2", "Mid PGY3", "Graduation", "Intern Intro")) {
       return(period)
     }
     return(NA_character_)
@@ -76,10 +108,111 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
   return(unname(mapped_period))
 }
 
-#' Get Previous Period for Comparison
+#' Calculate Resident Level Based on Data - ENHANCED VERSION  
 #'
-#' Determines the previous evaluation period for a given current period and level.
-#' Used for comparing current vs. previous milestone assessments.
+#' Enhanced to handle the grad_yr/type pattern from your coaching app.
+#'
+#' @param resident_data Data frame containing resident information
+#' @param current_date Date object for academic year calculation (defaults to current date)
+#' @return Data frame with Level column added or updated
+#' @export
+calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
+  
+  if (!requireNamespace("dplyr", quietly = TRUE)) {
+    stop("Package 'dplyr' is required for data processing")
+  }
+  
+  if (is.null(resident_data) || nrow(resident_data) == 0) {
+    return(resident_data)
+  }
+  
+  # If Level column already exists and is populated, use it
+  if ("Level" %in% names(resident_data)) {
+    existing_levels <- resident_data$Level[!is.na(resident_data$Level) & resident_data$Level != ""]
+    if (length(existing_levels) > 0) {
+      # Check if levels are already calculated properly
+      unique_levels <- unique(existing_levels)
+      if (all(unique_levels %in% c("Intern", "PGY2", "PGY3"))) {
+        message("Level column already properly calculated")
+        return(resident_data)
+      }
+    }
+  }
+  
+  # METHOD 1: Complex calculation using type + grad_yr (RDM 2.0 pattern)
+  if ("type" %in% names(resident_data) && "grad_yr" %in% names(resident_data)) {
+    
+    message("Using type/grad_yr calculation method (RDM 2.0 pattern)")
+    
+    # Calculate current academic year (July 1 - June 30)
+    if (format(current_date, "%m-%d") >= "07-01") {
+      current_academic_year <- as.numeric(format(current_date, "%Y"))
+    } else {
+      current_academic_year <- as.numeric(format(current_date, "%Y")) - 1
+    }
+    
+    message("Current academic year: ", current_academic_year)
+    
+    # Ensure grad_yr is numeric
+    resident_data <- resident_data %>%
+      dplyr::mutate(
+        grad_yr = suppressWarnings(as.numeric(.data$grad_yr))
+      )
+    
+    # Calculate Level based on type and grad_yr (matches your working coach app)
+    resident_data <- resident_data %>%
+      dplyr::mutate(
+        Level = dplyr::case_when(
+          # Preliminary residents are always Interns (one year program)
+          tolower(.data$type) %in% c("preliminary", "prelim") ~ "Intern",
+          
+          # Categorical residents based on graduation year
+          tolower(.data$type) == "categorical" & .data$grad_yr == current_academic_year + 3 ~ "Intern",  # PGY1
+          tolower(.data$type) == "categorical" & .data$grad_yr == current_academic_year + 2 ~ "PGY2",    # PGY2
+          tolower(.data$type) == "categorical" & .data$grad_yr == current_academic_year + 1 ~ "PGY3",    # PGY3
+          
+          # Default for unmatched cases
+          !is.na(.data$type) & !is.na(.data$grad_yr) ~ "Intern",
+          TRUE ~ "Intern"
+        )
+      )
+    
+    # METHOD 2: Simple year field (legacy apps)
+  } else if ("year" %in% names(resident_data)) {
+    
+    message("Using simple year field calculation method")
+    
+    resident_data <- resident_data %>%
+      dplyr::mutate(
+        Level = dplyr::case_when(
+          .data$year == 1 ~ "Intern",
+          .data$year == 2 ~ "PGY2",
+          .data$year == 3 ~ "PGY3", 
+          TRUE ~ "Intern"  # Default fallback
+        )
+      )
+    
+  } else {
+    # Fallback - add default Level
+    message("No type/grad_yr or year columns found, using default Level")
+    resident_data$Level <- "Intern"
+  }
+  
+  # Report level distribution
+  if ("Level" %in% names(resident_data)) {
+    level_counts <- table(resident_data$Level)
+    message("Level distribution: ", 
+            "Intern: ", level_counts[["Intern"]] %||% 0, ", ",
+            "PGY2: ", level_counts[["PGY2"]] %||% 0, ", ",
+            "PGY3: ", level_counts[["PGY3"]] %||% 0)
+  }
+  
+  return(resident_data)
+}
+
+#' Get Previous Period for Comparison - UPDATED VERSION
+#'
+#' Updated to match your working coach app period patterns.
 #'
 #' @param current_period Character string of current period in app format
 #' @param level Character string indicating resident level
@@ -87,31 +220,25 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
 #'
 #' @return Character string of previous period or NA if no previous period
 #' @export
-#'
-#' @examples
-#' \dontrun{
-#' get_previous_period("End Review", "Intern")
-#' get_previous_period("Mid Year Review", "PGY2")
-#' }
 get_previous_period <- function(current_period, level, form_context = NULL) {
   
   if (is.null(current_period) || is.null(level)) {
     return(NA_character_)
   }
   
-  # Define previous period relationships
+  # Define previous period relationships (matches your working patterns)
   previous_map <- list(
     "Intern" = list(
-      "Mid Year Review" = "Entering Residency",
-      "End Review" = "Mid Year Review"
+      "Mid Review" = "Intern Intro",   # Previous to Mid Review is Intern Intro
+      "End Review" = "Mid Review"      # Previous to End Review is Mid Review
     ),
     "PGY2" = list(
-      "Mid Year Review" = "End Review",  # Previous year's end review
-      "End Review" = "Mid Year Review"
+      "Mid Review" = "End Review",     # Previous year's end review (as Intern)
+      "End Review" = "Mid Review"      # Current year's mid review
     ),
     "PGY3" = list(
-      "Mid Year Review" = "End Review",  # Previous year's end review  
-      "End Review" = "Mid Year Review"
+      "Mid Review" = "End Review",     # Previous year's end review (as PGY2)  
+      "End Review" = "Mid Review"      # Current year's mid review
     )
   )
   
@@ -125,8 +252,8 @@ get_previous_period <- function(current_period, level, form_context = NULL) {
   
   # Handle special cases
   if (!is.null(form_context) && form_context == "milestone") {
-    # For milestone context, "Entering Residency" doesn't have milestone data
-    if (!is.null(previous_period) && previous_period == "Entering Residency") {
+    # For milestone context, "Intern Intro" doesn't have milestone data
+    if (!is.null(previous_period) && previous_period == "Intern Intro") {
       return(NA_character_)
     }
   }
@@ -134,249 +261,35 @@ get_previous_period <- function(current_period, level, form_context = NULL) {
   return(previous_period)
 }
 
-#' Get Current Period Based on Date
+# ============================================================================
+# ADD NEW UTILITY FUNCTIONS TO GMED
+# ============================================================================
+
+#' Check if Period is Intern Intro
 #'
-#' Determines the current evaluation period based on the current date
-#' and academic year calendar.
+#' Utility function to check if a given period represents the intern introduction period.
 #'
-#' @param reference_date Date object (defaults to current date)
-#'
-#' @return Character string indicating current period
+#' @param period Character string of period to check
+#' @return Logical indicating if period is intern intro
 #' @export
+is_intern_intro_period <- function(period) {
+  if (is.null(period) || is.na(period)) return(FALSE)
+  
+  return(period %in% c("Intern Intro", "7", "Intro"))
+}
+
+#' Get Academic Year from Date
 #'
-#' @examples
-#' \dontrun{
-#' get_current_period()
-#' get_current_period(as.Date("2024-02-15"))
-#' }
-get_current_period <- function(reference_date = Sys.Date()) {
-  
-  if (is.null(reference_date)) {
-    reference_date <- Sys.Date()
-  }
-  
-  # Convert to Date if needed
-  if (!inherits(reference_date, "Date")) {
-    reference_date <- as.Date(reference_date)
-  }
-  
-  # Get month and day
-  month <- as.numeric(format(reference_date, "%m"))
-  day <- as.numeric(format(reference_date, "%d"))
-  
-  # Define period boundaries (adjust based on your academic calendar)
-  if (month >= 7 && month <= 12) {
-    # July through December - first half of academic year
-    return("Mid Year Review")
-  } else if (month >= 1 && month <= 6) {
-    # January through June - second half of academic year
-    return("End Review")
+#' Determines the academic year (July 1 - June 30) for a given date.
+#'
+#' @param date Date object (defaults to current date)
+#' @return Numeric academic year (starting year)
+#' @export
+get_academic_year <- function(date = Sys.Date()) {
+  if (format(date, "%m-%d") >= "07-01") {
+    return(as.numeric(format(date, "%Y")))
   } else {
-    # Fallback
-    return("Mid Year Review")
+    return(as.numeric(format(date, "%Y")) - 1)
   }
 }
 
-#' Calculate Resident Level Based on Data
-#'
-#' Determines or calculates the resident level based on available data fields.
-#' Handles both explicit Level fields and calculated levels based on year.
-#'
-#' @param resident_data Data frame containing resident information
-#'
-#' @return Data frame with Level column added or updated
-#' @export
-#'
-#' @examples
-#' \dontrun{
-#' residents_with_levels <- calculate_resident_level(resident_data)
-#' }
-calculate_resident_level <- function(resident_data) {
-  
-  if (!requireNamespace("dplyr", quietly = TRUE)) {
-    stop("Package 'dplyr' is required for data processing")
-  }
-  
-  if (is.null(resident_data) || nrow(resident_data) == 0) {
-    return(resident_data)
-  }
-  
-  # If Level column already exists and is populated, use it
-  if ("Level" %in% names(resident_data)) {
-    # Fill in missing levels if we have year data
-    if ("year" %in% names(resident_data)) {
-      resident_data <- resident_data %>%
-        dplyr::mutate(
-          Level = dplyr::case_when(
-            !is.na(Level) & Level != "" ~ Level,  # Keep existing levels
-            year == 1 ~ "Intern",
-            year == 2 ~ "PGY2", 
-            year == 3 ~ "PGY3",
-            TRUE ~ Level  # Keep original if no mapping possible
-          )
-        )
-    }
-    return(resident_data)
-  }
-  
-  # Calculate Level based on year if Level column doesn't exist
-  if ("year" %in% names(resident_data)) {
-    resident_data <- resident_data %>%
-      dplyr::mutate(
-        Level = dplyr::case_when(
-          year == 1 ~ "Intern",
-          year == 2 ~ "PGY2",
-          year == 3 ~ "PGY3", 
-          TRUE ~ "Unknown"
-        )
-      )
-  } else {
-    # If no year column, add placeholder Level
-    resident_data$Level <- "Unknown"
-  }
-  
-  return(resident_data)
-}
-
-#' Get REDCap Instance Number for Form Submission
-#'
-#' Maps level, period, and review type to the appropriate REDCap instance number
-#' for repeating instruments. This is critical for proper data storage in RDM 2.0.
-#'
-#' @param level Character string indicating resident level
-#' @param period Character string indicating period
-#' @param review_type Character string indicating review type ("scheduled", "interim", etc.)
-#'
-#' @return Numeric instance number or NA if no mapping exists
-#' @export
-#'
-#' @examples
-#' \dontrun{
-#' get_redcap_instance("Intern", "End Review", "scheduled")
-#' get_redcap_instance("PGY2", "Mid Year Review", "interim")
-#' }
-get_redcap_instance <- function(level, period, review_type = "scheduled") {
-  
-  # Define instance mappings for scheduled reviews
-  if (review_type == "scheduled") {
-    instance_map <- list(
-      "Intern" = list(
-        "Entering Residency" = 7,
-        "Mid Year Review" = 1,
-        "End Review" = 2
-      ),
-      "PGY2" = list(
-        "Mid Year Review" = 3,
-        "End Review" = 4
-      ),
-      "PGY3" = list(
-        "Mid Year Review" = 5,
-        "End Review" = 6
-      )
-    )
-  } else if (review_type == "interim") {
-    # Interim reviews use different instance numbers
-    instance_map <- list(
-      "Intern" = list(
-        "Interim Review" = 8
-      ),
-      "PGY2" = list(
-        "Interim Review" = 9
-      ),
-      "PGY3" = list(
-        "Interim Review" = 10
-      )
-    )
-  } else {
-    return(NA_integer_)
-  }
-  
-  # Get instance number
-  level_map <- instance_map[[level]]
-  if (is.null(level_map)) {
-    return(NA_integer_)
-  }
-  
-  instance_num <- level_map[[period]]
-  if (is.null(instance_num)) {
-    return(NA_integer_)
-  }
-  
-  return(as.integer(instance_num))
-}
-
-#' Map Milestone Period to Instance (Legacy Support)
-#'
-#' Maps milestone period text to numeric instance for backward compatibility.
-#' Used when working with older milestone data structures.
-#'
-#' @param period_text Character string of milestone period
-#'
-#' @return Numeric instance number
-#' @export
-map_milestone_period_to_instance <- function(period_text) {
-  
-  period_instance_map <- c(
-    "Mid Intern" = 1,
-    "End Intern" = 2,
-    "Mid PGY2" = 3,
-    "End PGY2" = 4,
-    "Mid PGY3" = 5,
-    "Graduation" = 6,
-    "Intern Intro" = 7
-  )
-  
-  instance <- period_instance_map[period_text]
-  
-  if (is.na(instance) || is.null(instance)) {
-    return(1)  # Default to instance 1
-  }
-  
-  return(unname(instance))
-}
-
-#' Get Current Review Period
-#' 
-#' Determines current review period based on date
-#' @return Character string of current period
-#' @export
-get_current_period <- function() {
-  current_date <- Sys.Date()
-  month <- lubridate::month(current_date)
-  
-  # Basic period mapping based on academic year
-  if (month >= 7 && month <= 11) {
-    return("Intern Intro")  # July-November
-  } else if (month >= 12 || month <= 2) {
-    return("Mid Review")    # December-February  
-  } else if (month >= 3 && month <= 6) {
-    return("End Review")    # March-June
-  } else {
-    return("Mid Review")    # Default fallback
-  }
-}
-
-#' Get Previous Review Period
-#' 
-#' Gets the previous review period for comparison purposes
-#' @param current_period Current period (optional, will auto-detect if NULL)
-#' @return Character string of previous period
-#' @export
-get_previous_period <- function(current_period = NULL) {
-  if (is.null(current_period)) {
-    current_period <- get_current_period()
-  }
-  
-  period_sequence <- c("Intern Intro", "Mid Review", "End Review")
-  current_index <- which(period_sequence == current_period)
-  
-  if (length(current_index) == 0) {
-    return("Mid Review")  # Default fallback
-  }
-  
-  if (current_index == 1) {
-    return(period_sequence[length(period_sequence)])  # Wrap around
-  } else {
-    return(period_sequence[current_index - 1])
-  }
-}
