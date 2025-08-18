@@ -172,12 +172,38 @@ organize_redcap_data <- function(all_data) {
     print(repeat_counts)
   }
   
-  # Keep ALL data together, just filter out archived residents
+  # Filter out archived residents with improved logic
   all_resident_data <- all_data %>%
-    # Filter out archived residents if column exists
     {if ("res_archive" %in% names(.)) {
-      dplyr::filter(., is.na(res_archive) | res_archive != "Yes")
-    } else .}
+      # Debug: show what archive values exist
+      archive_values <- unique(.$res_archive)
+      message("DEBUG: res_archive values found: ", paste(archive_values, collapse = ", "))
+      
+      # Count before filtering
+      before_count <- nrow(.)
+      
+      # Filter out archived residents - handle multiple possible values
+      filtered_data <- dplyr::filter(., 
+                                     is.na(res_archive) | 
+                                       res_archive == "" | 
+                                       !(res_archive %in% c("Yes", "Y", "yes", "YES", "y", "1", 1, "True", "TRUE", "true"))
+      )
+      
+      # Count after filtering
+      after_count <- nrow(filtered_data)
+      filtered_count <- before_count - after_count
+      
+      if (filtered_count > 0) {
+        message("SUCCESS: Filtered out ", filtered_count, " archived residents (", before_count, " -> ", after_count, " rows)")
+      } else {
+        message("INFO: No archived residents found to filter")
+      }
+      
+      return(filtered_data)
+    } else {
+      message("INFO: No res_archive column found - keeping all residents")
+      return(.)
+    }}
   
   message("Found ", length(unique(all_resident_data$record_id)), " active residents")
   message("Total rows of data: ", nrow(all_resident_data))
@@ -212,6 +238,64 @@ organize_redcap_data <- function(all_data) {
     raw_data = all_data  # Original unfiltered data
   ))
 }
+
+#' Filter Archived Residents (Standalone Helper Function)
+#'
+#' Filters out archived residents from a dataset, handling multiple possible
+#' archive indicator values (Yes, Y, 1, True, etc.)
+#'
+#' @param data Data frame with potential res_archive column
+#' @param archive_column Name of the archive column (default: "res_archive")
+#' @param verbose Whether to print filtering messages (default: TRUE)
+#'
+#' @return Data frame with archived residents removed
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' clean_data <- filter_archived_residents(raw_data)
+#' }
+filter_archived_residents <- function(data, archive_column = "res_archive", verbose = TRUE) {
+  
+  if (!archive_column %in% names(data)) {
+    if (verbose) message("No ", archive_column, " column found - returning data unchanged")
+    return(data)
+  }
+  
+  before_count <- nrow(data)
+  
+  # Show what archive values exist
+  if (verbose) {
+    archive_values <- unique(data[[archive_column]])
+    message("DEBUG: ", archive_column, " values found: ", paste(archive_values, collapse = ", "))
+  }
+  
+  # Define all possible "archived" values
+  archived_indicators <- c("Yes", "Y", "yes", "YES", "y", "1", 1, "True", "TRUE", "true")
+  
+  # Filter out archived residents
+  data <- data %>%
+    dplyr::filter(
+      is.na(.data[[archive_column]]) | 
+        .data[[archive_column]] == "" | 
+        !.data[[archive_column]] %in% archived_indicators
+    )
+  
+  after_count <- nrow(data)
+  filtered_count <- before_count - after_count
+  
+  if (verbose) {
+    if (filtered_count > 0) {
+      message("SUCCESS: Filtered out ", filtered_count, " archived residents (", before_count, " -> ", after_count, " rows)")
+    } else {
+      message("INFO: No archived residents found to filter")
+    }
+  }
+  
+  return(data)
+}
+
+
 
 #' Get Evaluation Dictionary from REDCap
 #'
