@@ -587,3 +587,345 @@ get_record_id_from_name <- function(resident_name, redcap_url, redcap_token) {
     return(NULL)
   })
 }
+
+#' Load Application Data for RDM 2.0
+#'
+#' Comprehensive data loading function that retrieves and organizes all necessary
+#' data from REDCap for IMSLU applications using the unified RDM 2.0 database structure.
+#' This function handles connection testing, data dictionary loading, resident filtering,
+#' level calculations, and data organization with robust error handling.
+#'
+#' @param app_config List containing application configuration with rdm_token and other settings.
+#'   If NULL, will attempt to load from global app_config or environment variables.
+#' @param redcap_url Character string of REDCap API URL. Defaults to 
+#'   "https://redcapsurvey.slu.edu/api/"
+#' @param filter_archived Logical indicating whether to filter out archived residents.
+#'   Defaults to TRUE.
+#' @param calculate_levels Logical indicating whether to calculate resident training levels.
+#'   Defaults to TRUE.
+#' @param timeout_seconds Numeric value for API call timeout in seconds. Defaults to 90.
+#'
+#' @return Named list containing organized application data:
+#' \describe{
+#'   \item{url}{REDCap API URL used}
+#'   \item{rdm_token}{REDCap token used (first 8 characters for security)}
+#'   \item{resident_data}{Data frame of active residents with calculated levels}
+#'   \item{s_eval}{Data frame of self-evaluation records}
+#'   \item{rdm_dict}{Data frame containing REDCap data dictionary}
+#'   \item{milestone_program}{Data frame of program milestone assessments}
+#'   \item{milestone_self}{Data frame of self-assessment milestones}
+#'   \item{assessment_data}{Data frame of clinical assessment records}
+#'   \item{raw_data}{Data frame containing all raw REDCap data}
+#' }
+#'
+#' @details
+#' This function performs the following operations in sequence:
+#' \enumerate{
+#'   \item Validates REDCap token availability
+#'   \item Tests REDCap connection
+#'   \item Loads data dictionary using gmed functions or direct API calls
+#'   \item Retrieves all RDM 2.0 data
+#'   \item Filters to active (non-archived) residents
+#'   \item Calculates resident training levels (Intern, PGY2, PGY3)
+#'   \item Organizes data into structured components by instrument type
+#'   \item Provides debugging information for critical data elements
+#' }
+#'
+#' The function includes fallback mechanisms for when gmed functions are not
+#' available, ensuring compatibility across different deployment environments.
+#'
+#' @section Error Handling:
+#' The function includes comprehensive error handling:
+#' \itemize{
+#'   \item Stops execution if REDCap token is missing
+#'   \item Validates REDCap connectivity before data loading
+#'   \item Provides fallback calculations if gmed functions fail
+#'   \item Includes manual data organization if gmed organize functions fail
+#'   \item Logs detailed progress and debugging information
+#' }
+#'
+#' @section Performance:
+#' Optimized for Posit Connect deployment with extended timeouts for large
+#' datasets and efficient data processing using dplyr operations.
+#'
+#' @examples
+#' \dontrun{
+#' # Basic usage with global configuration
+#' app_data <- load_app_data()
+#' 
+#' # Custom configuration
+#' config <- list(rdm_token = "your_token_here")
+#' app_data <- load_app_data(app_config = config)
+#' 
+#' # Access organized data components
+#' residents <- app_data$resident_data
+#' evaluations <- app_data$s_eval
+#' milestones <- app_data$milestone_program
+#' }
+#'
+#' @export
+#' @importFrom dplyr filter mutate select case_when
+#' @importFrom httr POST status_code content timeout
+#' @importFrom jsonlite fromJSON
+#'
+#' @seealso 
+#' \code{\link{pull_all_redcap_data}}, \code{\link{organize_redcap_data}}, 
+#' \code{\link{calculate_resident_level}}, \code{\link{get_evaluation_dictionary}}
+load_app_data <- function(app_config = NULL, 
+                          redcap_url = "https://redcapsurvey.slu.edu/api/",
+                          filter_archived = TRUE,
+                          calculate_levels = TRUE,
+                          timeout_seconds = 90) {
+  
+  message("=== LOADING APPLICATION DATA ===")
+  
+  # Use provided config or try to get from environment
+  if (is.null(app_config)) {
+    if (exists("app_config", envir = .GlobalEnv)) {
+      app_config <- get("app_config", envir = .GlobalEnv)
+    } else {
+      app_config <- list(
+        rdm_token = Sys.getenv("RDM_TOKEN"),
+        access_code = Sys.getenv("ACCESS_CODE")
+      )
+    }
+  }
+  
+  # Validate token
+  if (is.null(app_config$rdm_token) || app_config$rdm_token == "") {
+    stop("❌ RDM_TOKEN not found. Please set the RDM_TOKEN environment variable.")
+  }
+  
+  # Test REDCap connection
+  if (!test_redcap_connection(redcap_url, app_config$rdm_token)) {
+    stop("❌ Cannot connect to REDCap. Check your RDM_TOKEN and network connection.")
+  }
+  
+  # Load data dictionary
+  message("Loading REDCap data dictionary...")
+  rdm_dict <- tryCatch({
+    if (exists("get_evaluation_dictionary", where = "package:gmed")) {
+      message("Using gmed::get_evaluation_dictionary")
+      gmed::get_evaluation_dictionary(app_config$rdm_token, redcap_url)
+    } else {
+      message("Using direct API call for data dictionary")
+      response <- httr::POST(
+        redcap_url,
+        body = list(
+          token = app_config$rdm_token,
+          content = "metadata",
+          format = "json",
+          returnFormat = "json"
+        ),
+        encode = "form",
+        httr::timeout(45)  # Longer timeout for production
+      )
+      
+      if (httr::status_code(response) == 200) {
+        content <- httr::content(response, "text", encoding = "UTF-8")
+        dict <- jsonlite::fromJSON(content, flatten = TRUE)
+        message("✅ Data dictionary loaded: ", nrow(dict), " fields")
+        dict
+      } else {
+        stop("❌ Data dictionary API call failed with status: ", httr::status_code(response))
+      }
+    }
+  }, error = function(e) {
+    message("❌ Data dictionary loading failed: ", e$message)
+    stop("Cannot load data dictionary: ", e$message)
+  })
+  
+  # Load all RDM data
+  message("Loading all RDM 2.0 data...")
+  all_rdm_data <- tryCatch({
+    if (exists("pull_all_redcap_data", where = "package:gmed")) {
+      message("Using gmed::pull_all_redcap_data")
+      gmed::pull_all_redcap_data(app_config$rdm_token, redcap_url)
+    } else {
+      message("Using direct REDCap API call")
+      response <- httr::POST(
+        redcap_url,
+        body = list(
+          token = app_config$rdm_token,
+          content = "record",
+          action = "export", 
+          format = "json",
+          type = "flat",
+          returnFormat = "json"
+        ),
+        encode = "form",
+        httr::timeout(timeout_seconds)  # Extended timeout for large datasets
+      )
+      
+      if (httr::status_code(response) == 200) {
+        content <- httr::content(response, "text", encoding = "UTF-8")
+        data <- jsonlite::fromJSON(content)
+        message("✅ RDM data loaded: ", nrow(data), " total rows")
+        data
+      } else {
+        stop("❌ RDM data API call failed with status: ", httr::status_code(response))
+      }
+    }
+  }, error = function(e) {
+    message("❌ RDM data loading failed: ", e$message)
+    stop("Cannot load RDM data: ", e$message)
+  })
+  
+  # Process resident data
+  message("=== PROCESSING RESIDENT DATA ===")
+  
+  # Get base resident data (main form only, no repeat instruments)
+  if ("redcap_repeat_instrument" %in% names(all_rdm_data)) {
+    resident_data <- all_rdm_data %>%
+      dplyr::filter(is.na(redcap_repeat_instrument) | redcap_repeat_instrument == "")
+    message("Filtered to ", nrow(resident_data), " base resident records")
+  } else {
+    resident_data <- all_rdm_data
+    message("No repeat instrument column found, using all ", nrow(resident_data), " records")
+  }
+  
+  # Filter out archived residents if requested
+  if (filter_archived && "res_archive" %in% names(resident_data)) {
+    before_count <- nrow(resident_data)
+    resident_data <- resident_data %>%
+      dplyr::filter(is.na(res_archive) | (!res_archive %in% c("Yes", "1")))
+    message("Archive filter: ", before_count, " -> ", nrow(resident_data), " active residents")
+  }
+  
+  # Calculate resident levels if requested
+  if (calculate_levels) {
+    message("Calculating resident levels...")
+    resident_data <- tryCatch({
+      gmed::calculate_resident_level(resident_data)
+    }, error = function(e) {
+      message("⚠️ gmed level calculation failed, using fallback: ", e$message)
+      
+      # Manual fallback calculation
+      current_date <- Sys.Date()
+      current_academic_year <- ifelse(
+        format(current_date, "%m-%d") >= "07-01",
+        as.numeric(format(current_date, "%Y")),
+        as.numeric(format(current_date, "%Y")) - 1
+      )
+      
+      resident_data %>%
+        dplyr::mutate(
+          grad_yr_numeric = suppressWarnings(as.numeric(grad_yr)),
+          Level = dplyr::case_when(
+            type == "Preliminary" ~ "Intern",
+            type == "Categorical" & grad_yr_numeric == current_academic_year + 3 ~ "Intern",
+            type == "Categorical" & grad_yr_numeric == current_academic_year + 2 ~ "PGY2",
+            type == "Categorical" & grad_yr_numeric == current_academic_year + 1 ~ "PGY3",
+            TRUE ~ "Unknown"
+          )
+        ) %>%
+        dplyr::select(-grad_yr_numeric)
+    })
+    
+    # Log level distribution
+    if ("Level" %in% names(resident_data)) {
+      level_counts <- table(resident_data$Level, useNA = "always")
+      message("Level distribution: ", paste(names(level_counts), "=", level_counts, collapse = ", "))
+    }
+  }
+  
+  # Organize other data components
+  message("Organizing additional data components...")
+  
+  organized_data <- tryCatch({
+    if (exists("organize_redcap_data", where = "package:gmed")) {
+      # Try using gmed function first
+      result <- gmed::organize_redcap_data(all_rdm_data)
+      # Override with our filtered resident data
+      result$resident_data <- resident_data
+      
+      # CRITICAL FIX: Manually extract s_eval if it's missing
+      if (is.null(result$s_eval) || nrow(result$s_eval) == 0) {
+        message("⚠️ s_eval missing from gmed organization, extracting manually...")
+        result$s_eval <- all_rdm_data %>%
+          dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "s_eval")
+        message("✅ Manually extracted ", nrow(result$s_eval), " s_eval records")
+      }
+      
+      result
+    } else {
+      # Manual organization
+      message("Using manual data organization...")
+      
+      list(
+        resident_data = resident_data,
+        s_eval = all_rdm_data %>%
+          dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "S Eval"),
+        milestone_program = all_rdm_data %>%
+          dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "milestone_entry"),
+        milestone_self = all_rdm_data %>%
+          dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "milestone_selfevaluation_c33c"),
+        assessment_data = all_rdm_data %>%
+          dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "assessment"),
+        raw_data = all_rdm_data
+      )
+    }
+  }, error = function(e) {
+    message("⚠️ organize_redcap_data issues: ", e$message)
+    
+    # Fallback manual organization
+    message("Using fallback manual organization...")
+    
+    list(
+      resident_data = resident_data,
+      s_eval = all_rdm_data %>%
+        dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "s_eval"),
+      milestone_program = all_rdm_data %>%
+        dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "milestone_entry"),
+      milestone_self = all_rdm_data %>%
+        dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "milestone_selfevaluation_c33c"),
+      assessment_data = all_rdm_data %>%
+        dplyr::filter(!is.na(redcap_repeat_instrument) & redcap_repeat_instrument == "assessment"),
+      raw_data = all_rdm_data
+    )
+  })
+  
+  # Add debugging for s_eval after organization
+  message("=== S_EVAL DEBUG ===")
+  if (!is.null(organized_data$s_eval)) {
+    message("✅ s_eval found with ", nrow(organized_data$s_eval), " records")
+    
+    # Check for Claire Boehm specifically (example debugging)
+    claire_data <- organized_data$s_eval %>%
+      dplyr::filter(name == "Claire Boehm")
+    
+    if (nrow(claire_data) > 0) {
+      message("✅ Found s_eval data for Claire Boehm")
+      
+      # Check specific fields
+      goal_fields <- c("s_e_ume_goal1", "s_e_ume_goal2", "s_e_ume_goal3")
+      for (field in goal_fields) {
+        if (field %in% names(claire_data)) {
+          value <- claire_data[[field]][1]
+          message("  ", field, ": ", ifelse(is.na(value), "NA", as.character(value)))
+        }
+      }
+    } else {
+      message("❌ No s_eval data found for Claire Boehm")
+    }
+  } else {
+    message("❌ s_eval is NULL in organized data")
+  }
+  message("===================")
+  
+  message("✅ Data loading completed successfully")
+  message("✅ Loaded ", nrow(organized_data$resident_data), " resident records")
+  
+  # Return organized data with metadata
+  return(list(
+    url = redcap_url,
+    rdm_token = substr(app_config$rdm_token, 1, 8),  # Only first 8 chars for security
+    resident_data = organized_data$resident_data,
+    s_eval = organized_data$s_eval,
+    rdm_dict = rdm_dict,
+    milestone_program = organized_data$milestone_program,
+    milestone_self = organized_data$milestone_self,
+    assessment_data = organized_data$assessment_data,
+    raw_data = organized_data$raw_data
+  ))
+}
