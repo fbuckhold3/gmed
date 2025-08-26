@@ -1,0 +1,410 @@
+# ============================================================================
+# PLUS/DELTA TABLE MODULE
+# R/mod_plus_delta_table.R
+# ============================================================================
+
+#' Plus/Delta Table Module UI
+#'
+#' Creates a user interface for displaying resident assessment plus/delta feedback
+#' in a styled datatable. This module is designed to work with RDM 2.0 assessment
+#' data structure and provides a consistent, professional display of evaluation
+#' feedback filtered by resident record ID.
+#'
+#' The module creates a card-based interface with:
+#' - Optional customizable title with icon
+#' - Styled datatable with consistent gmed theming
+#' - Summary statistics footer
+#' - Responsive design that works on mobile and desktop
+#'
+#' @param id Character string. Module namespace ID used to create unique input/output IDs.
+#'        This should be unique within your application.
+#' @param title Character string. Optional title displayed in the card header.
+#'        Defaults to "Plus/Delta Feedback". Use NULL to hide the header entirely.
+#'
+#' @return A \code{tagList} containing Shiny UI elements:
+#'         - Card container with gmed styling classes
+#'         - Header section (if title provided)
+#'         - Datatable output container
+#'         - Summary statistics footer
+#'
+#' @family plus_delta_modules
+#' @seealso \code{\link{mod_plus_delta_table_server}} for the corresponding server function
+#'
+#' @examples
+#' \dontrun{
+#' # Basic usage in UI
+#' fluidPage(
+#'   mod_plus_delta_table_ui("resident_feedback")
+#' )
+#'
+#' # With custom title
+#' mod_plus_delta_table_ui("feedback_table", title = "Assessment Results")
+#'
+#' # Without header
+#' mod_plus_delta_table_ui("minimal_table", title = NULL)
+#' }
+#'
+#' @export
+mod_plus_delta_table_ui <- function(id, title = "Plus/Delta Feedback") {
+  ns <- NS(id)
+  
+  tagList(
+    div(class = "gmed-card",
+        if (!is.null(title)) {
+          div(class = "gmed-card-header",
+              h4(icon("comments"), title, class = "gmed-card-title")
+          )
+        },
+        
+        # Main table output
+        div(class = "gmed-datatable-container",
+            DT::dataTableOutput(ns("plus_delta_table"))
+        ),
+        
+        # Summary statistics
+        div(class = "gmed-table-footer",
+            uiOutput(ns("table_summary"))
+        )
+    )
+  )
+}
+
+#' Plus/Delta Table Module Server
+#'
+#' Server-side logic for the plus/delta table module. This function processes
+#' RDM 2.0 assessment data to extract, clean, and display plus/delta feedback
+#' for a selected resident. It handles data filtering, formatting, and provides
+#' reactive summary statistics.
+#'
+#' The server function performs the following operations:
+#' 1. Filters data by the provided record_id
+#' 2. Extracts assessment records (redcap_repeat_instrument = "Assessment")
+#' 3. Includes only records with non-empty plus or delta feedback
+#' 4. Formats and cleans all display fields
+#' 5. Renders a styled datatable with custom formatting
+#' 6. Provides reactive summary statistics
+#'
+#' @param id Character string. Module namespace ID that must match the UI function.
+#' @param rdm_data Reactive expression returning a data frame. The complete RDM 2.0
+#'        dataset containing assessment records. Must include the following columns:
+#'        \itemize{
+#'          \item \code{record_id} - Unique resident identifier
+#'          \item \code{redcap_repeat_instrument} - REDCap instrument type
+#'          \item \code{redcap_repeat_instance} - REDCap repeat instance number
+#'          \item \code{ass_date} - Assessment date
+#'          \item \code{ass_level} - Assessment level (Intern, PGY2, etc.)
+#'          \item \code{ass_plus} - Positive feedback text
+#'          \item \code{ass_delta} - Areas for improvement text
+#'          \item \code{ass_faculty} - Evaluating faculty name
+#'          \item \code{ass_specialty} - Department/specialty
+#'        }
+#' @param record_id Reactive expression returning a character string. The record_id
+#'        of the resident whose assessments should be displayed. When this changes,
+#'        the table will automatically update to show the new resident's data.
+#'
+#' @return A named list containing reactive expressions:
+#'         \describe{
+#'           \item{\code{data}}{Reactive data frame with processed plus/delta records}
+#'           \item{\code{summary}}{Reactive list with summary statistics:
+#'             \itemize{
+#'               \item \code{total_entries} - Number of assessment records
+#'               \item \code{plus_count} - Number of records with plus feedback
+#'               \item \code{delta_count} - Number of records with delta feedback
+#'               \item \code{faculty_count} - Number of unique faculty members
+#'             }
+#'           }
+#'         }
+#'
+#' @details
+#' The module expects assessment data to follow the RDM 2.0 structure where:
+#' - Each resident has a unique \code{record_id}
+#' - Assessment records are marked with \code{redcap_repeat_instrument = "Assessment"}
+#' - Plus and delta feedback are stored in separate fields
+#' - Missing or empty values are handled gracefully with "Not specified" or "Not provided" defaults
+#'
+#' The rendered datatable includes:
+#' - Date formatting (MM/DD/YYYY)
+#' - Color-coded columns (green for Plus, orange for Delta, purple for Level)
+#' - Sortable columns with date sorting (newest first by default)
+#' - Responsive design with horizontal scrolling when needed
+#' - Consistent gmed package styling
+#'
+#' @family plus_delta_modules
+#' @seealso \code{\link{mod_plus_delta_table_ui}} for the corresponding UI function
+#' @seealso \code{\link{create_gmed_datatable}} for the underlying table creation function
+#'
+#' @examples
+#' \dontrun{
+#' # Basic server usage
+#' server <- function(input, output, session) {
+#'   # Your data loading logic
+#'   assessment_data <- reactive({
+#'     # Load your RDM 2.0 data
+#'   })
+#'   
+#'   # Selected resident
+#'   selected_resident_id <- reactive(input$resident_selector)
+#'   
+#'   # Call the module
+#'   feedback_results <- mod_plus_delta_table_server(
+#'     "resident_feedback",
+#'     rdm_data = assessment_data,
+#'     record_id = selected_resident_id
+#'   )
+#'   
+#'   # Access summary statistics
+#'   observe({
+#'     summary <- feedback_results$summary()
+#'     cat("Total assessments:", summary$total_entries, "\n")
+#'   })
+#' }
+#' }
+#'
+#' @export
+mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    
+    # ========================================================================
+    # REACTIVE DATA PROCESSING
+    # ========================================================================
+    
+    #' Process Plus/Delta Assessment Data
+    #'
+    #' Filters and formats RDM 2.0 assessment data for the selected resident.
+    #' This reactive handles all data processing including filtering, cleaning,
+    #' and formatting of assessment records.
+    #'
+    #' @details
+    #' Processing steps:
+    #' 1. Filter by record_id
+    #' 2. Filter for Assessment instrument records only
+    #' 3. Select required assessment fields
+    #' 4. Filter for records with non-empty plus OR delta feedback
+    #' 5. Clean and format all display fields
+    #' 6. Sort by date (newest first)
+    #'
+    #' @return Data frame with columns: Date, Level, Faculty, Specialty, Plus, Delta
+    plus_delta_data <- reactive({
+      req(rdm_data(), record_id())
+      
+      cat("=== PLUS/DELTA DATA PROCESSING ===\n")
+      cat("Record ID:", record_id(), "\n")
+      
+      # Get the raw data
+      data <- rdm_data()
+      
+      # Filter by record_id and assessment fields
+      filtered_data <- data %>%
+        dplyr::filter(record_id == !!record_id()) %>%
+        dplyr::filter(!is.na(redcap_repeat_instrument) & 
+                        redcap_repeat_instrument == "Assessment") %>%
+        dplyr::select(
+          record_id,
+          redcap_repeat_instance,
+          ass_date,
+          ass_level,
+          ass_plus,
+          ass_delta, 
+          ass_faculty,
+          ass_specialty
+        ) %>%
+        # Only keep rows that have either plus or delta content
+        dplyr::filter(
+          (!is.na(ass_plus) & nzchar(trimws(ass_plus))) | 
+            (!is.na(ass_delta) & nzchar(trimws(ass_delta)))
+        )
+      
+      cat("Found", nrow(filtered_data), "plus/delta records\n")
+      
+      if (nrow(filtered_data) == 0) {
+        return(data.frame(
+          Date = character(0),
+          Level = character(0),
+          Faculty = character(0),
+          Specialty = character(0),
+          Plus = character(0),
+          Delta = character(0)
+        ))
+      }
+      
+      # Clean and format the data
+      result <- filtered_data %>%
+        dplyr::mutate(
+          # Format date
+          Date = dplyr::case_when(
+            !is.na(ass_date) ~ format(as.Date(ass_date), "%m/%d/%Y"),
+            TRUE ~ "Not specified"
+          ),
+          
+          # Clean level 
+          Level = dplyr::case_when(
+            !is.na(ass_level) & nzchar(trimws(ass_level)) ~ trimws(ass_level),
+            TRUE ~ "Not specified"
+          ),
+          
+          # Clean faculty name
+          Faculty = dplyr::case_when(
+            !is.na(ass_faculty) & nzchar(trimws(ass_faculty)) ~ trimws(ass_faculty),
+            TRUE ~ "Not specified"
+          ),
+          
+          # Clean specialty
+          Specialty = dplyr::case_when(
+            !is.na(ass_specialty) & nzchar(trimws(ass_specialty)) ~ trimws(ass_specialty),
+            TRUE ~ "Not specified"
+          ),
+          
+          # Format plus feedback
+          Plus = dplyr::case_when(
+            !is.na(ass_plus) & nzchar(trimws(ass_plus)) ~ trimws(ass_plus),
+            TRUE ~ "Not provided"
+          ),
+          
+          # Format delta feedback
+          Delta = dplyr::case_when(
+            !is.na(ass_delta) & nzchar(trimws(ass_delta)) ~ trimws(ass_delta),
+            TRUE ~ "Not provided"
+          )
+        ) %>%
+        dplyr::select(Date, Level, Faculty, Specialty, Plus, Delta) %>%
+        dplyr::arrange(dplyr::desc(Date))
+      
+      return(result)
+    })
+    
+    # ========================================================================
+    # RENDER DATATABLE
+    # ========================================================================
+    
+    #' Render Plus/Delta Datatable
+    #'
+    #' Creates and renders the styled datatable with assessment feedback.
+    #' Handles empty data states and applies consistent gmed styling.
+    #'
+    #' @details
+    #' Table features:
+    #' - Custom styling for Plus (green), Delta (orange), and Level (purple) columns
+    #' - Responsive design with horizontal scrolling
+    #' - Date formatting and sorting
+    #' - Empty state handling with informative message
+    #' - Consistent with gmed package design standards
+    output$plus_delta_table <- DT::renderDataTable({
+      data <- plus_delta_data()
+      
+      if (nrow(data) == 0) {
+        return(DT::datatable(
+          data.frame(Message = "No plus/delta feedback available for this resident"),
+          options = list(dom = 't', ordering = FALSE, searching = FALSE),
+          rownames = FALSE,
+          class = 'table table-striped'
+        ))
+      }
+      
+      # Create the datatable with gmed styling
+      dt <- create_gmed_datatable(
+        data,
+        caption = paste("Plus/Delta Feedback (", nrow(data), "entries )"),
+        page_length = 10,
+        scrollX = TRUE,
+        highlight_columns = c("Plus", "Delta")
+      )
+      
+      # Additional custom styling for plus/delta
+      dt <- dt %>%
+        DT::formatStyle(
+          'Plus',
+          backgroundColor = '#e8f5e9',  # Light green
+          borderLeft = '3px solid #4caf50'  # Green border
+        ) %>%
+        DT::formatStyle(
+          'Delta',
+          backgroundColor = '#fff3e0',  # Light orange  
+          borderLeft = '3px solid #ff9800'  # Orange border
+        ) %>%
+        DT::formatStyle(
+          'Date',
+          fontWeight = 'bold',
+          color = '#1976d2'
+        ) %>%
+        DT::formatStyle(
+          'Level',
+          fontWeight = 'bold',
+          backgroundColor = '#f3e5f5',  # Light purple
+          color = '#7b1fa2'
+        )
+      
+      return(dt)
+    })
+    
+    # ========================================================================
+    # RENDER SUMMARY STATISTICS
+    # ========================================================================
+    
+    #' Render Summary Statistics Footer
+    #'
+    #' Creates a summary display showing counts of plus/delta items and
+    #' unique faculty members. Only displayed when data is available.
+    #'
+    #' @details
+    #' Summary includes:
+    #' - Total number of plus feedback items (green)
+    #' - Total number of delta feedback items (orange)  
+    #' - Number of unique faculty members providing feedback
+    #' - Proper pluralization for grammar
+    output$table_summary <- renderUI({
+      data <- plus_delta_data()
+      
+      if (nrow(data) == 0) {
+        return(NULL)
+      }
+      
+      plus_count <- sum(data$Plus != "Not provided")
+      delta_count <- sum(data$Delta != "Not provided") 
+      faculty_count <- length(unique(data$Faculty[data$Faculty != "Not specified"]))
+      
+      div(class = "gmed-summary-stats",
+          p(
+            icon("chart-bar"), 
+            strong("Summary: "),
+            span(paste(plus_count, "plus items,"), style = "color: #4caf50;"),
+            span(paste(delta_count, "delta items"), style = "color: #ff9800;"),
+            paste0("from ", faculty_count, " faculty member", if(faculty_count != 1) "s" else "")
+          )
+      )
+    })
+    
+    # ========================================================================
+    # RETURN MODULE INTERFACE
+    # ========================================================================
+    
+    #' Module Return Values
+    #'
+    #' Returns reactive expressions that can be used by the calling application
+    #' to access processed data and summary statistics.
+    #'
+    #' @return Named list with reactive expressions:
+    #'   - data: Processed plus/delta data frame
+    #'   - summary: Summary statistics list
+    return(list(
+      #' @field data Reactive data frame containing processed plus/delta records
+      #' with columns: Date, Level, Faculty, Specialty, Plus, Delta
+      data = plus_delta_data,
+      
+      #' @field summary Reactive list containing summary statistics:
+      #' - total_entries: Number of assessment records
+      #' - plus_count: Number of records with plus feedback  
+      #' - delta_count: Number of records with delta feedback
+      #' - faculty_count: Number of unique faculty members
+      summary = reactive({
+        data <- plus_delta_data()
+        list(
+          total_entries = nrow(data),
+          plus_count = sum(data$Plus != "Not provided"),
+          delta_count = sum(data$Delta != "Not provided"),
+          faculty_count = length(unique(data$Faculty[data$Faculty != "Not specified"]))
+        )
+      })
+    ))
+  })
+}
