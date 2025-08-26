@@ -1,6 +1,6 @@
 # ============================================================================
 # PLUS/DELTA TABLE MODULE
-# R/mod_plus_delta_table.R
+# R/modules/mod_plus_delta_table.R
 # ============================================================================
 
 #' Plus/Delta Table Module UI
@@ -169,22 +169,7 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
     # REACTIVE DATA PROCESSING
     # ========================================================================
     
-    #' Process Plus/Delta Assessment Data
-    #'
-    #' Filters and formats RDM 2.0 assessment data for the selected resident.
-    #' This reactive handles all data processing including filtering, cleaning,
-    #' and formatting of assessment records.
-    #'
-    #' @details
-    #' Processing steps:
-    #' 1. Filter by record_id
-    #' 2. Filter for Assessment instrument records only
-    #' 3. Select required assessment fields
-    #' 4. Filter for records with non-empty plus OR delta feedback
-    #' 5. Clean and format all display fields
-    #' 6. Sort by date (newest first)
-    #'
-    #' @return Data frame with columns: Date, Level, Faculty, Specialty, Plus, Delta
+    # Filter and process plus/delta data
     plus_delta_data <- reactive({
       req(rdm_data(), record_id())
       
@@ -277,18 +262,6 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
     # RENDER DATATABLE
     # ========================================================================
     
-    #' Render Plus/Delta Datatable
-    #'
-    #' Creates and renders the styled datatable with assessment feedback.
-    #' Handles empty data states and applies consistent gmed styling.
-    #'
-    #' @details
-    #' Table features:
-    #' - Custom styling for Plus (green), Delta (orange), and Level (purple) columns
-    #' - Responsive design with horizontal scrolling
-    #' - Date formatting and sorting
-    #' - Empty state handling with informative message
-    #' - Consistent with gmed package design standards
     output$plus_delta_table <- DT::renderDataTable({
       data <- plus_delta_data()
       
@@ -341,17 +314,6 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
     # RENDER SUMMARY STATISTICS
     # ========================================================================
     
-    #' Render Summary Statistics Footer
-    #'
-    #' Creates a summary display showing counts of plus/delta items and
-    #' unique faculty members. Only displayed when data is available.
-    #'
-    #' @details
-    #' Summary includes:
-    #' - Total number of plus feedback items (green)
-    #' - Total number of delta feedback items (orange)  
-    #' - Number of unique faculty members providing feedback
-    #' - Proper pluralization for grammar
     output$table_summary <- renderUI({
       data <- plus_delta_data()
       
@@ -378,24 +340,8 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
     # RETURN MODULE INTERFACE
     # ========================================================================
     
-    #' Module Return Values
-    #'
-    #' Returns reactive expressions that can be used by the calling application
-    #' to access processed data and summary statistics.
-    #'
-    #' @return Named list with reactive expressions:
-    #'   - data: Processed plus/delta data frame
-    #'   - summary: Summary statistics list
     return(list(
-      #' @field data Reactive data frame containing processed plus/delta records
-      #' with columns: Date, Level, Faculty, Specialty, Plus, Delta
       data = plus_delta_data,
-      
-      #' @field summary Reactive list containing summary statistics:
-      #' - total_entries: Number of assessment records
-      #' - plus_count: Number of records with plus feedback  
-      #' - delta_count: Number of records with delta feedback
-      #' - faculty_count: Number of unique faculty members
       summary = reactive({
         data <- plus_delta_data()
         list(
