@@ -424,3 +424,328 @@ mod_miles_rating_server <- function(id, period) {
     )
   })
 }
+
+#' Milestone Dashboard Module UI
+#'
+#' Creates a self-contained milestone dashboard with spider plot and progression chart
+#'
+#' @param id Module namespace ID
+#' @param milestone_type Type of milestones ("program", "self", "acgme")
+#' @param height Height of the dashboard (default: "600px")
+#' @return Shiny UI tagList
+#' @export
+milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600px") {
+  
+  ns <- NS(id)
+  
+  # Module title based on type
+  module_title <- switch(milestone_type,
+                         "program" = "Program Assessment",
+                         "self" = "Self-Assessment", 
+                         "acgme" = "ACGME Assessment",
+                         "Milestone Assessment")
+  
+  tagList(
+    div(class = "milestone-dashboard-container",
+        style = paste0("height: ", height, "; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 5px;"),
+        
+        # Module header
+        div(class = "dashboard-header", 
+            style = "text-align: center; margin-bottom: 15px; border-bottom: 2px solid #2c3e50; padding-bottom: 10px;",
+            h4(module_title, style = "color: #2c3e50; margin: 0; font-weight: bold;")
+        ),
+        
+        # Loading indicator
+        conditionalPanel(
+          condition = paste0("$('html').hasClass('shiny-busy') && $('#", ns("loading"), "').is(':visible')"),
+          div(id = ns("loading"), 
+              style = "text-align: center; padding: 20px;",
+              icon("spinner", class = "fa-spin"), " Loading milestone data..."
+          )
+        ),
+        
+        # Main content
+        div(id = ns("main_content"),
+            
+            # Spider plot section (top half)
+            div(class = "spider-section",
+                style = "height: 45%; margin-bottom: 15px;",
+                plotlyOutput(ns("spider_plot"), height = "100%")
+            ),
+            
+            # Controls section
+            div(class = "controls-section",
+                style = "height: 8%; margin-bottom: 10px; padding: 5px;",
+                fluidRow(
+                  column(12,
+                         selectInput(
+                           ns("selected_milestone"),
+                           label = "Select Milestone for Progression View:",
+                           choices = NULL,  # Will be populated by server
+                           width = "100%"
+                         )
+                  )
+                )
+            ),
+            
+            # Progression chart section (bottom half)
+            div(class = "progression-section",
+                style = "height: 42%;",
+                plotlyOutput(ns("progression_plot"), height = "100%")
+            )
+        ),
+        
+        # Error/no data message
+        div(id = ns("error_message"),
+            style = "display: none; text-align: center; padding: 50px; color: #e74c3c;",
+            icon("exclamation-triangle"), 
+            p("No milestone data available for the selected criteria.")
+        )
+    )
+  )
+}
+
+#' Milestone Dashboard Module Server
+#'
+#' Server logic for the milestone dashboard module
+#'
+#' @param id Module namespace ID  
+#' @param milestone_results Reactive containing processed milestone results
+#' @param record_id Reactive containing selected resident record ID
+#' @param period Reactive containing selected period
+#' @param milestone_type Type of milestones ("program", "self", "acgme")
+#' @param resident_data Reactive containing resident lookup data
+#' @return Server function
+#' @export
+milestone_dashboard_server <- function(id, milestone_results, record_id, period, 
+                                       milestone_type = "program", resident_data) {
+  
+  moduleServer(id, function(input, output, session) {
+    
+    ns <- session$ns
+    
+    # Reactive to get milestone data for this type
+    milestone_data_obj <- reactive({
+      req(milestone_results())
+      
+      milestone_system <- if (milestone_type == "acgme") "acgme" else "rep"
+      
+      get_milestone_data(
+        workflow_results = milestone_results(),
+        milestone_type = if (milestone_type == "acgme") "program" else milestone_type,
+        milestone_system = milestone_system
+      )
+    })
+    
+    # Reactive to get available milestones for the selector
+    available_milestones <- reactive({
+      req(milestone_data_obj())
+      
+      milestone_data <- milestone_data_obj()$data
+      if (is.null(milestone_data) || nrow(milestone_data) == 0) return(NULL)
+      
+      # Get milestone columns for this type
+      milestone_cols <- get_milestone_columns_simple(milestone_data, 
+                                                     if (milestone_type == "acgme") "acgme" else milestone_type)
+      
+      if (length(milestone_cols) == 0) return(NULL)
+      
+      # Create named vector for selectInput (label = value)
+      milestone_system <- if (milestone_type == "acgme") "acgme" else "rep"
+      milestone_labels <- sapply(milestone_cols, function(x) get_milestone_label(x, milestone_system))
+      
+      choices <- setNames(milestone_cols, milestone_labels)
+      return(choices)
+    })
+    
+    # Update milestone selector choices
+    observe({
+      choices <- available_milestones()
+      
+      if (is.null(choices)) {
+        updateSelectInput(session, "selected_milestone", 
+                          choices = list("No milestones available" = ""))
+      } else {
+        updateSelectInput(session, "selected_milestone", choices = choices)
+      }
+    })
+    
+    # Show/hide content based on data availability
+    observe({
+      if (is.null(milestone_data_obj()) || is.null(available_milestones())) {
+        shinyjs::hide("main_content")
+        shinyjs::show("error_message")
+      } else {
+        shinyjs::show("main_content")
+        shinyjs::hide("error_message")
+      }
+    })
+    
+    # Spider plot
+    output$spider_plot <- renderPlotly({
+      req(milestone_data_obj(), record_id(), period())
+      
+      milestone_data <- milestone_data_obj()$data
+      median_data <- milestone_data_obj()$medians
+      
+      if (is.null(milestone_data) || is.null(median_data)) {
+        return(plotly::plot_ly() %>% 
+                 plotly::add_annotations(
+                   text = "No milestone data available", 
+                   x = 0.5, y = 0.5, showarrow = FALSE
+                 ))
+      }
+      
+      create_enhanced_milestone_spider_plot(
+        milestone_data = milestone_data,
+        median_data = median_data,
+        resident_id = record_id(),
+        period_text = period(),
+        milestone_type = milestone_type,
+        resident_data = resident_data()
+      )
+    })
+    
+    # Progression plot
+    output$progression_plot <- renderPlotly({
+      req(milestone_data_obj(), record_id(), input$selected_milestone)
+      
+      # Skip if no milestone selected or invalid selection
+      if (is.null(input$selected_milestone) || input$selected_milestone == "") {
+        return(plotly::plot_ly() %>% 
+                 plotly::add_annotations(
+                   text = "Select a milestone above to view progression", 
+                   x = 0.5, y = 0.5, showarrow = FALSE,
+                   font = list(size = 14, color = "#666")
+                 ))
+      }
+      
+      milestone_system <- if (milestone_type == "acgme") "acgme" else "rep"
+      
+      create_enhanced_milestone_progression(
+        milestone_results = milestone_results(),
+        resident_id = record_id(),
+        milestone_col = input$selected_milestone,
+        milestone_type = if (milestone_type == "acgme") "program" else milestone_type,
+        milestone_system = milestone_system,
+        resident_data = resident_data(),
+        show_national = TRUE
+      )
+    })
+    
+    # Return reactive values for parent app if needed
+    return(list(
+      selected_milestone = reactive(input$selected_milestone),
+      data_available = reactive(!is.null(milestone_data_obj()))
+    ))
+  })
+}
+
+#' Helper Function to Create Multiple Dashboard Columns
+#'
+#' Creates a layout with multiple milestone dashboard modules side by side
+#'
+#' @param milestone_results Reactive containing processed milestone results
+#' @param record_id Reactive containing selected resident record ID  
+#' @param period Reactive containing selected period
+#' @param resident_data Reactive containing resident lookup data
+#' @param milestone_types Vector of milestone types to display (e.g., c("program", "self"))
+#' @param column_width Bootstrap column width (e.g., 4 for 3 columns, 6 for 2 columns)
+#' @return Shiny UI fluidRow
+#' @export
+create_milestone_dashboard_layout <- function(milestone_results, record_id, period, resident_data,
+                                              milestone_types = c("program", "self"), 
+                                              column_width = 6) {
+  
+  # Create columns for each milestone type
+  columns <- lapply(seq_along(milestone_types), function(i) {
+    milestone_type <- milestone_types[i]
+    module_id <- paste0("milestone_dash_", i)
+    
+    column(column_width,
+           milestone_dashboard_ui(module_id, milestone_type = milestone_type),
+           # Call server function in the parent server
+           # milestone_dashboard_server(module_id, milestone_results, record_id, period, milestone_type, resident_data)
+    )
+  })
+  
+  do.call(fluidRow, columns)
+}
+
+#' Example Usage in App Server
+#' 
+#' @examples
+#' # In your app server function:
+#' 
+#' # Create multiple dashboard modules
+#' milestone_dashboard_server("milestone_dash_1", milestone_results, record_id, period, "program", resident_data)
+#' milestone_dashboard_server("milestone_dash_2", milestone_results, record_id, period, "self", resident_data)
+#' 
+#' # In your app UI:
+#' fluidRow(
+#'   column(6, milestone_dashboard_ui("milestone_dash_1", milestone_type = "program")),
+#'   column(6, milestone_dashboard_ui("milestone_dash_2", milestone_type = "self"))
+#' )
+#' 
+#' # Or use the helper function:
+#' output$milestone_layout <- renderUI({
+#'   create_milestone_dashboard_layout(
+#'     milestone_results = reactive(milestone_results),
+#'     record_id = reactive(input$resident_select),
+#'     period = reactive(input$period_select), 
+#'     resident_data = reactive(complete_data$residents),
+#'     milestone_types = c("program", "self"),
+#'     column_width = 6
+#'   )
+#' })
+#' @export
+example_milestone_dashboard_usage <- function() {
+  # This is just documentation - see examples above
+}
+
+#' Add Required CSS for Milestone Dashboard
+#'
+#' Adds CSS styling for the milestone dashboard modules
+#'
+#' @return HTML tags with CSS
+#' @export
+milestone_dashboard_css <- function() {
+  tags$head(
+    tags$style(HTML("
+      .milestone-dashboard-container {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+      
+      .milestone-dashboard-container:hover {
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+      }
+      
+      .dashboard-header h4 {
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+      }
+      
+      .spider-section, .progression-section {
+        background: white;
+        border-radius: 6px;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+      }
+      
+      .controls-section {
+        padding: 10px;
+        background: rgba(255,255,255,0.7);
+        border-radius: 6px;
+      }
+      
+      /* Responsive adjustments */
+      @media (max-width: 768px) {
+        .milestone-dashboard-container {
+          height: auto !important;
+          min-height: 500px;
+        }
+      }
+    "))
+  )
+}
