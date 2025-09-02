@@ -1021,25 +1021,49 @@ check_milestone_completeness <- function(milestone_data, milestone_format = "aut
 # Individual milestone progression over time with program and national benchmarks
 # ============================================================================
 
-#' Get Milestone Label from Column Name
+#' Get Milestone Label from Column Name (Simple Pattern Matching)
 #'
-#' Converts milestone column names to proper labels using existing definitions
-#' @param milestone_col Column name (e.g., "rep_pc1", "acgme_mk2")
-#' @param milestone_format Format to use ("rep", "acgme")
+#' Converts milestone column names to proper labels using pattern matching
+#' Works for any milestone column regardless of prefix or suffix
+#' @param milestone_col Column name (e.g., "rep_pc1", "rep_pc1_self", "acgme_mk2")
+#' @param milestone_format Format to use ("rep", "acgme") - not used in this implementation
 #' @return Character string with proper label (e.g., "PC1: History")
 #' @export
 get_milestone_label <- function(milestone_col, milestone_format = "rep") {
   
-  # Get the milestone definitions
-  definitions <- get_milestone_definitions(milestone_format)
+  # Simple pattern matching - if it contains pc1, it's History, etc.
+  # Patient Care
+  if (grepl("pc1", milestone_col, ignore.case = TRUE)) return("PC1: History")
+  if (grepl("pc2", milestone_col, ignore.case = TRUE)) return("PC2: Physical Examination")
+  if (grepl("pc3", milestone_col, ignore.case = TRUE)) return("PC3: Clinical Reasoning")
+  if (grepl("pc4", milestone_col, ignore.case = TRUE)) return("PC4: Patient Management - Inpatient")
+  if (grepl("pc5", milestone_col, ignore.case = TRUE)) return("PC5: Patient Management - Outpatient")
+  if (grepl("pc6", milestone_col, ignore.case = TRUE)) return("PC6: Digital Health")
   
-  # Search through all sections for the milestone
-  for (section_name in names(definitions)) {
-    section <- definitions[[section_name]]
-    if (milestone_col %in% names(section$items)) {
-      return(section$items[[milestone_col]])
-    }
-  }
+  # Medical Knowledge
+  if (grepl("mk1", milestone_col, ignore.case = TRUE)) return("MK1: Applied Foundational Sciences")
+  if (grepl("mk2", milestone_col, ignore.case = TRUE)) return("MK2: Therapeutic Knowledge")
+  if (grepl("mk3", milestone_col, ignore.case = TRUE)) return("MK3: Knowledge of Diagnostic Testing")
+  
+  # Systems-Based Practice
+  if (grepl("sbp1", milestone_col, ignore.case = TRUE)) return("SBP1: Patient Safety and Quality Improvement")
+  if (grepl("sbp2", milestone_col, ignore.case = TRUE)) return("SBP2: System Navigation for Patient-Centered Care")
+  if (grepl("sbp3", milestone_col, ignore.case = TRUE)) return("SBP3: Physician Role in Health Care Systems")
+  
+  # Practice-Based Learning and Improvement
+  if (grepl("pbl1", milestone_col, ignore.case = TRUE)) return("PBLI1: Evidence-Based and Informed Practice")
+  if (grepl("pbl2", milestone_col, ignore.case = TRUE)) return("PBLI2: Reflective Practice and Commitment to Personal Growth")
+  
+  # Professionalism
+  if (grepl("prof1", milestone_col, ignore.case = TRUE)) return("PROF1: Professional Behavior")
+  if (grepl("prof2", milestone_col, ignore.case = TRUE)) return("PROF2: Ethical Principles")
+  if (grepl("prof3", milestone_col, ignore.case = TRUE)) return("PROF3: Accountability/Conscientiousness")
+  if (grepl("prof4", milestone_col, ignore.case = TRUE)) return("PROF4: Knowledge of Systemic and Individual Factors of Well-Being")
+  
+  # Interpersonal and Communication Skills
+  if (grepl("ics1", milestone_col, ignore.case = TRUE)) return("ICS1: Patient- and Family-Centered Communication")
+  if (grepl("ics2", milestone_col, ignore.case = TRUE)) return("ICS2: Interprofessional and Team Communication")
+  if (grepl("ics3", milestone_col, ignore.case = TRUE)) return("ICS3: Communication within Health Care Systems")
   
   # Fallback: clean up the column name
   clean_name <- gsub("^(rep_|acgme_)", "", milestone_col)
