@@ -389,5 +389,99 @@ calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
   return(resident_data)
 }
 
+# Add this to your gmed package, probably in R/period_mapping.R or R/helpers.R
+
+#' Get Most Recent Available Period for Resident
+#'
+#' Automatically determines the most recent milestone period that has data
+#' for a specific resident, following the standard evaluation hierarchy.
+#' Used across gmed-based applications for consistent period selection.
+#'
+#' @param resident_info List containing resident information (record_id, Level, etc.)
+#' @param app_data Complete app data structure (from load_rdm_complete or similar)
+#' @param verbose Logical. Print selection details for debugging
+#' @return Character string of the most recent period with data
+#' @export
+#' @examples
+#' \dontrun{
+#' # In a Shiny app
+#' period <- get_most_recent_period_for_resident(resident_info(), app_data())
+#' 
+#' # With debugging
+#' period <- get_most_recent_period_for_resident(resident_info(), app_data(), verbose = TRUE)
+#' }
+get_most_recent_period_for_resident <- function(resident_info, app_data, verbose = FALSE) {
+  
+  resident_level <- resident_info$Level %||% "Unknown"
+  resident_id <- resident_info$record_id
+  
+  if (verbose) message("Finding most recent period for resident ", resident_id, " (", resident_level, ")")
+  
+  # Standard evaluation period hierarchy (most recent first)
+  period_hierarchy <- c("Graduating", "Mid PGY3", "End PGY2", "Mid PGY2", "End Intern", "Mid Intern")
+  
+  # Check what periods actually have data for this resident
+  available_periods <- c()
+  
+  # Check across all milestone forms
+  if (!is.null(app_data$all_forms)) {
+    milestone_forms <- c("milestone_entry", "milestone_selfevaluation_c33c", "acgme_miles", "acgme_entry")
+    
+    for (form_name in milestone_forms) {
+      if (form_name %in% names(app_data$all_forms)) {
+        form_data <- app_data$all_forms[[form_name]]
+        
+        if (!is.null(form_data) && nrow(form_data) > 0 && resident_id %in% form_data$record_id) {
+          # Get period column (flexible naming)
+          period_cols <- grep("period", names(form_data), ignore.case = TRUE, value = TRUE)
+          
+          if (length(period_cols) > 0) {
+            resident_periods <- form_data %>%
+              dplyr::filter(record_id == !!resident_id) %>%
+              dplyr::pull(!!period_cols[1]) %>%
+              unique() %>%
+              na.omit()
+            
+            available_periods <- c(available_periods, resident_periods)
+            
+            if (verbose && length(resident_periods) > 0) {
+              message("  Found periods in ", form_name, ": ", paste(resident_periods, collapse = ", "))
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  # Remove duplicates and clean up
+  available_periods <- unique(available_periods[!is.na(available_periods) & available_periods != ""])
+  
+  if (verbose) {
+    message("  All available periods: ", paste(available_periods, collapse = ", "))
+  }
+  
+  # Find the most recent period that exists in our data
+  for (period in period_hierarchy) {
+    if (period %in% available_periods) {
+      if (verbose) message("  Selected most recent period: ", period)
+      return(period)
+    }
+  }
+  
+  # Fallback based on resident level if no data periods found
+  fallback_period <- dplyr::case_when(
+    grepl("PGY3|Graduating", resident_level, ignore.case = TRUE) ~ "Graduating",
+    grepl("PGY2", resident_level, ignore.case = TRUE) ~ "End PGY2",
+    grepl("Intern", resident_level, ignore.case = TRUE) ~ "End Intern",
+    TRUE ~ "End PGY2"
+  )
+  
+  if (verbose) {
+    message("  No data periods found, using level-based fallback: ", fallback_period)
+  }
+  
+  return(fallback_period)
+}
+
 
 
