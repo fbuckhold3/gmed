@@ -1,10 +1,143 @@
-# ============================================================================
-# DEBUG: Show the exact structure your load_rdm_complete function needs
-# ============================================================================
-
-# This shows you exactly where the data_dict variable should be placed
-# Copy this structure into your load_rdm_complete function
-
+#' Complete RDM 2.0 Data Loader with Full Pipeline Processing
+#'
+#' Comprehensive data loading function that handles the complete RDM 2.0 data pipeline including
+#' raw data loading, data dictionary integration, historical calculations, filtering, and preparation 
+#' for gmed modules. This is the primary data loading function for complex applications requiring
+#' the full data processing workflow.
+#' 
+#' This function orchestrates the complete data loading pipeline:
+#' - Loads raw REDCap data organized by forms
+#' - Retrieves and integrates data dictionary for metadata-driven workflows
+#' - Calculates historical milestone medians before any filtering
+#' - Filters archived residents while preserving historical data
+#' - Adds level-at-time calculations to active residents
+#' - Prepares milestone data for visualizations
+#' - Standardizes column names and data structures
+#' - Returns comprehensive data structure ready for gmed modules
+#'
+#' @param rdm_token Character. RDM REDCap API token. If NULL, attempts to retrieve from 
+#'   environment variable RDM_TOKEN. Token must have appropriate permissions for data 
+#'   export and metadata access.
+#' @param redcap_url Character. REDCap API URL. Default: "https://redcapsurvey.slu.edu/api/"
+#' @param verbose Logical. Whether to print detailed progress messages during loading. 
+#'   Default: TRUE. Useful for debugging and monitoring long-running processes.
+#' @param ensure_gmed_columns Logical. Whether to verify and create required columns for
+#'   gmed module compatibility. Default: TRUE. Ensures assessment data has proper structure.
+#' @param cache Logical. Whether to enable caching of intermediate results for faster 
+#'   subsequent loads. Default: FALSE. (Note: caching functionality may not be fully implemented)
+#'
+#' @return List containing comprehensive RDM 2.0 data structure with the following components:
+#' \describe{
+#'   \item{residents}{Data frame of active residents with standardized columns (name, Level, 
+#'     access_code) and calculated training levels}
+#'   \item{all_forms}{Named list of all form data organized by REDCap form names, with 
+#'     archived residents filtered and levels calculated}
+#'   \item{assessment_data}{Processed assessment/evaluation data formatted for gmed modules
+#'     with required column structure}
+#'   \item{milestone_data}{Processed milestone data ready for visualization, including 
+#'     individual data and comparison medians}
+#'   \item{data_dict}{Complete REDCap data dictionary with field metadata, labels, choices, 
+#'     and validation rules for metadata-driven workflows}
+#'   \item{raw_data}{Unfiltered raw REDCap data for reference and advanced processing}
+#'   \item{historical_medians}{Pre-calculated milestone medians from complete historical data
+#'     (including archived residents) for comparison purposes}
+#'   \item{data_loaded}{Logical flag indicating successful data loading}
+#'   \item{load_timestamp}{POSIXct timestamp of when data was loaded}
+#'   \item{rdm_token}{Character string of the token used (for debugging/reference)}
+#'   \item{redcap_url}{Character string of the REDCap URL used}
+#' }
+#'
+#' @details
+#' The function follows a specific order of operations to ensure data integrity:
+#' 
+#' 1. **Token Validation**: Checks for valid RDM_TOKEN from parameter or environment
+#' 2. **Raw Data Loading**: Uses `load_data_by_forms()` to get all REDCap data organized by forms
+#' 3. **Data Dictionary**: Loads complete field metadata using `get_evaluation_dictionary()`
+#' 4. **Historical Calculations**: Calculates milestone medians using `calculate_all_milestone_medians()` 
+#'    BEFORE filtering to preserve historical context
+#' 5. **Archive Filtering**: Removes archived residents using `filter_archived_residents()`
+#' 6. **Level Calculations**: Adds resident training levels at time of data collection using
+#'    `add_level_at_time_to_forms()`
+#' 7. **Milestone Preparation**: Processes milestone data for apps using `prepare_milestone_app_data()`
+#' 8. **Column Standardization**: Ensures consistent column naming (name, Level, access_code)
+#' 9. **Final Assembly**: Creates comprehensive return structure with all components
+#'
+#' Column standardization includes:
+#' - **name**: Uses Name, resident_name, full_name, or first_name alternatives
+#' - **Level**: Uses level, resident_level, training_level, pgy, PGY, or year alternatives  
+#' - **access_code**: Uses accesscode, code, or resident_code alternatives
+#'
+#' @section Error Handling:
+#' - Stops execution if RDM_TOKEN is missing or empty
+#' - Continues with warnings if optional processing steps fail
+#' - Provides fallback values for missing standardized columns
+#' - Reports detailed error messages when verbose=TRUE
+#'
+#' @section Performance Notes:
+#' This is a comprehensive loading function that may take 10-60 seconds depending on 
+#' database size. For faster loading in development, consider using `load_rdm_simple()` 
+#' or `load_rdm_quick()` for basic data needs.
+#'
+#' @section Dependencies:
+#' Requires the following gmed package functions:
+#' - `load_data_by_forms()`
+#' - `get_evaluation_dictionary()`  
+#' - `calculate_all_milestone_medians()`
+#' - `filter_archived_residents()`
+#' - `add_level_at_time_to_forms()`
+#' - `prepare_milestone_app_data()`
+#'
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Basic usage with environment token
+#' Sys.setenv(RDM_TOKEN = "your_redcap_token_here")
+#' complete_data <- load_rdm_complete()
+#' 
+#' # With explicit token
+#' complete_data <- load_rdm_complete(
+#'   rdm_token = "your_redcap_token_here",
+#'   verbose = TRUE
+#' )
+#' 
+#' # Quiet loading for production
+#' complete_data <- load_rdm_complete(verbose = FALSE)
+#' 
+#' # Access different data components
+#' residents <- complete_data$residents
+#' assessment_data <- complete_data$assessment_data
+#' data_dict <- complete_data$data_dict
+#' historical_medians <- complete_data$historical_medians
+#' 
+#' # Use in Shiny apps
+#' library(shiny)
+#' server <- function(input, output, session) {
+#'   app_data <- reactive({
+#'     load_rdm_complete()
+#'   })
+#'   
+#'   output$resident_table <- DT::renderDataTable({
+#'     app_data()$residents
+#'   })
+#' }
+#' 
+#' # Check data loading success
+#' if (complete_data$data_loaded) {
+#'   message("Data loaded successfully at ", complete_data$load_timestamp)
+#'   message("Residents: ", nrow(complete_data$residents))
+#'   message("Assessment records: ", nrow(complete_data$assessment_data))
+#'   message("Data dictionary fields: ", nrow(complete_data$data_dict))
+#' }
+#' }
+#'
+#' @seealso 
+#' \code{\link{load_rdm_simple}} for simplified data loading
+#' \code{\link{load_rdm_quick}} for development/testing
+#' \code{\link{load_data_by_forms}} for basic form-organized data loading
+#' \code{\link{get_evaluation_dictionary}} for data dictionary access
+#'
+#' @keywords data loading REDCap RDM
 load_rdm_complete <- function(rdm_token = NULL, 
                                     redcap_url = "https://redcapsurvey.slu.edu/api/",
                                     verbose = TRUE,
