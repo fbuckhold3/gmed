@@ -138,11 +138,11 @@
 #' \code{\link{get_evaluation_dictionary}} for data dictionary access
 #'
 #' @keywords data loading REDCap RDM
-load_rdm_complete <- function(rdm_token = NULL, 
-                                    redcap_url = "https://redcapsurvey.slu.edu/api/",
-                                    verbose = TRUE,
-                                    ensure_gmed_columns = TRUE,
-                                    cache = FALSE) {
+load_rdm_complete1 <- function(rdm_token = NULL, 
+                               redcap_url = "https://redcapsurvey.slu.edu/api/",
+                               verbose = TRUE,
+                               ensure_gmed_columns = TRUE,
+                               cache = FALSE) {
   
   # TOKEN HANDLING
   if (is.null(rdm_token)) {
@@ -159,6 +159,37 @@ load_rdm_complete <- function(rdm_token = NULL,
   if (verbose) message("Loading RDM 2.0 data...")
   data <- load_data_by_forms(rdm_token = rdm_token)
   if (verbose) message("Raw data loaded")
+  
+  # ADD THIS NEW STEP HERE - Filter empty assessment instances
+  if (verbose) message("Filtering empty assessment instances...")
+  if (!is.null(data$raw_data)) {
+    # Helper function to check if a field is empty
+    is_empty <- function(x) {
+      is.na(x) | as.character(x) == "" | as.character(x) == "NA"
+    }
+    
+    # Filter out completely empty assessment instances
+    data$raw_data <- data$raw_data %>%
+      filter(
+        !(redcap_repeat_instrument == "assessment" & 
+            is_empty(ass_date) &
+            is_empty(ass_delta) &
+            is_empty(ass_plus))
+      )
+    
+    # Also filter the forms data if it exists
+    if (!is.null(data$forms$assessment)) {
+      data$forms$assessment <- data$forms$assessment %>%
+        filter(
+          !(is_empty(ass_date) & is_empty(ass_delta) & is_empty(ass_plus))
+        )
+    }
+    
+    if (verbose) message("Filtered empty assessment instances")
+  } else {
+    if (verbose) message("No raw data found to filter")
+  }
+  
   
   # STEP 1.5: LOAD DATA DICTIONARY - MOVE THIS RIGHT AFTER DATA LOADING
   if (verbose) message("Loading data dictionary...")
