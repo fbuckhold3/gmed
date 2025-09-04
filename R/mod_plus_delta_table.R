@@ -213,9 +213,14 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
         ))
       }
       
-      # Clean and format the data
+      # In the plus_delta_data reactive, replace the select() call with:
+      
+      # In your gmed package R/mod_plus_delta_table.R
+      # In the plus_delta_data reactive, replace the select() call with:
+      
       result <- filtered_data %>%
-        dplyr::select(record_id, ass_date, ass_level, level, ass_faculty, ass_specialty, ass_plus, ass_delta) %>%
+        # FIXED: Use ass_level instead of level
+        dplyr::select(record_id, ass_date, ass_level, ass_faculty, ass_specialty, ass_plus, ass_delta) %>%
         dplyr::filter(
           (!is.na(ass_plus) & nzchar(trimws(ass_plus))) | 
             (!is.na(ass_delta) & nzchar(trimws(ass_delta)))
@@ -241,19 +246,13 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
             TRUE ~ "No Date"
           ),
           
-          # Handle level properly (convert numeric to text)
+          # FIXED: Handle ass_level directly (no fallback to missing level column)
           Level = dplyr::case_when(
             !is.na(ass_level) ~ case_when(
               ass_level == 1 | ass_level == "1" | ass_level == "Intern" ~ "Intern",
               ass_level == 2 | ass_level == "2" | ass_level == "PGY2" ~ "PGY2", 
               ass_level == 3 | ass_level == "3" | ass_level == "PGY3" ~ "PGY3",
               TRUE ~ as.character(ass_level)
-            ),
-            !is.na(level) ~ case_when(
-              level == 1 | level == "1" | level == "Intern" ~ "Intern",
-              level == 2 | level == "2" | level == "PGY2" ~ "PGY2", 
-              level == 3 | level == "3" | level == "PGY3" ~ "PGY3",
-              TRUE ~ as.character(level)
             ),
             TRUE ~ "Unknown"
           ),
@@ -285,11 +284,6 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
         dplyr::arrange(dplyr::desc(sort_date)) %>%
         # Remove the helper column
         dplyr::select(Date, Level, Faculty, Specialty, Plus, Delta)
-      
-      cat("Plus/delta table created with", nrow(result), "records\n")
-      if(nrow(result) > 0) {
-        cat("Date range:", min(result$Date, na.rm=TRUE), "to", max(result$Date, na.rm=TRUE), "\n")
-      }
       
       return(result)
     })
