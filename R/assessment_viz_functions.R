@@ -49,12 +49,21 @@ create_combined_assessment_chart <- function(data, record_id, resident_name = NU
       source_form == "assessment"
     ) %>%
     mutate(
+      # FIXED: Handle both string and numeric level formats
       level = case_when(
+        # First try the ass_level column (could be string or numeric)
         !is.na(ass_level) ~ case_when(
-          ass_level == 1L ~ "Intern",
-          ass_level == 2L ~ "PGY2", 
-          ass_level == 3L ~ "PGY3",
-          TRUE ~ "Unknown"
+          ass_level == "Intern" | ass_level == 1L | ass_level == "1" ~ "Intern",
+          ass_level == "PGY2" | ass_level == 2L | ass_level == "2" ~ "PGY2", 
+          ass_level == "PGY3" | ass_level == 3L | ass_level == "3" ~ "PGY3",
+          TRUE ~ paste0("Unknown (", ass_level, ")")
+        ),
+        # Fallback to level column if ass_level is missing
+        !is.na(level) ~ case_when(
+          level == "Intern" | level == 1L | level == "1" ~ "Intern",
+          level == "PGY2" | level == 2L | level == "2" ~ "PGY2", 
+          level == "PGY3" | level == 3L | level == "3" ~ "PGY3",
+          TRUE ~ paste0("Unknown (", level, ")")
         ),
         TRUE ~ "No Level Data"
       )
@@ -184,12 +193,21 @@ create_combined_faculty_chart <- function(data, record_id, resident_name = NULL)
       source_form == "faculty_evaluation"
     ) %>%
     mutate(
+      # FIXED: Handle both string and numeric level formats for faculty evaluations
       level = case_when(
+        # First try the fac_eval_level column (could be string or numeric)
         !is.na(fac_eval_level) ~ case_when(
-          fac_eval_level == 1L ~ "Intern",
-          fac_eval_level == 2L ~ "PGY2", 
-          fac_eval_level == 3L ~ "PGY3",
-          TRUE ~ "Unknown"
+          fac_eval_level == "Intern" | fac_eval_level == 1L | fac_eval_level == "1" ~ "Intern",
+          fac_eval_level == "PGY2" | fac_eval_level == 2L | fac_eval_level == "2" ~ "PGY2", 
+          fac_eval_level == "PGY3" | fac_eval_level == 3L | fac_eval_level == "3" ~ "PGY3",
+          TRUE ~ paste0("Unknown (", fac_eval_level, ")")
+        ),
+        # Fallback to level column if fac_eval_level is missing
+        !is.na(level) ~ case_when(
+          level == "Intern" | level == 1L | level == "1" ~ "Intern",
+          level == "PGY2" | level == 2L | level == "2" ~ "PGY2", 
+          level == "PGY3" | level == 3L | level == "3" ~ "PGY3",
+          TRUE ~ paste0("Unknown (", level, ")")
         ),
         TRUE ~ "No Level Data"
       )

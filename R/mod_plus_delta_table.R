@@ -215,26 +215,66 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
       
       # Clean and format the data
       result <- filtered_data %>%
+        dplyr::select(record_id, ass_date, ass_level, level, ass_faculty, ass_specialty, ass_plus, ass_delta) %>%
+        dplyr::filter(
+          (!is.na(ass_plus) & nzchar(trimws(ass_plus))) | 
+            (!is.na(ass_delta) & nzchar(trimws(ass_delta)))
+        ) %>%
         dplyr::mutate(
-          # Format date
+          # FIXED: Better date handling
           Date = dplyr::case_when(
-            !is.na(ass_date) ~ format(as.Date(ass_date), "%m/%d/%Y"),
-            TRUE ~ "Not specified"
+            !is.na(ass_date) ~ {
+              # Convert to Date if it's not already
+              if(inherits(ass_date, "Date")) {
+                format(ass_date, "%m/%d/%Y")
+              } else {
+                # Try to parse as date
+                parsed_date <- lubridate::as_date(ass_date)
+                if(!is.na(parsed_date)) {
+                  format(parsed_date, "%m/%d/%Y")
+                } else {
+                  "No Date"
+                }
+              }
+            },
+            TRUE ~ "No Date"
           ),
           
-          # Clean level 
+          # Create a sortable date column for ordering
+          sort_date = dplyr::case_when(
+            !is.na(ass_date) ~ {
+              if(inherits(ass_date, "Date")) {
+                ass_date
+              } else {
+                lubridate::as_date(ass_date)
+              }
+            },
+            TRUE ~ as.Date(NA)
+          ),
+          
+          # Format level - handle both string and numeric
           Level = dplyr::case_when(
-            !is.na(ass_level) & nzchar(trimws(ass_level)) ~ trimws(ass_level),
-            TRUE ~ "Not specified"
+            !is.na(ass_level) ~ case_when(
+              ass_level == "Intern" | ass_level == 1L | ass_level == "1" ~ "Intern",
+              ass_level == "PGY2" | ass_level == 2L | ass_level == "2" ~ "PGY2", 
+              ass_level == "PGY3" | ass_level == 3L | ass_level == "3" ~ "PGY3",
+              TRUE ~ "Unknown"
+            ),
+            !is.na(level) ~ case_when(
+              level == "Intern" | level == 1L | level == "1" ~ "Intern",
+              level == "PGY2" | level == 2L | level == "2" ~ "PGY2", 
+              level == "PGY3" | level == 3L | level == "3" ~ "PGY3",
+              TRUE ~ "Unknown"
+            ),
+            TRUE ~ "Unknown"
           ),
           
-          # Clean faculty name
+          # Format faculty and specialty
           Faculty = dplyr::case_when(
             !is.na(ass_faculty) & nzchar(trimws(ass_faculty)) ~ trimws(ass_faculty),
             TRUE ~ "Not specified"
           ),
           
-          # Clean specialty
           Specialty = dplyr::case_when(
             !is.na(ass_specialty) & nzchar(trimws(ass_specialty)) ~ trimws(ass_specialty),
             TRUE ~ "Not specified"
@@ -252,8 +292,10 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
             TRUE ~ "Not provided"
           )
         ) %>%
-        dplyr::select(Date, Level, Faculty, Specialty, Plus, Delta) %>%
-        dplyr::arrange(dplyr::desc(Date))
+        dplyr::select(Date, Level, Faculty, Specialty, Plus, Delta, sort_date) %>%
+        # FIXED: Sort by actual date column (newest first)
+        dplyr::arrange(dplyr::desc(sort_date), dplyr::desc(Date)) %>%
+        dplyr::select(-sort_date)  # Remove the sort helper column
       
       return(result)
     })
