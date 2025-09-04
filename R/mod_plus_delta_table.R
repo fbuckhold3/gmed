@@ -221,50 +221,39 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
             (!is.na(ass_delta) & nzchar(trimws(ass_delta)))
         ) %>%
         dplyr::mutate(
-          # FIXED: Better date handling
-          Date = dplyr::case_when(
-            !is.na(ass_date) ~ {
-              # Convert to Date if it's not already
-              if(inherits(ass_date, "Date")) {
-                format(ass_date, "%m/%d/%Y")
-              } else {
-                # Try to parse as date
-                parsed_date <- lubridate::as_date(ass_date)
-                if(!is.na(parsed_date)) {
-                  format(parsed_date, "%m/%d/%Y")
-                } else {
-                  "No Date"
-                }
-              }
-            },
-            TRUE ~ "No Date"
-          ),
-          
-          # Create a sortable date column for ordering
+          # Create a sortable date column FIRST
           sort_date = dplyr::case_when(
             !is.na(ass_date) ~ {
               if(inherits(ass_date, "Date")) {
                 ass_date
               } else {
-                lubridate::as_date(ass_date)
+                tryCatch({
+                  lubridate::as_date(ass_date)
+                }, error = function(e) as.Date(NA))
               }
             },
             TRUE ~ as.Date(NA)
           ),
           
-          # Format level - handle both string and numeric
+          # Format display date
+          Date = dplyr::case_when(
+            !is.na(sort_date) ~ format(sort_date, "%m/%d/%Y"),
+            TRUE ~ "No Date"
+          ),
+          
+          # Handle level properly (convert numeric to text)
           Level = dplyr::case_when(
             !is.na(ass_level) ~ case_when(
-              ass_level == "Intern" | ass_level == 1L | ass_level == "1" ~ "Intern",
-              ass_level == "PGY2" | ass_level == 2L | ass_level == "2" ~ "PGY2", 
-              ass_level == "PGY3" | ass_level == 3L | ass_level == "3" ~ "PGY3",
-              TRUE ~ "Unknown"
+              ass_level == 1 | ass_level == "1" | ass_level == "Intern" ~ "Intern",
+              ass_level == 2 | ass_level == "2" | ass_level == "PGY2" ~ "PGY2", 
+              ass_level == 3 | ass_level == "3" | ass_level == "PGY3" ~ "PGY3",
+              TRUE ~ as.character(ass_level)
             ),
             !is.na(level) ~ case_when(
-              level == "Intern" | level == 1L | level == "1" ~ "Intern",
-              level == "PGY2" | level == 2L | level == "2" ~ "PGY2", 
-              level == "PGY3" | level == 3L | level == "3" ~ "PGY3",
-              TRUE ~ "Unknown"
+              level == 1 | level == "1" | level == "Intern" ~ "Intern",
+              level == 2 | level == "2" | level == "PGY2" ~ "PGY2", 
+              level == 3 | level == "3" | level == "PGY3" ~ "PGY3",
+              TRUE ~ as.character(level)
             ),
             TRUE ~ "Unknown"
           ),
@@ -292,10 +281,15 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
             TRUE ~ "Not provided"
           )
         ) %>%
-        dplyr::select(Date, Level, Faculty, Specialty, Plus, Delta, sort_date) %>%
-        # FIXED: Sort by actual date column (newest first)
-        dplyr::arrange(dplyr::desc(sort_date), dplyr::desc(Date)) %>%
-        dplyr::select(-sort_date)  # Remove the sort helper column
+        # FIXED: Sort by the proper date column (newest first)
+        dplyr::arrange(dplyr::desc(sort_date)) %>%
+        # Remove the helper column
+        dplyr::select(Date, Level, Faculty, Specialty, Plus, Delta)
+      
+      cat("Plus/delta table created with", nrow(result), "records\n")
+      if(nrow(result) > 0) {
+        cat("Date range:", min(result$Date, na.rm=TRUE), "to", max(result$Date, na.rm=TRUE), "\n")
+      }
       
       return(result)
     })
