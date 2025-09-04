@@ -138,7 +138,7 @@
 #' \code{\link{get_evaluation_dictionary}} for data dictionary access
 #'
 #' @keywords data loading REDCap RDM
-load_rdm_complete1 <- function(rdm_token = NULL, 
+load_rdm_complete <- function(rdm_token = NULL, 
                                redcap_url = "https://redcapsurvey.slu.edu/api/",
                                verbose = TRUE,
                                ensure_gmed_columns = TRUE,
