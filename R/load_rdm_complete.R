@@ -80,7 +80,8 @@ load_rdm_complete <- function(rdm_token = NULL,
       residents <- residents %>%
         dplyr::mutate(
           Level = dplyr::case_when(
-            type == "Resident" & !is.na(grad_yr) ~ {
+            # Handle Categorical residents (type = 2)
+            type == 2 & !is.na(grad_yr) ~ {
               years_to_grad <- as.numeric(grad_yr) - academic_year
               dplyr::case_when(
                 years_to_grad == 3 ~ "Intern",
@@ -91,6 +92,8 @@ load_rdm_complete <- function(rdm_token = NULL,
                 TRUE ~ "Unknown"
               )
             },
+            # Handle Preliminary residents (type = 1) - always Intern
+            type == 1 ~ "Intern",
             TRUE ~ "Unknown"
           )
         )
