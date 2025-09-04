@@ -106,41 +106,27 @@ load_rdm_complete <- function(rdm_token = NULL,
       residents$Level <- "Unknown"
       if (verbose) message("No type/grad_yr columns found, using 'Unknown'")
     }
-  }
+
   
   # STEP 5: SIMPLE ASSESSMENT DATA PREPARATION
   assessment_data <- all_forms$assessment %||% data.frame()
   
   if (ensure_gmed_columns && nrow(assessment_data) > 0) {
-    if (verbose) message("Preparing assessment data for gmed modules...")
+    if (verbose) message("Assessment data already has correct ass_level values")
     
-    # SIMPLE APPROACH: Add most recent level for each resident to assessments
-    # Get the most recent assessment level for each resident
-    if (!is.null(residents) && nrow(residents) > 0) {
-      resident_levels <- residents %>%
-        dplyr::select(record_id, Level) %>%
-        dplyr::mutate(record_id = as.character(record_id))
-      
-      # Add current resident level to assessment data
-      assessment_data <- assessment_data %>%
-        dplyr::mutate(record_id = as.character(record_id)) %>%
-        dplyr::left_join(resident_levels, by = "record_id") %>%
-        dplyr::mutate(
-          # Simple level assignment based on current resident level
-          ass_level = dplyr::case_when(
-            Level == "Intern" ~ 1L,
-            Level == "PGY2" ~ 2L,
-            Level == "PGY3" ~ 3L,
-            TRUE ~ NA_integer_
-          ),
-          fac_eval_level = ass_level,  # Same for faculty evaluations
-          q_level = ass_level          # Same for questions
-        )
-      
-      if (verbose) {
-        ass_level_counts <- table(assessment_data$ass_level, useNA = "always")
-        message("Assessment levels assigned: ", paste(names(ass_level_counts), "=", ass_level_counts, collapse = ", "))
-      }
+    # Don't recalculate ass_level - it's already correct!
+    # Just ensure the other level columns exist for compatibility
+    if (!"fac_eval_level" %in% names(assessment_data)) {
+      assessment_data$fac_eval_level <- assessment_data$ass_level
+    }
+    if (!"q_level" %in% names(assessment_data)) {
+      assessment_data$q_level <- assessment_data$ass_level
+    }
+    
+    if (verbose) {
+      ass_level_counts <- table(assessment_data$ass_level, useNA = "always")
+      message("Using existing assessment levels: ", paste(names(ass_level_counts), "=", ass_level_counts, collapse = ", "))
+    }
     }
   }
   
