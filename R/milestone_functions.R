@@ -1367,7 +1367,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
     )
   }
   
-  # Enhanced layout with modern design
+  # Enhanced layout with modern design - FIXED POLAR STRUCTURE
   title_prefix <- switch(milestone_type,
                          "program" = "📋 Program Assessment",
                          "self" = "🔍 Self-Assessment", 
@@ -1377,28 +1377,18 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   
   fig <- fig %>% plotly::layout(
     title = list(
-      text = paste0(#"<b style='font-size: 20px; color: #2c3e50;'>", title_prefix, "</b><br>",
-                    #"<span style='font-size: 16px; color: #34495e;'>", resident_name, "</span><br>",
-                    "<span style='font-size: 12px; color: #7f8c8d;'>", period_text, "</span>"),
+      text = paste0("<span style='font-size: 12px; color: #7f8c8d;'>", period_text, "</span>"),
       font = list(family = "Arial, sans-serif"),
       x = 0.5
     ),
     
-    # Add margin adjustments to use more space
-    margin = list(
-      l = 40,   # Reduce left margin
-      r = 40,   # Reduce right margin  
-      t = 40,   # Reduce top margin (especially since you removed title)
-      b = 40    # Reduce bottom margin
-    ),
-    
+    # FIXED: Corrected polar layout structure
     polar = list(
-      polar = list(
-        bgcolor = 'rgba(248, 249, 250, 0.8)',
-        domain = list(
-          x = c(0.05, 0.95),  # Use 90% of horizontal space
-          y = c(0.05, 0.95)   # Use 90% of vertical space
-        ),
+      bgcolor = 'rgba(248, 249, 250, 0.8)',
+      domain = list(
+        x = c(0.05, 0.95),  # Use 90% of horizontal space
+        y = c(0.05, 0.95)   # Use 90% of vertical space
+      ),
       radialaxis = list(
         visible = TRUE,
         range = c(0, 9),
@@ -1417,6 +1407,15 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
         linecolor = 'rgba(52, 73, 94, 0.2)'
       )
     ),
+    
+    # FIXED: Proper margin structure
+    margin = list(
+      l = 40,   # Reduce left margin
+      r = 40,   # Reduce right margin  
+      t = 60,   # Reduce top margin (minimal title now)
+      b = 60    # Reduce bottom margin
+    ),
+    
     paper_bgcolor = 'white',
     plot_bgcolor = 'rgba(248, 249, 250, 0.5)',
     showlegend = TRUE,
@@ -1429,8 +1428,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       bgcolor = 'rgba(255, 255, 255, 0.9)',
       bordercolor = 'rgba(52, 73, 94, 0.2)',
       borderwidth = 1
-    ),
-    margin = list(t = 140, b = 100, l = 80, r = 80)
+    )
   ) %>%
     # Add config for better interactivity
     plotly::config(
@@ -1441,7 +1439,6 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   
   return(fig)
 }
-
 #' Create Enhanced Milestone Progression Chart with Modern Styling
 #'
 #' Creates a visually stunning line chart with gradients, better colors, and modern design
