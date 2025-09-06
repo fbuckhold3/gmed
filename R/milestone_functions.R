@@ -1377,8 +1377,8 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   
   fig <- fig %>% plotly::layout(
     title = list(
-      text = paste0("<b style='font-size: 20px; color: #2c3e50;'>", title_prefix, "</b><br>",
-                    "<span style='font-size: 16px; color: #34495e;'>", resident_name, "</span><br>",
+      text = paste0(#"<b style='font-size: 20px; color: #2c3e50;'>", title_prefix, "</b><br>",
+                    #"<span style='font-size: 16px; color: #34495e;'>", resident_name, "</span><br>",
                     "<span style='font-size: 12px; color: #7f8c8d;'>", period_text, "</span>"),
       font = list(family = "Arial, sans-serif"),
       x = 0.5

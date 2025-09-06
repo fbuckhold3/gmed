@@ -469,7 +469,7 @@ milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600
             
             # Spider plot section (top half)
             div(class = "spider-section",
-                style = "height: 45%; margin-bottom: 15px;",
+                style = "height: 60%; margin-bottom: 15px;",  # Increased from 45% to 60%
                 plotlyOutput(ns("spider_plot"), height = "100%")
             ),
             
@@ -490,7 +490,7 @@ milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600
             
             # Progression chart section (bottom half)
             div(class = "progression-section",
-                style = "height: 42%;",
+                style = "height: 35%;",  # Reduced from 42% to 35%
                 plotlyOutput(ns("progression_plot"), height = "100%")
             )
         ),
