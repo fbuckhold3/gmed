@@ -481,7 +481,7 @@ milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600
                          selectInput(
                            ns("selected_milestone"),
                            label = "Select Milestone for Progression View:",
-                           choices = NULL,  # Will be populated by server
+                           choices = list("Loading milestones..." = ""),  # <- Provide initial choice
                            width = "100%"
                          )
                   )
