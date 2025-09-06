@@ -1383,8 +1383,22 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       font = list(family = "Arial, sans-serif"),
       x = 0.5
     ),
+    
+    # Add margin adjustments to use more space
+    margin = list(
+      l = 40,   # Reduce left margin
+      r = 40,   # Reduce right margin  
+      t = 40,   # Reduce top margin (especially since you removed title)
+      b = 40    # Reduce bottom margin
+    ),
+    
     polar = list(
-      bgcolor = 'rgba(248, 249, 250, 0.8)',
+      polar = list(
+        bgcolor = 'rgba(248, 249, 250, 0.8)',
+        domain = list(
+          x = c(0.05, 0.95),  # Use 90% of horizontal space
+          y = c(0.05, 0.95)   # Use 90% of vertical space
+        ),
       radialaxis = list(
         visible = TRUE,
         range = c(0, 9),
