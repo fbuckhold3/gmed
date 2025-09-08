@@ -265,10 +265,17 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
         fluidRow(
           # Left column: Charts (3/4 width)
           column(9,
-                 # Assessment section
                  div(class = "viz-card",
                      div(class = "viz-card-header", 
-                         icon("clipboard-check"), " Feedback Assessments Completed"),
+                         div(style = "display: flex; justify-content: space-between; align-items: center;",
+                             div(icon("clipboard-check"), " Feedback Assessments Completed"),
+                             a(href = "https://fbuckhold3-imslu-resident-assessment.share.connect.posit.cloud",
+                               target = "_blank",
+                               class = "btn btn-sm btn-outline-light",
+                               style = "font-size: 0.8rem;",
+                               icon("external-link-alt"), " Record New")
+                         )
+                     ),
                      div(style = "padding: 1.5rem;",
                          plotlyOutput(ns("assessment_combined"), height = "300px")
                      )
@@ -277,7 +284,15 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
                  # Faculty evaluation section  
                  div(class = "viz-card",
                      div(class = "viz-card-header",
-                         icon("user-tie"), " Faculty Evaluations Completed"),
+                         div(style = "display: flex; justify-content: space-between; align-items: center;",
+                             div(icon("user-tie"), " Faculty Evaluations Completed"),
+                             a(href = "https://fbuckhold3-imslu-facultyeval.share.connect.posit.cloud",
+                               target = "_blank", 
+                               class = "btn btn-sm btn-outline-light",
+                               style = "font-size: 0.8rem;",
+                               icon("external-link-alt"), " Record New")
+                         )
+                     ),
                      div(style = "padding: 1.5rem;",
                          plotlyOutput(ns("faculty_combined"), height = "300px")
                      )
