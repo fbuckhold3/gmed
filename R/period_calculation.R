@@ -4,8 +4,9 @@
 #' based on graduation year, residency type, and current date within academic year.
 #'
 #' @param grad_yr Numeric. Year of expected graduation (e.g., 2026)
-#' @param type Character. Residency type: "Categorical" or "Preliminary"
+#' @param type Numeric or Character. Residency type: 1/"Preliminary" or 2/"Categorical"
 #' @param current_date Date. Current date for calculation (default: Sys.Date())
+#' @param data_dict Optional. Data dictionary data frame to pull labels from REDCap
 #'
 #' @return List with elements:
 #'   \item{pgy_year}{Numeric. Current PGY year (1, 2, or 3)}
@@ -29,24 +30,31 @@
 #'
 #' Preliminary residents only experience periods 7, 1, 2.
 #' After graduation, period_number = NA and is_valid = FALSE.
+#' 
+#' If data_dict is provided, period names and type labels will be pulled from
+#' REDCap data dictionary. Otherwise, falls back to hardcoded labels.
 #'
 #' @export
 #'
 #' @examples
 #' # Categorical resident graduating 2026, checked in December 2024
-#' calculate_pgy_and_period(2026, "Categorical", as.Date("2024-12-15"))
+#' calculate_pgy_and_period(2026, 2, as.Date("2024-12-15"))
 #' # Returns: PGY2, period 3 (Mid PGY2)
 #'
+#' # With data dictionary for dynamic labels
+#' calculate_pgy_and_period(2026, 2, as.Date("2024-12-15"), data_dict = my_data_dict)
+#'
 #' # Preliminary resident graduating 2025, checked in January 2025
-#' calculate_pgy_and_period(2025, "Preliminary", as.Date("2025-01-15"))
+#' calculate_pgy_and_period(2025, 1, as.Date("2025-01-15"))
 #' # Returns: PGY1, period 1 (Mid Intern)
 #'
 #' # Recent graduate (after June 30)
-#' calculate_pgy_and_period(2024, "Categorical", as.Date("2024-08-01"))
+#' calculate_pgy_and_period(2024, 2, as.Date("2024-08-01"))
 #' # Returns: Graduated, period NA, is_valid = FALSE
 calculate_pgy_and_period <- function(grad_yr, 
-                                     type = "Categorical",
-                                     current_date = Sys.Date()) {
+                                     type = 2,
+                                     current_date = Sys.Date(),
+                                     data_dict = NULL) {
   
   # Validate inputs
   if (is.na(grad_yr) || is.null(grad_yr)) {
@@ -61,9 +69,15 @@ calculate_pgy_and_period <- function(grad_yr,
     ))
   }
   
-  # Standardize type
-  type <- tolower(trimws(as.character(type)))
-  is_preliminary <- grepl("prelim", type)
+  # Standardize type - convert to numeric if needed
+  type_numeric <- as.numeric(type)
+  if (is.na(type_numeric)) {
+    # Try string matching
+    type_str <- tolower(trimws(as.character(type)))
+    type_numeric <- if (grepl("prelim", type_str)) 1 else 2
+  }
+  
+  is_preliminary <- (type_numeric == 1)
   
   # Calculate years of training
   training_years <- if (is_preliminary) 1 else 3
@@ -123,51 +137,36 @@ calculate_pgy_and_period <- function(grad_yr,
   }
   
   # Determine period based on PGY year and date within year
-  # Period cutoffs:
-  # July 1 - Sept 30: Period 7 (Entering)
-  # Oct 1 - Jan 31: Period 1, 3, or 5 (Mid year)
-  # Feb 1 - June 30: Period 2, 4, or 6 (End year)
-  
   period_number <- NA
-  period_name <- "Unknown"
   
   if (pgy_year == 1) {
     # PGY1 periods
     if (current_month >= 7 && current_month <= 9) {
       period_number <- 7
-      period_name <- "Entering Residency"
     } else if (current_month >= 10 || current_month == 1) {
       period_number <- 1
-      period_name <- "Mid Intern"
     } else if (current_month >= 2 && current_month <= 6) {
       period_number <- 2
-      period_name <- "End Intern"
     }
   } else if (pgy_year == 2 && !is_preliminary) {
     # PGY2 periods (categorical only)
     if (current_month >= 10 || current_month == 1) {
       period_number <- 3
-      period_name <- "Mid PGY2"
     } else if (current_month >= 2 && current_month <= 6) {
       period_number <- 4
-      period_name <- "End PGY2"
     } else if (current_month >= 7 && current_month <= 9) {
       # Early PGY2 - use previous period (End Intern)
       period_number <- 2
-      period_name <- "End Intern"
     }
   } else if (pgy_year == 3 && !is_preliminary) {
     # PGY3 periods (categorical only)
     if (current_month >= 10 || current_month == 1) {
       period_number <- 5
-      period_name <- "Mid PGY3"
     } else if (current_month >= 2 && current_month <= 6) {
       period_number <- 6
-      period_name <- "Graduating"
     } else if (current_month >= 7 && current_month <= 9) {
       # Early PGY3 - use previous period (End PGY2)
       period_number <- 4
-      period_name <- "End PGY2"
     }
   } else if (is_preliminary && pgy_year > 1) {
     # Preliminary residents shouldn't be beyond PGY1
@@ -182,6 +181,12 @@ calculate_pgy_and_period <- function(grad_yr,
     ))
   }
   
+  # Get period name from data dictionary or fallback
+  period_name <- get_period_label(period_number, data_dict = data_dict)
+  
+  # Get type label from data dictionary or fallback
+  type_label <- translate_resident_type(type_numeric, data_dict = data_dict)
+  
   return(list(
     pgy_year = pgy_year,
     period_number = period_number,
@@ -190,23 +195,57 @@ calculate_pgy_and_period <- function(grad_yr,
     months_into_year = round(months_into_year, 1),
     is_valid = !is.na(period_number),
     grad_yr = grad_yr,
-    type = if (is_preliminary) "Preliminary" else "Categorical"
+    type = type_label,
+    type_code = type_numeric
   ))
 }
 
 
 #' Get Period Label from Period Number
 #'
-#' Simple helper to convert period number to readable label
+#' Simple helper to convert period number to readable label.
+#' If data dictionary is provided, pulls labels from REDCap.
 #'
 #' @param period_number Numeric period number (7, 1-6)
+#' @param data_dict Optional data dictionary to pull labels from
 #' @return Character period label
 #' @export
 #'
 #' @examples
 #' get_period_label(7)  # "Entering Residency"
 #' get_period_label(1)  # "Mid Intern"
-get_period_label <- function(period_number) {
+#' 
+#' # With data dictionary
+#' get_period_label(1, data_dict = my_data_dict)
+get_period_label <- function(period_number, data_dict = NULL) {
+  
+  if (is.na(period_number)) return("Unknown")
+  
+  # If data dictionary provided, try to use it
+  if (!is.null(data_dict)) {
+    # Look for period field (could be s_e_period, prog_mile_period, etc.)
+    period_fields <- data_dict %>%
+      dplyr::filter(
+        grepl("period", field_name, ignore.case = TRUE) &
+          field_type %in% c("dropdown", "radio")
+      )
+    
+    if (nrow(period_fields) > 0) {
+      # Use first period field found
+      period_field <- period_fields %>% dplyr::slice(1)
+      
+      if (!is.na(period_field$select_choices_or_calculations)) {
+        choices <- parse_redcap_choices(period_field$select_choices_or_calculations)
+        
+        period_code_str <- as.character(period_number)
+        if (period_code_str %in% names(choices)) {
+          return(choices[[period_code_str]])
+        }
+      }
+    }
+  }
+  
+  # Fallback to hardcoded labels
   labels <- c(
     "1" = "Mid Intern",
     "2" = "End Intern",
@@ -217,9 +256,97 @@ get_period_label <- function(period_number) {
     "7" = "Entering Residency"
   )
   
-  if (is.na(period_number)) return("Unknown")
-  
   labels[as.character(period_number)] %||% "Unknown"
+}
+
+
+#' Translate Resident Type Code to Label
+#'
+#' Converts numeric type code (1 or 2) to readable label.
+#' If data dictionary is provided, pulls labels from REDCap.
+#'
+#' @param type_code Numeric type code (1 or 2) or character
+#' @param data_dict Optional data dictionary to pull labels from
+#'
+#' @return Character string with type label
+#' @export
+#'
+#' @examples
+#' translate_resident_type(1)  # "Preliminary"
+#' translate_resident_type(2)  # "Categorical"
+#' 
+#' # With data dictionary
+#' translate_resident_type(2, data_dict = my_data_dict)
+translate_resident_type <- function(type_code, data_dict = NULL) {
+  
+  # If data dictionary provided, use it
+  if (!is.null(data_dict)) {
+    type_field <- data_dict %>%
+      dplyr::filter(field_name == "type") %>%
+      dplyr::slice(1)
+    
+    if (nrow(type_field) > 0 && !is.na(type_field$select_choices_or_calculations)) {
+      # Parse choices
+      choices_string <- type_field$select_choices_or_calculations
+      choices <- parse_redcap_choices(choices_string)
+      
+      # Find matching label
+      type_code_str <- as.character(type_code)
+      if (type_code_str %in% names(choices)) {
+        return(choices[[type_code_str]])
+      }
+    }
+  }
+  
+  # Fallback to hardcoded (if data dict not available or doesn't have it)
+  switch(as.character(type_code),
+         "1" = "Preliminary",
+         "2" = "Categorical",
+         "Unknown")
+}
+
+
+#' Parse REDCap Choices String
+#'
+#' Helper to parse "1, Label 1 | 2, Label 2" format from REDCap data dictionary
+#'
+#' @param choices_string Character string from data dictionary select_choices_or_calculations
+#'
+#' @return Named character vector where names are codes and values are labels
+#' @export
+#'
+#' @examples
+#' parse_redcap_choices("1, Preliminary | 2, Categorical")
+#' # Returns: c("1" = "Preliminary", "2" = "Categorical")
+parse_redcap_choices <- function(choices_string) {
+  if (is.na(choices_string) || nchar(trimws(choices_string)) == 0) {
+    return(NULL)
+  }
+  
+  # Split by |
+  items <- strsplit(choices_string, "\\|")[[1]]
+  items <- trimws(items)
+  
+  # Parse each item (format: "code, label")
+  result <- sapply(items, function(item) {
+    parts <- strsplit(item, ",", fixed = TRUE)[[1]]
+    if (length(parts) >= 2) {
+      code <- trimws(parts[1])
+      label <- trimws(paste(parts[-1], collapse = ","))  # Handle labels with commas
+      return(c(code = label))
+    }
+    return(NULL)
+  }, USE.NAMES = FALSE, simplify = FALSE)
+  
+  # Remove NULLs and combine
+  result <- result[!sapply(result, is.null)]
+  result <- unlist(result)
+  
+  # Create named vector: names = codes, values = labels
+  codes <- names(result)
+  labels <- unname(result)
+  
+  setNames(labels, codes)
 }
 
 
@@ -228,16 +355,24 @@ get_period_label <- function(period_number) {
 #' Returns vector of all period numbers a resident will experience
 #' based on their type
 #'
-#' @param type Character. "Categorical" or "Preliminary"
+#' @param type Numeric or Character. Residency type: 1/"Preliminary" or 2/"Categorical"
 #' @return Numeric vector of period numbers
 #' @export
 #'
 #' @examples
+#' get_resident_periods(2)  # c(7, 1, 2, 3, 4, 5, 6)
 #' get_resident_periods("Categorical")  # c(7, 1, 2, 3, 4, 5, 6)
+#' get_resident_periods(1)  # c(7, 1, 2)
 #' get_resident_periods("Preliminary")  # c(7, 1, 2)
 get_resident_periods <- function(type) {
-  type <- tolower(trimws(as.character(type)))
-  is_preliminary <- grepl("prelim", type)
+  # Handle both numeric and string type
+  type_numeric <- as.numeric(type)
+  if (is.na(type_numeric)) {
+    type_str <- tolower(trimws(as.character(type)))
+    type_numeric <- if (grepl("prelim", type_str)) 1 else 2
+  }
+  
+  is_preliminary <- (type_numeric == 1)
   
   if (is_preliminary) {
     return(c(7, 1, 2))

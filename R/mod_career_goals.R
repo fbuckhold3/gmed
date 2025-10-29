@@ -6,7 +6,7 @@
 #' Career Goals Module UI
 #'
 #' Display and edit career goals data with period comparison
-#'
+#' @importFrom shiny icon
 #' @param id Module namespace
 #' @param mode Character: "edit", "view", or "compare"
 #'

@@ -6,16 +6,19 @@
 \usage{
 calculate_pgy_and_period(
   grad_yr,
-  type = "Categorical",
-  current_date = Sys.Date()
+  type = 2,
+  current_date = Sys.Date(),
+  data_dict = NULL
 )
 }
 \arguments{
 \item{grad_yr}{Numeric. Year of expected graduation (e.g., 2026)}
 
-\item{type}{Character. Residency type: "Categorical" or "Preliminary"}
+\item{type}{Numeric or Character. Residency type: 1/"Preliminary" or 2/"Categorical"}
 
 \item{current_date}{Date. Current date for calculation (default: Sys.Date())}
+
+\item{data_dict}{Optional. Data dictionary data frame to pull labels from REDCap}
 }
 \value{
 List with elements:
@@ -44,17 +47,23 @@ Self-evaluation periods (note: starts at 7, not 0):
 
 Preliminary residents only experience periods 7, 1, 2.
 After graduation, period_number = NA and is_valid = FALSE.
+
+If data_dict is provided, period names and type labels will be pulled from
+REDCap data dictionary. Otherwise, falls back to hardcoded labels.
 }
 \examples{
 # Categorical resident graduating 2026, checked in December 2024
-calculate_pgy_and_period(2026, "Categorical", as.Date("2024-12-15"))
+calculate_pgy_and_period(2026, 2, as.Date("2024-12-15"))
 # Returns: PGY2, period 3 (Mid PGY2)
 
+# With data dictionary for dynamic labels
+calculate_pgy_and_period(2026, 2, as.Date("2024-12-15"), data_dict = my_data_dict)
+
 # Preliminary resident graduating 2025, checked in January 2025
-calculate_pgy_and_period(2025, "Preliminary", as.Date("2025-01-15"))
+calculate_pgy_and_period(2025, 1, as.Date("2025-01-15"))
 # Returns: PGY1, period 1 (Mid Intern)
 
 # Recent graduate (after June 30)
-calculate_pgy_and_period(2024, "Categorical", as.Date("2024-08-01"))
+calculate_pgy_and_period(2024, 2, as.Date("2024-08-01"))
 # Returns: Graduated, period NA, is_valid = FALSE
 }

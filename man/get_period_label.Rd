@@ -4,18 +4,24 @@
 \alias{get_period_label}
 \title{Get Period Label from Period Number}
 \usage{
-get_period_label(period_number)
+get_period_label(period_number, data_dict = NULL)
 }
 \arguments{
 \item{period_number}{Numeric period number (7, 1-6)}
+
+\item{data_dict}{Optional data dictionary to pull labels from}
 }
 \value{
 Character period label
 }
 \description{
-Simple helper to convert period number to readable label
+Simple helper to convert period number to readable label.
+If data dictionary is provided, pulls labels from REDCap.
 }
 \examples{
 get_period_label(7)  # "Entering Residency"
 get_period_label(1)  # "Mid Intern"
+
+# With data dictionary
+get_period_label(1, data_dict = my_data_dict)
 }

@@ -7,7 +7,7 @@
 get_resident_periods(type)
 }
 \arguments{
-\item{type}{Character. "Categorical" or "Preliminary"}
+\item{type}{Numeric or Character. Residency type: 1/"Preliminary" or 2/"Categorical"}
 }
 \value{
 Numeric vector of period numbers
@@ -17,6 +17,8 @@ Returns vector of all period numbers a resident will experience
 based on their type
 }
 \examples{
+get_resident_periods(2)  # c(7, 1, 2, 3, 4, 5, 6)
 get_resident_periods("Categorical")  # c(7, 1, 2, 3, 4, 5, 6)
+get_resident_periods(1)  # c(7, 1, 2)
 get_resident_periods("Preliminary")  # c(7, 1, 2)
 }
