@@ -9,6 +9,7 @@ load_data_by_forms(
   redcap_url = "https://redcapsurvey.slu.edu/api/",
   filter_archived = TRUE,
   calculate_levels = TRUE,
+  raw_or_label = "label",
   verbose = TRUE
 )
 }
@@ -20,6 +21,8 @@ load_data_by_forms(
 \item{filter_archived}{Boolean. Remove archived residents (default: TRUE)}
 
 \item{calculate_levels}{Boolean. Calculate resident levels (default: TRUE)}
+
+\item{raw_or_label}{Character. "label" for labels (default), "raw" for codes}
 
 \item{verbose}{Boolean. Print detailed loading messages (default: TRUE)}
 }

@@ -8,7 +8,8 @@ load_rdm_complete(
   rdm_token = NULL,
   redcap_url = "https://redcapsurvey.slu.edu/api/",
   verbose = TRUE,
-  ensure_gmed_columns = TRUE
+  ensure_gmed_columns = TRUE,
+  raw_or_label = "label"
 )
 }
 \arguments{

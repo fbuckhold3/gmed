@@ -4,12 +4,14 @@
 \alias{pull_all_redcap_data}
 \title{Pull All REDCap Data for RDM 2.0}
 \usage{
-pull_all_redcap_data(token, url)
+pull_all_redcap_data(token, url, raw_or_label = "label")
 }
 \arguments{
 \item{token}{REDCap API token}
 
 \item{url}{REDCap API URL}
+
+\item{raw_or_label}{Character. "label" for human-readable labels (default), "raw" for codes/checkbox fields}
 }
 \value{
 Data frame with all REDCap records

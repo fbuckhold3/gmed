@@ -328,24 +328,20 @@ parse_redcap_choices <- function(choices_string) {
   items <- trimws(items)
   
   # Parse each item (format: "code, label")
-  result <- sapply(items, function(item) {
+  codes <- character()
+  labels <- character()
+  
+  for (item in items) {
     parts <- strsplit(item, ",", fixed = TRUE)[[1]]
     if (length(parts) >= 2) {
       code <- trimws(parts[1])
       label <- trimws(paste(parts[-1], collapse = ","))  # Handle labels with commas
-      return(c(code = label))
+      codes <- c(codes, code)
+      labels <- c(labels, label)
     }
-    return(NULL)
-  }, USE.NAMES = FALSE, simplify = FALSE)
+  }
   
-  # Remove NULLs and combine
-  result <- result[!sapply(result, is.null)]
-  result <- unlist(result)
-  
-  # Create named vector: names = codes, values = labels
-  codes <- names(result)
-  labels <- unname(result)
-  
+  # Return named vector: names = codes, values = labels
   setNames(labels, codes)
 }
 

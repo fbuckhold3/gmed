@@ -64,6 +64,7 @@ initialize_app_config <- function() {
 #'
 #' @param token REDCap API token
 #' @param url REDCap API URL
+#' @param raw_or_label Character. "label" for human-readable labels (default), "raw" for codes/checkbox fields
 #'
 #' @return Data frame with all REDCap records
 #' @export
@@ -73,26 +74,24 @@ initialize_app_config <- function() {
 #' config <- initialize_app_config()
 #' all_data <- pull_all_redcap_data(config$rdm_token, config$url)
 #' }
-pull_all_redcap_data <- function(token, url) {
-  
+pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
   if (!requireNamespace("httr", quietly = TRUE)) {
     stop("Package 'httr' is required for REDCap API calls")
   }
-  
   if (!requireNamespace("readr", quietly = TRUE)) {
     stop("Package 'readr' is required for CSV processing")
   }
   
   message("Making REDCap API call...")
   
-  # Prepare form data for API call (matches your working version exactly)
+  # Prepare form data for API call
   form_data <- list(
     token = token,
     content = "record",
     action = "export", 
     format = "csv",
     type = "flat",
-    rawOrLabel = "label",
+    rawOrLabel = raw_or_label,  # CHANGED: now parameterized
     rawOrLabelHeaders = "raw",
     exportCheckboxLabel = "true",
     exportSurveyFields = "true",
@@ -101,14 +100,13 @@ pull_all_redcap_data <- function(token, url) {
     csvDelimiter = ""
   )
   
-  # Make API call with explicit httr namespace (matches your working version)
+  # Make API call with explicit httr namespace
   httr::set_config(httr::config(ssl_verifypeer = FALSE, ssl_verifyhost = FALSE))
-  
   response <- httr::POST(
     url = url,
     body = form_data,
     encode = "form",
-    httr::timeout(60)  # 60 second timeout
+    httr::timeout(60)
   )
   
   # Check response status
@@ -118,7 +116,6 @@ pull_all_redcap_data <- function(token, url) {
   
   # Parse CSV response
   csv_content <- httr::content(response, as = "text", encoding = "UTF-8")
-  
   data <- tryCatch({
     readr::read_csv(csv_content, col_types = readr::cols(.default = "c"), show_col_types = FALSE)
   }, error = function(e) {
@@ -261,6 +258,7 @@ get_record_id_from_name <- function(resident_name, redcap_url, redcap_token) {
 #' @param redcap_url Character. REDCap API URL (default: SLU REDCap)
 #' @param filter_archived Boolean. Remove archived residents (default: TRUE)
 #' @param calculate_levels Boolean. Calculate resident levels (default: TRUE)
+#' @param raw_or_label Character. "label" for labels (default), "raw" for codes
 #' @param verbose Boolean. Print detailed loading messages (default: TRUE)
 #'
 #' @return List containing data organized by form names
@@ -269,6 +267,7 @@ load_data_by_forms <- function(rdm_token = NULL,
                                redcap_url = "https://redcapsurvey.slu.edu/api/",
                                filter_archived = TRUE,
                                calculate_levels = TRUE,
+                               raw_or_label = "label",  # ADD THIS PARAMETER
                                verbose = TRUE) {
   
   if (verbose) message("📊 Loading REDCap data organized by forms...")
@@ -285,9 +284,13 @@ load_data_by_forms <- function(rdm_token = NULL,
   if (verbose) message("📖 Loading data dictionary...")
   data_dict <- get_evaluation_dictionary(token = rdm_token, url = redcap_url)
   
-  # Load raw data
+  # Load raw data - PASS THROUGH PARAMETER
   if (verbose) message("📊 Loading raw REDCap data...")
-  raw_data <- pull_all_redcap_data(token = rdm_token, url = redcap_url)
+  raw_data <- pull_all_redcap_data(
+    token = rdm_token, 
+    url = redcap_url,
+    raw_or_label = raw_or_label  # ADD THIS
+  )
   
   if (verbose) {
     message("✅ Loaded ", nrow(raw_data), " total records")

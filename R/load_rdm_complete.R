@@ -15,7 +15,8 @@
 load_rdm_complete <- function(rdm_token = NULL, 
                               redcap_url = "https://redcapsurvey.slu.edu/api/",
                               verbose = TRUE,
-                              ensure_gmed_columns = TRUE) {
+                              ensure_gmed_columns = TRUE,
+                              raw_or_label = "label") {
   
   # TOKEN HANDLING
   if (is.null(rdm_token)) {
@@ -30,13 +31,14 @@ load_rdm_complete <- function(rdm_token = NULL,
   
   # STEP 1: LOAD ALL RAW DATA (INCLUDING ARCHIVED) USING EXISTING FUNCTION
   if (verbose) message("📊 Loading REDCap data organized by forms...")
-  raw_data <- load_data_by_forms(
-    rdm_token = rdm_token,
-    redcap_url = redcap_url,
-    filter_archived = FALSE,  # CRITICAL: Don't filter yet
-    calculate_levels = FALSE, # Don't calculate yet 
-    verbose = verbose
-  )
+raw_data <- load_data_by_forms(
+  rdm_token = rdm_token,
+  redcap_url = redcap_url,
+  filter_archived = FALSE,
+  calculate_levels = FALSE,
+  raw_or_label = raw_or_label,  # ADD THIS
+  verbose = verbose
+)
   
   if (verbose) {
     # Count total records from raw data
