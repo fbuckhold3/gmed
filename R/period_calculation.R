@@ -182,7 +182,7 @@ calculate_pgy_and_period <- function(grad_yr,
   }
   
   # Get period name from data dictionary or fallback
-  period_name <- get_period_label(period_number, data_dict = data_dict)
+  period_name <- get_period_label(period_number)
   
   # Get type label from data dictionary or fallback
   type_label <- translate_resident_type(type_numeric, data_dict = data_dict)

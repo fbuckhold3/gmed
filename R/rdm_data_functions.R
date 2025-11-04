@@ -78,29 +78,28 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
   if (!requireNamespace("httr", quietly = TRUE)) {
     stop("Package 'httr' is required for REDCap API calls")
   }
-  if (!requireNamespace("readr", quietly = TRUE)) {
-    stop("Package 'readr' is required for CSV processing")
+  if (!requireNamespace("jsonlite", quietly = TRUE)) {
+    stop("Package 'jsonlite' is required for JSON processing")
   }
   
   message("Making REDCap API call...")
   
-  # Prepare form data for API call
+  # Prepare form data for API call - USE JSON FORMAT
   form_data <- list(
     token = token,
     content = "record",
     action = "export", 
-    format = "csv",
+    format = "json",  # CHANGED: json instead of csv
     type = "flat",
-    rawOrLabel = raw_or_label,  # CHANGED: now parameterized
+    rawOrLabel = raw_or_label,
     rawOrLabelHeaders = "raw",
-    exportCheckboxLabel = "true",
+    exportCheckboxLabel = "false",  # Export as separate 0/1 columns
     exportSurveyFields = "true",
     exportDataAccessGroups = "false",
-    returnFormat = "csv",
-    csvDelimiter = ""
+    returnFormat = "json"
   )
   
-  # Make API call with explicit httr namespace
+  # Make API call
   httr::set_config(httr::config(ssl_verifypeer = FALSE, ssl_verifyhost = FALSE))
   response <- httr::POST(
     url = url,
@@ -114,13 +113,17 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
     stop("REDCap API call failed. Status: ", httr::status_code(response))
   }
   
-  # Parse CSV response
-  csv_content <- httr::content(response, as = "text", encoding = "UTF-8")
+  # Parse JSON response
+  json_content <- httr::content(response, as = "text", encoding = "UTF-8")
   data <- tryCatch({
-    readr::read_csv(csv_content, col_types = readr::cols(.default = "c"), show_col_types = FALSE)
+    jsonlite::fromJSON(json_content, flatten = TRUE)
   }, error = function(e) {
-    stop("Failed to parse CSV content from REDCap: ", e$message)
+    stop("Failed to parse JSON content from REDCap: ", e$message)
   })
+  
+  # Convert to data frame and ensure all columns are character
+  data <- as.data.frame(data, stringsAsFactors = FALSE)
+  data[] <- lapply(data, as.character)
   
   # Ensure record_id is character
   if ("record_id" %in% names(data)) {
@@ -342,20 +345,31 @@ load_data_by_forms <- function(rdm_token = NULL,
   result$resident_data <- resident_data
   
   # For each form, extract relevant fields and data
-  for (current_form in form_names) {
-    
-    # Get all field names for this form from data dictionary
-    form_fields <- data_dict %>%
-      dplyr::filter(form_name == current_form) %>%
-      dplyr::pull(field_name)
-    
-    # Always include REDCap metadata fields
-    metadata_fields <- c("record_id", "redcap_repeat_instrument", "redcap_repeat_instance", 
-                         "redcap_event_name", "redcap_survey_identifier")
-    
-    # Combine metadata + form fields, keep only those that exist in data
-    all_fields <- c(metadata_fields, form_fields)
-    existing_fields <- intersect(all_fields, names(raw_data))
+  # For each form, extract relevant fields and data
+for (current_form in form_names) {
+  
+  # Get all field names for this form from data dictionary
+  form_fields <- data_dict %>%
+    dplyr::filter(form_name == current_form) %>%
+    dplyr::pull(field_name)
+  
+  # Always include REDCap metadata fields
+  metadata_fields <- c("record_id", "redcap_repeat_instrument", "redcap_repeat_instance", 
+                       "redcap_event_name", "redcap_survey_identifier")
+  
+  # For checkbox fields, also include all the ___1, ___2, etc. variants
+  checkbox_fields <- character()
+  for (field in form_fields) {
+    # Find any columns that start with this field name followed by ___
+    pattern <- paste0("^", field, "___")
+    matching_cols <- grep(pattern, names(raw_data), value = TRUE)
+    checkbox_fields <- c(checkbox_fields, matching_cols)
+  }
+  
+  # Combine metadata + form fields + checkbox variants, keep only those that exist in data
+  all_fields <- c(metadata_fields, form_fields, checkbox_fields)
+  existing_fields <- intersect(all_fields, names(raw_data))
+  
     
     # Extract data for this form
     if (length(existing_fields) > length(metadata_fields)) {

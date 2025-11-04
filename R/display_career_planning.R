@@ -173,33 +173,21 @@ display_career_planning <- function(rdm_data, record_id, current_period, data_di
       }
     ))
     
-  } else {
+ } else {
   # Period 2+: Show career planning from PREVIOUS period
-  previous_period_num <- as.character(as.numeric(current_period_num) - 1)
-  
-  # Map to TEXT version of period (what's actually in the data)
-  reverse_period_map <- c(
-    "7" = "Entering Residency",
-    "1" = "Mid Intern",
-    "2" = "End Intern",
-    "3" = "Mid PGY2",
-    "4" = "End PGY2",
-    "5" = "Mid PGY3",
-    "6" = "Graduating"
-  )
-  
-  previous_period_text <- reverse_period_map[previous_period_num]
+  current_period_code <- normalize_period(current_period, "code")
+  previous_period_code <- as.character(as.numeric(current_period_code) - 1)
   
   period_data <- record_data %>%
     dplyr::filter(
       redcap_repeat_instrument == "S Eval",
-      s_e_period == previous_period_text  # CHANGED: Only check text version
+      s_e_period == previous_period_code  # Use the code directly
     )
     
     if (nrow(period_data) == 0) {
       return(shiny::tagList(
         shiny::h4("Career Planning"),
-        shiny::p(paste0("No career planning data from Period ", previous_period_num, " yet."), 
+        shiny::p(paste0("No career planning data from Period ", previous_period_code, " yet."), 
                 class = "text-muted")
       ))
     }
@@ -219,7 +207,7 @@ display_career_planning <- function(rdm_data, record_id, current_period, data_di
     track <- period_row$s_e_track[1]
     
     return(shiny::tagList(
-      shiny::h4(paste0("Career Planning (from Period ", previous_period_num, ")")),
+      shiny::h4(paste0("Career Planning (from Period ", previous_period_code, ")")),
       
       # Wellness
       if (!is.na(wellness) && wellness != "") {
