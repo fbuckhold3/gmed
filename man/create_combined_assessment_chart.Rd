@@ -11,18 +11,12 @@ create_combined_assessment_chart(data, record_id, resident_name = NULL)
 
 \item{record_id}{Character or numeric ID of the resident to analyze}
 
-\item{resident_name}{Optional character string with resident name. If NULL, will be extracted from data}
+\item{resident_name}{Optional character string with resident name. If NULL, will use "Resident \link{ID}"}
 }
 \value{
 A plotly object showing assessment progress by level
 }
 \description{
 Creates a horizontal stacked bar chart showing assessment progress by level.
-Combines total count and progress toward annual goals in a single visualization.
-}
-\examples{
-\dontrun{
-chart <- create_combined_assessment_chart(assessment_data, "88")
-chart
-}
+Handles both populated and empty ass_level fields.
 }

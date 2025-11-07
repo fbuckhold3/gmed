@@ -159,7 +159,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         dplyr::filter(
           record_id == !!record_id(),
           !is.na(redcap_repeat_instrument),
-          redcap_repeat_instrument == "Questions"
+          redcap_repeat_instrument == "questions"
         ) %>%
         dplyr::filter(!is.na(q_date) & q_date != "") %>%
         dplyr::mutate(
@@ -434,6 +434,8 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
 #' @return Named list of value -> label mappings
 #' @keywords internal
 parse_choices <- function(choices_raw) {
+  # Handle NULL or NA input
+  if (is.null(choices_raw) || length(choices_raw) == 0) return(NULL)
   if (is.na(choices_raw) || choices_raw == "") return(NULL)
   
   choices <- strsplit(choices_raw, "\\|")[[1]]

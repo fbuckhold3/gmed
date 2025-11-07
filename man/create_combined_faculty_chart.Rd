@@ -7,22 +7,16 @@
 create_combined_faculty_chart(data, record_id, resident_name = NULL)
 }
 \arguments{
-\item{data}{Data frame containing faculty evaluation data with columns: record_id, source_form, fac_eval_level}
+\item{data}{Data frame containing faculty evaluation data}
 
 \item{record_id}{Character or numeric ID of the resident to analyze}
 
-\item{resident_name}{Optional character string with resident name. If NULL, will be extracted from data}
+\item{resident_name}{Optional character string with resident name. If NULL, will use "Resident \link{ID}"}
 }
 \value{
 A plotly object showing faculty evaluation progress by level
 }
 \description{
 Creates a horizontal stacked bar chart showing faculty evaluation progress by level.
-Combines total count and progress toward annual goals in a single visualization.
-}
-\examples{
-\dontrun{
-chart <- create_combined_faculty_chart(faculty_data, "88")
-chart
-}
+Handles both populated and empty fac_eval_level fields.
 }

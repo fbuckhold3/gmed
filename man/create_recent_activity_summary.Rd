@@ -17,6 +17,5 @@ create_recent_activity_summary(data, record_id, resident_name = NULL)
 A list containing recent_assessments, recent_faculty, and conference_avg
 }
 \description{
-Calculates assessment and faculty evaluation activity in the last 4 weeks,
-plus conference attendance average for sidebar display.
+Calculate Recent Activity Summary (Last 4 Weeks)
 }

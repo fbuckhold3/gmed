@@ -183,7 +183,7 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
       filtered_data <- data %>%
         dplyr::filter(record_id == !!record_id()) %>%
         dplyr::filter(!is.na(redcap_repeat_instrument) & 
-                        redcap_repeat_instrument == "Assessment") %>%
+                        redcap_repeat_instrument == "assessment") %>%
         dplyr::select(
           record_id,
           redcap_repeat_instance,
@@ -383,4 +383,104 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
       })
     ))
   })
+}
+
+#' Create Questions Summary Display
+#'
+#' Creates a large number display showing weekly questions average.
+#' Displays the result as a prominent number "out of 4" with supporting details.
+#'
+#' @param data Data frame containing questions data with columns: record_id, source_form, q_date
+#' @param record_id Character or numeric ID of the resident to analyze
+#' @param resident_name Optional character string with resident name. If NULL, will use "Resident [ID]"
+#'
+#' @return A plotly object displaying the questions average as a large number
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' display <- create_questions_summary_display(questions_data, "88")
+#' display
+#' }
+create_questions_summary_display <- function(data, record_id, resident_name = NULL) {
+  
+  # Get the summary data
+  summary_data <- create_weekly_questions_average(data, record_id, resident_name)
+  
+  # Use provided name or default
+  if (is.null(resident_name)) {
+    resident_name <- paste("Resident", record_id)
+  }
+  
+  # Handle no data case - show 0 
+  if (summary_data$total_weeks == 0) {
+    fig <- plot_ly(type = "scatter", mode = "markers") %>%
+      add_annotations(
+        x = 0.5, y = 0.7,
+        text = "<b>0</b>",
+        showarrow = FALSE,
+        font = list(size = 80, color = ssm_colors()$accent_blue),
+        xref = "paper", yref = "paper"
+      ) %>%
+      add_annotations(
+        x = 0.5, y = 0.45,
+        text = "out of 4",
+        showarrow = FALSE,
+        font = list(size = 24, color = "gray"),
+        xref = "paper", yref = "paper"
+      ) %>%
+      add_annotations(
+        x = 0.5, y = 0.25,
+        text = "No questions data",
+        showarrow = FALSE,
+        font = list(size = 14, color = "gray"),
+        xref = "paper", yref = "paper"
+      ) %>%
+      layout(
+        title = paste("Weekly Questions Average -", resident_name),
+        xaxis = list(visible = FALSE),
+        yaxis = list(visible = FALSE),
+        showlegend = FALSE,
+        margin = list(t = 80, b = 40, l = 40, r = 40)
+      )
+    return(fig)
+  }
+  
+  # Create display with data
+  big_number <- as.character(summary_data$average)
+  detail_text <- as.character(summary_data$detail_text)
+  
+  fig <- plot_ly(type = "scatter", mode = "markers") %>%
+    add_annotations(
+      x = 0.5, y = 0.7,
+      text = paste0("<b>", big_number, "</b>"),
+      showarrow = FALSE,
+      font = list(size = 80, color = ssm_colors()$accent_blue),
+      xref = "paper", yref = "paper"
+    ) %>%
+    add_annotations(
+      x = 0.5, y = 0.45,
+      text = "out of 4",
+      showarrow = FALSE,
+      font = list(size = 24, color = "gray"),
+      xref = "paper", yref = "paper"
+    ) %>%
+    add_annotations(
+      x = 0.5, y = 0.25,
+      text = detail_text,
+      showarrow = FALSE,
+      font = list(size = 14, color = "gray"),
+      xref = "paper", yref = "paper"
+    ) %>%
+    layout(
+      title = paste("Weekly Questions Average -", resident_name),
+      xaxis = list(visible = FALSE),
+      yaxis = list(visible = FALSE),
+      showlegend = FALSE,
+      margin = list(t = 80, b = 40, l = 40, r = 40),
+      plot_bgcolor = "rgba(0,0,0,0)",
+      paper_bgcolor = "rgba(0,0,0,0)"
+    )
+  
+  return(fig)
 }
