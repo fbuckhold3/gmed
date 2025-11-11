@@ -431,9 +431,30 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
   if (!requireNamespace("rlang", quietly = TRUE)) {
     stop("Package 'rlang' is required for data processing")
   }
+
+  # Map period text to number FIRST
+  period_num <- switch(period_text,
+                      "Mid Intern" = 1,
+                      "End Intern" = 2,
+                      "Mid PGY2" = 3,
+                      "End PGY2" = 4,
+                      "Mid PGY3" = 5,
+                      "End PGY3" = 6,
+                      "Graduating" = 6,
+                      "Entering Residency" = 7,
+                      as.numeric(period_text))
+
+  
+  # Debug
+  cat("\n=== SPIDER PLOT FINAL DEBUG ===\n")
+  cat("resident_id:", resident_id, "\n")
+  cat("period_text:", period_text, "\n")
+  cat("milestone_type:", milestone_type, "\n")
   
   # Get milestone columns
   milestone_cols <- get_milestone_columns_simple(milestone_data, milestone_type)
+  
+  cat("Found", length(milestone_cols), "milestone columns\n")
   
   if (length(milestone_cols) == 0) {
     return(plotly::plot_ly() %>% 
@@ -444,9 +465,24 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
              ))
   }
   
-  # Filter individual resident's scores for the period using text period
+  # Map period text to number for filtering
+  period_num <- switch(period_text,
+                      "Mid Intern" = 1,
+                      "End Intern" = 2,
+                      "Mid PGY2" = 3,
+                      "End PGY2" = 4,
+                      "Mid PGY3" = 5,
+                      "End PGY3" = 6,
+                      "Entering Residency" = 7,
+                      NULL)
+  
+  cat("Mapped period_text to period_num:", period_num, "\n")
+  
+  # Filter individual resident's scores for the period using numeric period
   individual_data <- milestone_data %>%
-    dplyr::filter(record_id == !!resident_id, prog_mile_period == !!period_text)
+    dplyr::filter(record_id == !!resident_id, prog_mile_period == !!period_num)
+  
+  cat("Individual data rows:", nrow(individual_data), "\n")
   
   if (nrow(individual_data) == 0) {
     return(plotly::plot_ly() %>% 
@@ -468,112 +504,72 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
     }
   }
   
-  # Extract milestone scores
+  # Extract milestone scores - get the most recent instance
+  if ("redcap_repeat_instance" %in% names(individual_data)) {
+    individual_data <- individual_data %>%
+      dplyr::arrange(desc(redcap_repeat_instance)) %>%
+      dplyr::slice(1)
+  }
+  
   individual_scores <- individual_data %>%
     dplyr::select(dplyr::all_of(milestone_cols))
   
-  # Filter median scores for the period using text period
+  cat("Individual scores:", as.numeric(individual_scores[1,]), "\n")
+  
+  # Filter median scores for the period using text period name
   median_scores <- median_data %>%
-    dplyr::filter(prog_mile_period == !!period_text) %>%
+    dplyr::filter(period_name == !!period_text) %>%
     dplyr::select(dplyr::all_of(milestone_cols))
   
+  cat("Median data rows:", nrow(median_scores), "\n")
+  
   if (nrow(median_scores) == 0) {
-    return(plotly::plot_ly() %>% 
-             plotly::add_annotations(
-               text = "No median data available for this period", 
-               x = 0.5, y = 0.5,
-               showarrow = FALSE
-             ))
+    median_scores <- NULL
+  } else {
+    cat("Median scores:", as.numeric(median_scores[1,]), "\n")
   }
   
-  # Prepare data for plotting
-  individual_values <- as.numeric(individual_scores[1, ])
-  median_values <- as.numeric(median_scores[1, ])
+  # Create clean category labels
+  categories <- gsub("^(rep_|acgme_)", "", milestone_cols)
+  categories <- gsub("_self$", "", categories)
   
-  # Remove any NA values and corresponding labels
-  valid_indices <- !is.na(individual_values) & !is.na(median_values)
-  individual_values <- individual_values[valid_indices]
-  median_values <- median_values[valid_indices]
+  # Create plotly figure
+  fig <- plotly::plot_ly(type = 'scatterpolar', mode = 'lines+markers', fill = 'toself')
   
-  # Clean milestone names for display (works for both REP and ACGME)
-  milestone_labels <- gsub("^(rep_|acgme_)", "", milestone_cols[valid_indices])
-  milestone_labels <- toupper(milestone_labels)
-  milestone_labels <- gsub("PBL", "PBLI", milestone_labels)
-  
-  # Create hover text for better tooltip display
-  individual_hover <- paste0(
-    "<b>", milestone_labels, "</b><br>",
-    resident_name, ": ", individual_values, "<br>",
-    "Cohort Median: ", median_values,
-    "<extra></extra>"
-  )
-  
-  median_hover <- paste0(
-    "<b>", milestone_labels, "</b><br>",
-    "Cohort Median: ", median_values, "<br>",
-    resident_name, ": ", individual_values,
-    "<extra></extra>"
-  )
-  
-  # Create the spider plot
-  fig <- plotly::plot_ly(type = 'scatterpolar', fill = 'toself')
-  
-  # Add individual scores with custom hover
+  # Add individual scores
   fig <- fig %>% plotly::add_trace(
-    r = individual_values,
-    theta = milestone_labels,
+    r = as.numeric(individual_scores[1,]),
+    theta = categories,
     name = resident_name,
-    line = list(color = '#1f77b4', width = 3),
-    marker = list(color = '#1f77b4', size = 8),
-    fillcolor = 'rgba(31, 119, 180, 0.1)',
-    hovertemplate = individual_hover
+    line = list(color = '#1f77b4', width = 2),
+    marker = list(size = 8, color = '#1f77b4'),
+    fillcolor = 'rgba(31, 119, 180, 0.2)'
   )
   
-  # Add median scores with custom hover
-  fig <- fig %>% plotly::add_trace(
-    r = median_values,
-    theta = milestone_labels,
-    name = "Cohort Median",
-    line = list(color = '#ff7f0e', width = 2, dash = 'dash'),
-    marker = list(color = '#ff7f0e', size = 6),
-    fillcolor = 'rgba(255, 127, 14, 0.05)',
-    hovertemplate = median_hover
-  )
+  # Add median scores if available
+  if (!is.null(median_scores)) {
+    fig <- fig %>% plotly::add_trace(
+      r = as.numeric(median_scores[1,]),
+      theta = categories,
+      name = "Program Median",
+      line = list(color = '#ff7f0e', width = 2, dash = 'dash'),
+      marker = list(size = 6, color = '#ff7f0e')
+    )
+  }
   
-  # Create title based on milestone type
-  title_prefix <- switch(milestone_type,
-                         "program" = "Program Milestones (REP)",
-                         "self" = "Self-Assessment Milestones (REP)", 
-                         "acgme" = "Program Milestones (ACGME)",
-                         "acgme_self" = "Self-Assessment Milestones (ACGME)",
-                         "Milestones"
-  )
-  
-  # Layout with scale from 1-9
+  # Layout
   fig <- fig %>% plotly::layout(
     polar = list(
       radialaxis = list(
         visible = TRUE,
-        range = c(1, 9),
-        tickmode = 'array',
-        tickvals = c(1, 5, 9),
-        ticktext = c('1', '5', '9'),
-        tickfont = list(size = 12),
-        gridcolor = 'rgba(0,0,0,0.1)'
-      ),
-      angularaxis = list(
-        tickfont = list(size = 12),
-        rotation = 90,
-        direction = "clockwise"
+        range = c(1, 5),
+        tickmode = "linear",
+        tick0 = 1,
+        dtick = 1
       )
     ),
-    title = list(
-      text = paste0(title_prefix, " for ", resident_name, " - ", period_text),
-      font = list(size = 16)
-    ),
     showlegend = TRUE,
-    legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.1),
-    margin = list(t = 80, b = 80, l = 80, r = 80)
+    title = paste("Milestones -", period_text, "-", resident_name)
   )
   
   return(fig)
@@ -598,18 +594,27 @@ get_milestone_columns_simple <- function(data, type = "program") {
     return(character(0))
   }
   
-  # Define patterns for each milestone type
+  # Auto-detect if data has ACGME or REP columns
+  has_acgme <- any(grepl("^acgme_", names(data)))
+  has_rep <- any(grepl("^rep_", names(data)))
+  
+  # Define patterns based on what's actually in the data
   if (type == "program") {
-    # Legacy REP program milestones: rep_pc1, rep_pc2, etc.
-    pattern <- "^rep_(pc|mk|sbp|pbl|prof|ics)\\d+$"
+    if (has_acgme) {
+      # ACGME program milestones
+      pattern <- "^acgme_(pc|mk|sbp|pbl|prof|ics)\\d+$"
+    } else {
+      # REP program milestones
+      pattern <- "^rep_(pc|mk|sbp|pbl|prof|ics)\\d+$"
+    }
   } else if (type == "self") {
-    # Legacy REP self milestones: rep_pc1_self, rep_pc2_self, etc.
+    # REP self milestones (ACGME doesn't have self)
     pattern <- "^rep_(pc|mk|sbp|pbl|prof|ics)\\d+_self$"
   } else if (type == "acgme") {
-    # New ACGME program milestones: acgme_pc1, acgme_pc2, etc.
+    # Explicitly ACGME program milestones
     pattern <- "^acgme_(pc|mk|sbp|pbl|prof|ics)\\d+$"
   } else if (type == "acgme_self") {
-    # New ACGME self milestones: acgme_pc1_self, acgme_pc2_self, etc.
+    # ACGME self milestones (if they exist)
     pattern <- "^acgme_(pc|mk|sbp|pbl|prof|ics)\\d+_self$"
   } else {
     stop("Unknown milestone type: ", type, ". Use: program, self, acgme, or acgme_self")
@@ -1181,6 +1186,7 @@ get_national_milestone_benchmarks <- function(milestone_format = "rep") {
   return(national_data)
 }
 
+
 #' Create Enhanced Milestone Spider Plot with Modern Styling
 #'
 #' Creates a visually stunning spider/radar plot with gradients, shadows, and modern styling
@@ -1205,6 +1211,18 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
     stop("Package 'dplyr' is required for data processing")
   }
   
+  # Map period text to number
+  period_num <- switch(period_text,
+                      "Mid Intern" = 1,
+                      "End Intern" = 2,
+                      "Mid PGY2" = 3,
+                      "End PGY2" = 4,
+                      "Mid PGY3" = 5,
+                      "End PGY3" = 6,
+                      "Graduating" = 6,
+                      "Entering Residency" = 7,
+                      as.numeric(period_text))
+
   # Get milestone columns
   milestone_cols <- get_milestone_columns_simple(milestone_data, milestone_type)
   
@@ -1218,9 +1236,26 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
              ))
   }
   
-  # Filter individual resident's scores for the period
+  # Smart filtering: Try period_name first (text), then prog_mile_period (numeric)
   individual_data <- milestone_data %>%
-    dplyr::filter(record_id == !!resident_id, prog_mile_period == !!period_text)
+    dplyr::filter(record_id == !!resident_id)
+  
+  # Try filtering by period_name if it exists
+  if ("period_name" %in% names(individual_data)) {
+    individual_data <- individual_data %>%
+      dplyr::filter(period_name == !!period_text)
+  }
+  
+  # If no rows or period_name doesn't exist, try prog_mile_period
+  if (nrow(individual_data) == 0 && "prog_mile_period" %in% names(milestone_data)) {
+    individual_data <- milestone_data %>%
+      dplyr::filter(record_id == !!resident_id) %>%
+      dplyr::filter(
+        prog_mile_period == !!period_num | 
+        prog_mile_period == !!as.character(period_num) |
+        prog_mile_period == !!period_text
+      )
+  }
   
   if (nrow(individual_data) == 0) {
     return(plotly::plot_ly() %>% 
@@ -1247,10 +1282,22 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   individual_scores <- individual_data %>%
     dplyr::select(dplyr::all_of(milestone_cols))
   
-  # Filter median scores for the period
-  median_scores <- median_data %>%
-    dplyr::filter(prog_mile_period == !!period_text) %>%
-    dplyr::select(dplyr::all_of(milestone_cols))
+  # Smart filtering for medians: Try period_name first, then prog_mile_period
+  if ("period_name" %in% names(median_data)) {
+    median_scores <- median_data %>%
+      dplyr::filter(period_name == !!period_text) %>%
+      dplyr::select(dplyr::all_of(milestone_cols))
+  } else if ("prog_mile_period" %in% names(median_data)) {
+    median_scores <- median_data %>%
+      dplyr::filter(
+        prog_mile_period == !!period_num | 
+        prog_mile_period == !!as.character(period_num) |
+        prog_mile_period == !!period_text
+      ) %>%
+      dplyr::select(dplyr::all_of(milestone_cols))
+  } else {
+    median_scores <- data.frame()
+  }
   
   if (nrow(median_scores) == 0) {
     return(plotly::plot_ly() %>% 
@@ -1308,7 +1355,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   # Add individual scores with gradient fill and glow effect
   fig <- fig %>% plotly::add_trace(
     r = individual_values,
-    theta = short_labels,  # Use short labels for display
+    theta = short_labels,
     name = paste("🎯", resident_name),
     line = list(
       color = '#2E86AB', 
@@ -1321,14 +1368,14 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       line = list(color = 'white', width = 2),
       symbol = 'circle'
     ),
-    fillcolor = 'rgba(46, 134, 171, 0.15)',  # Modern blue with transparency
+    fillcolor = 'rgba(46, 134, 171, 0.15)',
     hovertemplate = individual_hover
   )
   
   # Add median scores with contrasting style
   fig <- fig %>% plotly::add_trace(
     r = median_values,
-    theta = short_labels,  # Use short labels for display
+    theta = short_labels,
     name = "📊 Program Median",
     line = list(
       color = '#A23B72', 
@@ -1342,7 +1389,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       symbol = 'diamond',
       line = list(color = 'white', width = 2)
     ),
-    fillcolor = 'rgba(162, 59, 114, 0.08)',  # Subtle purple fill
+    fillcolor = 'rgba(162, 59, 114, 0.08)',
     hovertemplate = median_hover
   )
   
@@ -1355,7 +1402,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       mode = 'markers',
       marker = list(
         size = 1,
-        color = 'rgba(0,0,0,0)',  # Invisible
+        color = 'rgba(0,0,0,0)',
         line = list(width = 0)
       ),
       showlegend = FALSE,
@@ -1367,7 +1414,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
     )
   }
   
-  # Enhanced layout with modern design - FIXED POLAR STRUCTURE
+  # Enhanced layout with modern design
   title_prefix <- switch(milestone_type,
                          "program" = "📋 Program Assessment",
                          "self" = "🔍 Self-Assessment", 
@@ -1382,12 +1429,11 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       x = 0.5
     ),
     
-    # FIXED: Corrected polar layout structure
     polar = list(
       bgcolor = 'rgba(248, 249, 250, 0.8)',
       domain = list(
-        x = c(0.05, 0.95),  # Use 90% of horizontal space
-        y = c(0.05, 0.95)   # Use 90% of vertical space
+        x = c(0.05, 0.95),
+        y = c(0.05, 0.95)
       ),
       radialaxis = list(
         visible = TRUE,
@@ -1408,12 +1454,11 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       )
     ),
     
-    # FIXED: Proper margin structure
     margin = list(
-      l = 40,   # Reduce left margin
-      r = 40,   # Reduce right margin  
-      t = 60,   # Reduce top margin (minimal title now)
-      b = 60    # Reduce bottom margin
+      l = 40,
+      r = 40,  
+      t = 60,
+      b = 60
     ),
     
     paper_bgcolor = 'white',
@@ -1430,7 +1475,6 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       borderwidth = 1
     )
   ) %>%
-    # Add config for better interactivity
     plotly::config(
       displayModeBar = TRUE,
       displaylogo = FALSE,
@@ -1439,6 +1483,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   
   return(fig)
 }
+
 #' Create Enhanced Milestone Progression Chart with Modern Styling
 #'
 #' Creates a visually stunning line chart with gradients, better colors, and modern design
