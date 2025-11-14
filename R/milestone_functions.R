@@ -212,9 +212,21 @@ create_milestone_workflow_from_dict <- function(all_forms, data_dict, resident_d
     # Process the data - keep original period column name!
     period_sym <- rlang::sym(primary_period_col)
 
+    # DEBUG: Print what we're joining
+    if (verbose) {
+      message("  Primary period column: ", primary_period_col)
+      message("  Form data columns before join: ", paste(head(names(form_data), 10), collapse = ", "))
+    }
+
     processed_data <- form_data %>%
       # Add universal period mapping using the original period column name
       dplyr::left_join(period_mapping, by = setNames("period_code", primary_period_col)) %>%
+      {
+        if (verbose) {
+          message("  Columns after join: ", paste(head(names(.), 15), collapse = ", "))
+        }
+        .
+      } %>%
 
       # Convert milestone scores to numeric
       dplyr::mutate(dplyr::across(dplyr::all_of(config$score_columns), as.numeric)) %>%
