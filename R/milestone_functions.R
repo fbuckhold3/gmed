@@ -644,48 +644,70 @@ get_milestone_columns_simple <- function(data, type = "program") {
 #' @return Processed milestone data
 #' @export
 process_milestone_data_simple <- function(milestone_data, type = "program") {
-  
+
   if (!requireNamespace("dplyr", quietly = TRUE)) {
     stop("Package 'dplyr' is required for data processing")
   }
-  
+
+  if (!requireNamespace("rlang", quietly = TRUE)) {
+    stop("Package 'rlang' is required for data processing")
+  }
+
   if (is.null(milestone_data) || nrow(milestone_data) == 0) {
     message("No ", type, " milestone data to process")
     return(NULL)
   }
-  
+
   message("Processing ", type, " milestone data: ", nrow(milestone_data), " rows")
-  
+
   # Get milestone columns
   milestone_cols <- get_milestone_columns_simple(milestone_data, type)
-  
+
   if (length(milestone_cols) == 0) {
     message("No milestone columns found for type: ", type)
     return(NULL)
   }
-  
+
+  # Dynamically detect which period field exists in the data
+  # Support: prog_mile_period (REP program), prog_mile_period_self (REP self), acgme_mile_period (ACGME)
+  period_field <- NULL
+  if ("acgme_mile_period" %in% names(milestone_data)) {
+    period_field <- "acgme_mile_period"
+  } else if ("prog_mile_period_self" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period_self"
+  } else if ("prog_mile_period" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period"
+  } else {
+    stop("No recognized period field found in data. Expected one of: prog_mile_period, prog_mile_period_self, acgme_mile_period")
+  }
+
+  message("Using period field: ", period_field)
+
+  # Create a symbol for dynamic evaluation
+  period_sym <- rlang::sym(period_field)
+
   # Process the data
   processed_data <- milestone_data %>%
     # Convert milestone scores to numeric
     dplyr::mutate(dplyr::across(dplyr::all_of(milestone_cols), as.numeric)) %>%
-    # Add readable period names based on prog_mile_period or equivalent
+    # Add readable period names based on dynamically detected period field
     dplyr::mutate(
       period_name = dplyr::case_when(
-        prog_mile_period == 1 ~ "Mid Intern",
-        prog_mile_period == 2 ~ "End Intern", 
-        prog_mile_period == 3 ~ "Mid PGY2",
-        prog_mile_period == 4 ~ "End PGY2",
-        prog_mile_period == 5 ~ "Mid PGY3",
-        prog_mile_period == 6 ~ "Graduation",
-        prog_mile_period == 7 ~ "Intern Intro",
-        TRUE ~ paste("Period", prog_mile_period)
+        !!period_sym == 1 ~ "Mid Intern",
+        !!period_sym == 2 ~ "End Intern",
+        !!period_sym == 3 ~ "Mid PGY2",
+        !!period_sym == 4 ~ "End PGY2",
+        !!period_sym == 5 ~ "Mid PGY3",
+        !!period_sym == 6 ~ "Graduation",
+        !!period_sym == 7 ~ "Intern Intro",
+        TRUE ~ paste("Period", !!period_sym)
       )
     ) %>%
     # Remove rows with all NA milestone scores
     dplyr::filter(dplyr::if_any(dplyr::all_of(milestone_cols), ~ !is.na(.x)))
-  
+
   message("After processing: ", nrow(processed_data), " rows with valid milestone data")
-  
+
   return(processed_data)
 }
 
@@ -698,34 +720,54 @@ process_milestone_data_simple <- function(milestone_data, type = "program") {
 #' @return Data frame with median scores by period
 #' @export
 calculate_milestone_medians_simple <- function(processed_milestone_data) {
-  
+
   if (!requireNamespace("dplyr", quietly = TRUE)) {
     stop("Package 'dplyr' is required for data processing")
   }
-  
+
+  if (!requireNamespace("rlang", quietly = TRUE)) {
+    stop("Package 'rlang' is required for data processing")
+  }
+
   if (is.null(processed_milestone_data) || nrow(processed_milestone_data) == 0) {
     return(NULL)
   }
-  
+
   # Get milestone columns (numeric ones only) - supports both REP and ACGME
   milestone_cols <- names(processed_milestone_data)[
-    grepl("^(rep_|acgme_)(pc|mk|sbp|pbl|prof|ics)\\d+", names(processed_milestone_data)) & 
+    grepl("^(rep_|acgme_)(pc|mk|sbp|pbl|prof|ics)\\d+", names(processed_milestone_data)) &
       !grepl("_desc|_self$", names(processed_milestone_data))
   ]
-  
+
   if (length(milestone_cols) == 0) {
     message("No numeric milestone columns found for median calculation")
     return(NULL)
   }
-  
+
+  # Dynamically detect which period field exists in the data
+  # Support: prog_mile_period (REP program), prog_mile_period_self (REP self), acgme_mile_period (ACGME)
+  period_field <- NULL
+  if ("acgme_mile_period" %in% names(processed_milestone_data)) {
+    period_field <- "acgme_mile_period"
+  } else if ("prog_mile_period_self" %in% names(processed_milestone_data)) {
+    period_field <- "prog_mile_period_self"
+  } else if ("prog_mile_period" %in% names(processed_milestone_data)) {
+    period_field <- "prog_mile_period"
+  } else {
+    stop("No recognized period field found in data. Expected one of: prog_mile_period, prog_mile_period_self, acgme_mile_period")
+  }
+
+  # Create a symbol for dynamic evaluation
+  period_sym <- rlang::sym(period_field)
+
   medians <- processed_milestone_data %>%
-    dplyr::group_by(prog_mile_period, period_name) %>%
+    dplyr::group_by(!!period_sym, period_name) %>%
     dplyr::summarise(
       dplyr::across(dplyr::all_of(milestone_cols), ~ median(.x, na.rm = TRUE)),
       n_residents = dplyr::n(),
       .groups = "drop"
     )
-  
+
   message("Calculated medians for ", nrow(medians), " periods")
   return(medians)
 }
