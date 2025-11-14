@@ -634,10 +634,18 @@ milestone_dashboard_server <- function(id, milestone_results, record_id, period,
     })
     
     # Return reactive values for parent app if needed
-    return(list(
-      selected_milestone = reactive(input$selected_milestone),
-      data_available = reactive(!is.null(milestone_data_obj()))
-    ))
+return(list(
+  selected_milestone = reactive(input$selected_milestone),
+  data_available = reactive(!is.null(milestone_data_obj())),
+  current_data = reactive({
+    # Return the milestone results the user just entered
+    milestone_results()
+  }),
+  milestone_data_obj = reactive({
+    # Return the full milestone data object
+    milestone_data_obj()
+  })
+))
   })
 }
 
