@@ -477,10 +477,32 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
                       NULL)
   
   cat("Mapped period_text to period_num:", period_num, "\n")
-  
+
+  # Dynamically detect which period field exists in the data
+  period_field <- NULL
+  if ("acgme_mile_period" %in% names(milestone_data)) {
+    period_field <- "acgme_mile_period"
+  } else if ("prog_mile_period_self" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period_self"
+  } else if ("prog_mile_period" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period"
+  } else {
+    return(plotly::plot_ly() %>%
+             plotly::add_annotations(
+               text = "No recognized period field found in data",
+               x = 0.5, y = 0.5,
+               showarrow = FALSE
+             ))
+  }
+
+  cat("Using period field:", period_field, "\n")
+
+  # Create a symbol for dynamic evaluation
+  period_sym <- rlang::sym(period_field)
+
   # Filter individual resident's scores for the period using numeric period
   individual_data <- milestone_data %>%
-    dplyr::filter(record_id == !!resident_id, prog_mile_period == !!period_num)
+    dplyr::filter(record_id == !!resident_id, !!period_sym == !!period_num)
   
   cat("Individual data rows:", nrow(individual_data), "\n")
   
@@ -1278,24 +1300,37 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
              ))
   }
   
-  # Smart filtering: Try period_name first (text), then prog_mile_period (numeric)
+  # Dynamically detect which period field exists in the data
+  period_field <- NULL
+  if ("acgme_mile_period" %in% names(milestone_data)) {
+    period_field <- "acgme_mile_period"
+  } else if ("prog_mile_period_self" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period_self"
+  } else if ("prog_mile_period" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period"
+  }
+
+  # Create a symbol for dynamic evaluation
+  period_sym <- if (!is.null(period_field)) rlang::sym(period_field) else NULL
+
+  # Smart filtering: Try period_name first (text), then detected period field (numeric)
   individual_data <- milestone_data %>%
     dplyr::filter(record_id == !!resident_id)
-  
+
   # Try filtering by period_name if it exists
   if ("period_name" %in% names(individual_data)) {
     individual_data <- individual_data %>%
       dplyr::filter(period_name == !!period_text)
   }
-  
-  # If no rows or period_name doesn't exist, try prog_mile_period
-  if (nrow(individual_data) == 0 && "prog_mile_period" %in% names(milestone_data)) {
+
+  # If no rows or period_name doesn't exist, try the detected period field
+  if (nrow(individual_data) == 0 && !is.null(period_sym)) {
     individual_data <- milestone_data %>%
       dplyr::filter(record_id == !!resident_id) %>%
       dplyr::filter(
-        prog_mile_period == !!period_num | 
-        prog_mile_period == !!as.character(period_num) |
-        prog_mile_period == !!period_text
+        !!period_sym == !!period_num |
+        !!period_sym == !!as.character(period_num) |
+        !!period_sym == !!period_text
       )
   }
   
@@ -1324,17 +1359,17 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   individual_scores <- individual_data %>%
     dplyr::select(dplyr::all_of(milestone_cols))
   
-  # Smart filtering for medians: Try period_name first, then prog_mile_period
+  # Smart filtering for medians: Try period_name first, then detected period field
   if ("period_name" %in% names(median_data)) {
     median_scores <- median_data %>%
       dplyr::filter(period_name == !!period_text) %>%
       dplyr::select(dplyr::all_of(milestone_cols))
-  } else if ("prog_mile_period" %in% names(median_data)) {
+  } else if (!is.null(period_sym) && period_field %in% names(median_data)) {
     median_scores <- median_data %>%
       dplyr::filter(
-        prog_mile_period == !!period_num | 
-        prog_mile_period == !!as.character(period_num) |
-        prog_mile_period == !!period_text
+        !!period_sym == !!period_num |
+        !!period_sym == !!as.character(period_num) |
+        !!period_sym == !!period_text
       ) %>%
       dplyr::select(dplyr::all_of(milestone_cols))
   } else {
@@ -1590,17 +1625,33 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
              ))
   }
   
+  # Dynamically detect which period field exists in the data
+  period_field <- NULL
+  if ("acgme_mile_period" %in% names(milestone_data)) {
+    period_field <- "acgme_mile_period"
+  } else if ("prog_mile_period_self" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period_self"
+  } else if ("prog_mile_period" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period"
+  } else {
+    # Default to prog_mile_period for compatibility
+    period_field <- "prog_mile_period"
+  }
+
+  # Create a symbol for dynamic evaluation
+  period_sym <- rlang::sym(period_field)
+
   # Create complete period framework to ensure all periods are displayed
   all_periods <- data.frame(
     period_name = c("Entering Residency", "Mid Intern", "End Intern", "Mid PGY2", "End PGY2", "Mid PGY3", "Graduating"),
     period_order = c(0, 1, 2, 3, 4, 5, 6),
     stringsAsFactors = FALSE
   )
-  
+
   # Get individual resident data with proper ordering
   individual_data <- milestone_data %>%
     dplyr::filter(record_id == !!resident_id) %>%
-    dplyr::select(prog_mile_period, period_name, !!milestone_col) %>%
+    {if (period_field %in% names(.)) dplyr::select(., !!period_sym, period_name, !!milestone_col) else dplyr::select(., period_name, !!milestone_col)} %>%
     dplyr::mutate(
       period_order = dplyr::case_when(
         period_name == "Entering Residency" ~ 0,
@@ -1610,8 +1661,8 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
         period_name == "End PGY2" ~ 4,
         period_name == "Mid PGY3" ~ 5,
         period_name == "Graduating" ~ 6,
-        # Handle numeric prog_mile_period safely
-        !is.na(suppressWarnings(as.numeric(prog_mile_period))) ~ as.numeric(prog_mile_period),
+        # Handle numeric period field safely if it exists
+        period_field %in% names(.) && !is.na(suppressWarnings(as.numeric(!!period_sym))) ~ as.numeric(!!period_sym),
         TRUE ~ NA_real_
       )
     ) %>%
@@ -1622,7 +1673,7 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
   
   # Get program medians with proper ordering
   program_medians <- median_data %>%
-    dplyr::select(prog_mile_period, period_name, !!milestone_col) %>%
+    {if (period_field %in% names(.)) dplyr::select(., !!period_sym, period_name, !!milestone_col) else dplyr::select(., period_name, !!milestone_col)} %>%
     dplyr::mutate(
       period_order = dplyr::case_when(
         period_name == "Entering Residency" ~ 0,
@@ -1632,8 +1683,8 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
         period_name == "End PGY2" ~ 4,
         period_name == "Mid PGY3" ~ 5,
         period_name == "Graduating" ~ 6,
-        # Handle numeric prog_mile_period safely  
-        !is.na(suppressWarnings(as.numeric(prog_mile_period))) ~ as.numeric(prog_mile_period),
+        # Handle numeric period field safely if it exists
+        period_field %in% names(.) && !is.na(suppressWarnings(as.numeric(!!period_sym))) ~ as.numeric(!!period_sym),
         TRUE ~ NA_real_
       )
     ) %>%
@@ -1866,10 +1917,30 @@ create_milestone_overview_dashboard <- function(milestone_results, resident_id, 
     milestone_type = milestone_type,
     resident_data = resident_data
   )
-  
+
+  # Dynamically detect which period field exists in the data
+  period_field <- NULL
+  if ("acgme_mile_period" %in% names(milestone_data)) {
+    period_field <- "acgme_mile_period"
+  } else if ("prog_mile_period_self" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period_self"
+  } else if ("prog_mile_period" %in% names(milestone_data)) {
+    period_field <- "prog_mile_period"
+  }
+
   # Calculate summary statistics
+  # Try filtering by period_name first (text match), then by detected period field
   individual_data <- milestone_data %>%
-    dplyr::filter(record_id == !!resident_id, prog_mile_period == !!period_text)
+    dplyr::filter(record_id == !!resident_id)
+
+  if ("period_name" %in% names(individual_data)) {
+    individual_data <- individual_data %>%
+      dplyr::filter(period_name == !!period_text)
+  } else if (!is.null(period_field) && period_field %in% names(individual_data)) {
+    period_sym <- rlang::sym(period_field)
+    individual_data <- individual_data %>%
+      dplyr::filter(!!period_sym == !!period_text)
+  }
   
   if (nrow(individual_data) > 0) {
     milestone_cols <- get_milestone_columns_simple(milestone_data, milestone_type)
