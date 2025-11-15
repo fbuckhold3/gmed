@@ -209,20 +209,31 @@ create_milestone_workflow_from_dict <- function(all_forms, data_dict, resident_d
       next
     }
     
-    # Process the data
+    # Process the data - keep original period column name!
+    period_sym <- rlang::sym(primary_period_col)
+
+    # DEBUG: Print what we're joining
+    if (verbose) {
+      message("  Primary period column: ", primary_period_col)
+      message("  Form data columns before join: ", paste(head(names(form_data), 10), collapse = ", "))
+    }
+
     processed_data <- form_data %>%
-      # Standardize column names
-      dplyr::rename(prog_mile_period = !!primary_period_col) %>%
-      
-      # Add universal period mapping
-      dplyr::left_join(period_mapping, by = c("prog_mile_period" = "period_code")) %>%
-      
+      # Add universal period mapping using the original period column name
+      dplyr::left_join(period_mapping, by = setNames("period_code", primary_period_col)) %>%
+      {
+        if (verbose) {
+          message("  Columns after join: ", paste(head(names(.), 15), collapse = ", "))
+        }
+        .
+      } %>%
+
       # Convert milestone scores to numeric
       dplyr::mutate(dplyr::across(dplyr::all_of(config$score_columns), as.numeric)) %>%
-      
+
       # Filter to rows with milestone data
       dplyr::filter(dplyr::if_any(dplyr::all_of(config$score_columns), ~ !is.na(.))) %>%
-      
+
       # Ensure record_id is character
       dplyr::mutate(record_id = as.character(record_id))
     
@@ -237,10 +248,10 @@ create_milestone_workflow_from_dict <- function(all_forms, data_dict, resident_d
         )
     }
     
-    # Calculate medians
+    # Calculate medians using the original period column name
     if (nrow(processed_data) > 0) {
       medians <- processed_data %>%
-        dplyr::group_by(prog_mile_period, period_name) %>%
+        dplyr::group_by(!!period_sym, period_name) %>%
         dplyr::summarise(
           dplyr::across(dplyr::all_of(config$score_columns), ~ median(.x, na.rm = TRUE)),
           n_residents = dplyr::n(),
