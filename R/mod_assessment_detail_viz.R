@@ -102,15 +102,11 @@ mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict)
       buttons <- lapply(names(cats), function(cat_key) {
         cat_info <- cats[[cat_key]]
 
-        # Count non-empty values for this category
+        # Count assessments with at least one non-empty value in this category
+        # (count rows before pivot, not field values after pivot)
         cat_count <- filtered_data %>%
           dplyr::select(dplyr::any_of(cat_info$fields)) %>%
-          tidyr::pivot_longer(
-            cols = dplyr::everything(),
-            names_to = "field",
-            values_to = "value"
-          ) %>%
-          dplyr::filter(!is.na(value) & value != "" & value != "0") %>%
+          dplyr::filter(dplyr::if_any(dplyr::everything(), ~!is.na(.) & . != "" & . != "0")) %>%
           nrow()
 
         # Create button label with count
@@ -137,14 +133,14 @@ mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict)
       })
     })
     
-    # Render visualization based on selected category
-    output$viz_output <- renderUI({
+    # Reactive expression for current category data
+    current_category_data <- reactive({
       req(selected_category(), rdm_data(), record_id())
-      
+
       cat_key <- selected_category()
       cats <- assessment_categories()
       cat_info <- cats[[cat_key]]
-      
+
       # Filter data for this resident and category
       filtered_data <- rdm_data() %>%
         dplyr::filter(
@@ -152,15 +148,200 @@ mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict)
           !is.na(redcap_repeat_instrument),
           tolower(redcap_repeat_instrument) == "assessment"
         )
-      
+
+      list(
+        data = filtered_data,
+        cat_info = cat_info,
+        cat_key = cat_key
+      )
+    })
+
+    # Render visualization based on selected category
+    output$viz_output <- renderUI({
+      req(current_category_data())
+
+      cat_data <- current_category_data()
+      cat_info <- cat_data$cat_info
+
       # Create visualization based on category type
       if (cat_info$type == "numeric_scale") {
-        create_scale_viz(filtered_data, cat_info, ns)
+        create_scale_viz(cat_data$data, cat_info, ns)
       } else if (cat_info$type == "observation") {
-        create_observation_viz(filtered_data, cat_info, ns)
+        create_observation_viz(cat_data$data, cat_info, ns)
       } else {
-        create_general_viz(filtered_data, cat_info, ns)
+        create_general_viz(cat_data$data, cat_info, ns)
       }
+    })
+
+    # Render the plotly chart for numeric scale categories
+    output$category_chart <- renderPlotly({
+      req(current_category_data())
+
+      cat_data <- current_category_data()
+      cat_info <- cat_data$cat_info
+      data <- cat_data$data
+
+      # Only render for numeric scale types
+      if (cat_info$type != "numeric_scale") return(NULL)
+
+      # Get non-NA values for these fields
+      field_data <- data %>%
+        dplyr::select(record_id, ass_date, dplyr::any_of(cat_info$fields)) %>%
+        tidyr::pivot_longer(
+          cols = dplyr::any_of(cat_info$fields),
+          names_to = "field",
+          values_to = "value"
+        ) %>%
+        dplyr::filter(!is.na(value) & value != "" & value != "0") %>%
+        dplyr::mutate(
+          value_num = suppressWarnings(as.numeric(value)),
+          field_label = cat_info$field_labels[field]
+        )
+
+      if (nrow(field_data) == 0) return(NULL)
+
+      # Create summary stats
+      summary_stats <- field_data %>%
+        dplyr::group_by(field_label) %>%
+        dplyr::summarise(
+          mean_score = round(mean(value_num, na.rm = TRUE), 2),
+          median_score = median(value_num, na.rm = TRUE),
+          n_assessments = dplyr::n(),
+          .groups = "drop"
+        ) %>%
+        dplyr::arrange(desc(mean_score))
+
+      # Create plotly bar chart
+      plotly::plot_ly(
+        data = summary_stats,
+        x = ~mean_score,
+        y = ~reorder(field_label, mean_score),
+        type = "bar",
+        orientation = "h",
+        text = ~paste0("Mean: ", mean_score, "<br>Median: ", median_score, "<br>N: ", n_assessments),
+        hoverinfo = "text",
+        marker = list(color = ssm_colors()$primary)
+      ) %>%
+        plotly::layout(
+          title = "Average Scores by Assessment Item",
+          xaxis = list(title = "Mean Score"),
+          yaxis = list(title = ""),
+          margin = list(l = 300)
+        )
+    })
+
+    # Render the data table for numeric scale categories
+    output$category_table <- DT::renderDataTable({
+      req(current_category_data())
+
+      cat_data <- current_category_data()
+      cat_info <- cat_data$cat_info
+      data <- cat_data$data
+
+      # Only render for numeric scale types
+      if (cat_info$type != "numeric_scale") return(NULL)
+
+      # Get non-NA values for these fields
+      field_data <- data %>%
+        dplyr::select(record_id, ass_date, dplyr::any_of(cat_info$fields)) %>%
+        tidyr::pivot_longer(
+          cols = dplyr::any_of(cat_info$fields),
+          names_to = "field",
+          values_to = "value"
+        ) %>%
+        dplyr::filter(!is.na(value) & value != "" & value != "0") %>%
+        dplyr::mutate(
+          value_num = suppressWarnings(as.numeric(value)),
+          field_label = cat_info$field_labels[field]
+        )
+
+      if (nrow(field_data) == 0) return(NULL)
+
+      # Create summary stats for table
+      summary_table <- field_data %>%
+        dplyr::group_by(field_label) %>%
+        dplyr::summarise(
+          `Mean Score` = round(mean(value_num, na.rm = TRUE), 2),
+          `Median Score` = median(value_num, na.rm = TRUE),
+          `Count` = dplyr::n(),
+          .groups = "drop"
+        ) %>%
+        dplyr::arrange(desc(`Mean Score`))
+
+      DT::datatable(
+        summary_table,
+        options = list(
+          pageLength = 10,
+          searching = TRUE,
+          ordering = TRUE
+        ),
+        rownames = FALSE
+      )
+    })
+
+    # Render the plotly chart for observation categories
+    output$obs_chart <- renderPlotly({
+      req(current_category_data())
+
+      cat_data <- current_category_data()
+      cat_info <- cat_data$cat_info
+      data <- cat_data$data
+
+      # Only render for observation types
+      if (cat_info$type != "observation") return(NULL)
+
+      # Count observations by type
+      obs_counts <- data %>%
+        dplyr::filter(!is.na(ass_obs_type) & ass_obs_type != "") %>%
+        dplyr::count(ass_obs_type, sort = TRUE)
+
+      if (nrow(obs_counts) == 0) return(NULL)
+
+      # Create plotly bar chart for observations
+      plotly::plot_ly(
+        data = obs_counts,
+        x = ~n,
+        y = ~reorder(ass_obs_type, n),
+        type = "bar",
+        orientation = "h",
+        marker = list(color = ssm_colors()$secondary)
+      ) %>%
+        plotly::layout(
+          title = "Observations by Type",
+          xaxis = list(title = "Count"),
+          yaxis = list(title = "Observation Type"),
+          margin = list(l = 200)
+        )
+    })
+
+    # Render the data table for observation categories
+    output$obs_table <- DT::renderDataTable({
+      req(current_category_data())
+
+      cat_data <- current_category_data()
+      cat_info <- cat_data$cat_info
+      data <- cat_data$data
+
+      # Only render for observation types
+      if (cat_info$type != "observation") return(NULL)
+
+      # Get observation details
+      obs_data <- data %>%
+        dplyr::filter(!is.na(ass_obs_type) & ass_obs_type != "") %>%
+        dplyr::select(ass_date, ass_obs_type, dplyr::any_of(cat_info$fields)) %>%
+        dplyr::arrange(desc(ass_date))
+
+      if (nrow(obs_data) == 0) return(NULL)
+
+      DT::datatable(
+        obs_data,
+        options = list(
+          pageLength = 10,
+          searching = TRUE,
+          ordering = TRUE
+        ),
+        rownames = FALSE
+      )
     })
   })
 }
