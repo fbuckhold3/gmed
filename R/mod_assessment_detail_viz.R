@@ -88,18 +88,41 @@ mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict)
     
     # Render category buttons
     output$category_buttons <- renderUI({
+      req(rdm_data(), record_id())
       cats <- assessment_categories()
-      
+
+      # Get filtered data for this resident
+      filtered_data <- rdm_data() %>%
+        dplyr::filter(
+          record_id == !!record_id(),
+          !is.na(redcap_repeat_instrument),
+          tolower(redcap_repeat_instrument) == "assessment"
+        )
+
       buttons <- lapply(names(cats), function(cat_key) {
         cat_info <- cats[[cat_key]]
-        
+
+        # Count non-empty values for this category
+        cat_count <- filtered_data %>%
+          dplyr::select(dplyr::any_of(cat_info$fields)) %>%
+          tidyr::pivot_longer(
+            cols = dplyr::everything(),
+            names_to = "field",
+            values_to = "value"
+          ) %>%
+          dplyr::filter(!is.na(value) & value != "" & value != "0") %>%
+          nrow()
+
+        # Create button label with count
+        button_label <- paste0(cat_info$display_name, " (", cat_count, ")")
+
         actionButton(
           ns(paste0("cat_", cat_key)),
-          label = cat_info$display_name,
+          label = button_label,
           class = if(selected_category() == cat_key) "category-btn active" else "category-btn"
         )
       })
-      
+
       do.call(tagList, buttons)
     })
     
@@ -127,7 +150,7 @@ mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict)
         dplyr::filter(
           record_id == !!record_id(),
           !is.na(redcap_repeat_instrument),
-          redcap_repeat_instrument == "Assessment"
+          tolower(redcap_repeat_instrument) == "assessment"
         )
       
       # Create visualization based on category type
@@ -244,25 +267,30 @@ extract_assessment_categories <- function(data_dict) {
 #' @keywords internal
 create_scale_viz <- function(data, cat_info, ns) {
   
+  # Count total assessments
+  total_assessments <- nrow(data)
+
   # Get non-NA values for these fields
   field_data <- data %>%
-    dplyr::select(record_id, ass_date, dplyr::all_of(cat_info$fields)) %>%
+    dplyr::select(record_id, ass_date, dplyr::any_of(cat_info$fields)) %>%
     tidyr::pivot_longer(
-      cols = dplyr::all_of(cat_info$fields),
+      cols = dplyr::any_of(cat_info$fields),
       names_to = "field",
       values_to = "value"
     ) %>%
-    dplyr::filter(!is.na(value) & value != "") %>%
+    dplyr::filter(!is.na(value) & value != "" & value != "0") %>%
     dplyr::mutate(
-      value_num = as.numeric(value),
+      value_num = suppressWarnings(as.numeric(value)),
       field_label = cat_info$field_labels[field]
     )
-  
+
   if (nrow(field_data) == 0) {
     return(div(
       class = "alert alert-info",
       icon("info-circle"),
-      " No data available for this category yet."
+      paste0(" No data available for this category yet. ",
+             "Total assessments: ", total_assessments,
+             ", but none contain entries for these specific fields.")
     ))
   }
   
