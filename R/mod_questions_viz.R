@@ -152,20 +152,44 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           week = lubridate::floor_date(q_date, "week")
         )
 
-      # Add rotation labels
-      if (!is.null(rotation_labels())) {
+      # Add rotation labels using the lookup
+      rot_lookup <- rotation_labels()
+
+      if (!is.null(rot_lookup) && length(rot_lookup) > 0) {
         data <- data %>%
           dplyr::mutate(
-            rotation_label = sapply(q_rotation, function(x) {
-              if (is.na(x) || x == "") return("Unknown")
-              label <- rotation_labels()[[as.character(x)]]
-              if (is.null(label)) return(paste("Rotation", x))
-              return(label)
-            })
+            rotation_label = dplyr::case_when(
+              is.na(q_rotation) | q_rotation == "" ~ "Unknown",
+              as.character(q_rotation) %in% names(rot_lookup) ~ rot_lookup[[as.character(q_rotation)]],
+              TRUE ~ paste("Rotation", q_rotation)
+            )
           )
       } else {
+        # Fallback: use hardcoded mapping based on user's specification
         data <- data %>%
-          dplyr::mutate(rotation_label = paste("Rotation", q_rotation))
+          dplyr::mutate(
+            rotation_label = dplyr::case_when(
+              is.na(q_rotation) | q_rotation == "" ~ "Unknown",
+              q_rotation == "1" ~ "Red",
+              q_rotation == "2" ~ "Green",
+              q_rotation == "3" ~ "White",
+              q_rotation == "4" ~ "Yellow",
+              q_rotation == "5" ~ "Diamond",
+              q_rotation == "6" ~ "Gold",
+              q_rotation == "7" ~ "MICU",
+              q_rotation == "8" ~ "Bronze",
+              q_rotation == "9" ~ "Cardiology",
+              q_rotation == "10" ~ "Bridge / Acute Care",
+              q_rotation == "11" ~ "Consults -SLUH",
+              q_rotation == "12" ~ "Elective / Clinics CSM",
+              q_rotation == "13" ~ "VA A",
+              q_rotation == "14" ~ "VA B",
+              q_rotation == "15" ~ "VA C",
+              q_rotation == "16" ~ "VA D",
+              q_rotation == "17" ~ "VA Clinics or Consults",
+              TRUE ~ paste("Rotation", q_rotation)
+            )
+          )
       }
 
       return(data)
@@ -308,7 +332,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
 
       plot_ly(
         data = monthly_data,
-        x = ~month,
+        x = ~month_label,
         y = ~questions,
         type = "bar",
         marker = list(
@@ -318,7 +342,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         text = ~questions,
         textposition = "outside",
         hovertemplate = paste0(
-          "<b>%{x|%B %Y}</b><br>",
+          "<b>%{x}</b><br>",
           "Questions: %{y}<br>",
           "<extra></extra>"
         )
@@ -327,7 +351,9 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           title = "Monthly Question Totals (All Rotations)",
           xaxis = list(
             title = "Month",
-            tickformat = "%b %Y"
+            type = "category",
+            categoryorder = "array",
+            categoryarray = ~month_label
           ),
           yaxis = list(title = "Total Questions", rangemode = "tozero"),
           plot_bgcolor = "rgba(0,0,0,0)",
