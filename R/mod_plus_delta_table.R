@@ -47,23 +47,67 @@
 #' @export
 mod_plus_delta_table_ui <- function(id, title = "Plus/Delta Feedback") {
   ns <- NS(id)
-  
+
   tagList(
+    tags$style(HTML("
+      .plus-delta-toggle {
+        cursor: pointer;
+        user-select: none;
+      }
+      .plus-delta-toggle:hover {
+        opacity: 0.8;
+      }
+      .toggle-icon {
+        transition: transform 0.3s;
+        display: inline-block;
+      }
+      .toggle-icon.collapsed {
+        transform: rotate(-90deg);
+      }
+      .collapsible-content {
+        transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+        overflow: hidden;
+        max-height: 10000px;
+        opacity: 1;
+      }
+      .collapsible-content.collapsed {
+        max-height: 0;
+        opacity: 0;
+      }
+    ")),
+    tags$script(HTML(sprintf("
+      $(document).ready(function() {
+        $('#%s').click(function() {
+          $('#%s').toggleClass('collapsed');
+          $('#%s').toggleClass('collapsed');
+        });
+      });
+    ", ns("toggle_header"), ns("toggle_icon"), ns("collapsible_content")))),
     div(class = "gmed-card",
         if (!is.null(title)) {
-          div(class = "gmed-card-header",
-              h4(icon("comments"), title, class = "gmed-card-title")
+          div(class = "gmed-card-header plus-delta-toggle",
+              id = ns("toggle_header"),
+              h4(
+                span(id = ns("toggle_icon"), class = "toggle-icon", icon("chevron-down")),
+                icon("comments"),
+                title,
+                class = "gmed-card-title",
+                style = "display: inline; margin-left: 0.5rem;"
+              )
           )
         },
-        
-        # Main table output
-        div(class = "gmed-datatable-container",
-            DT::dataTableOutput(ns("plus_delta_table"))
-        ),
-        
-        # Summary statistics
-        div(class = "gmed-table-footer",
-            uiOutput(ns("table_summary"))
+
+        # Collapsible content
+        div(id = ns("collapsible_content"), class = "collapsible-content",
+            # Main table output
+            div(class = "gmed-datatable-container",
+                DT::dataTableOutput(ns("plus_delta_table"))
+            ),
+
+            # Summary statistics
+            div(class = "gmed-table-footer",
+                uiOutput(ns("table_summary"))
+            )
         )
     )
   )
@@ -164,7 +208,7 @@ mod_plus_delta_table_ui <- function(id, title = "Plus/Delta Feedback") {
 mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    
+
     # ========================================================================
     # REACTIVE DATA PROCESSING
     # ========================================================================
