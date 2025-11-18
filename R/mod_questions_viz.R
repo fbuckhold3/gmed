@@ -109,8 +109,16 @@ mod_questions_viz_ui <- function(id, title = "Conference Attendance by Rotation"
                  plotlyOutput(ns("rotation_bar_chart"), height = "400px")
           ),
           column(6,
-                 h4("Timeline"),
+                 h4("Timeline (Weekly)"),
                  plotlyOutput(ns("timeline_chart"), height = "400px")
+          )
+        ),
+
+        # Monthly aggregation chart
+        fluidRow(
+          column(12,
+                 h4("Questions per Month"),
+                 plotlyOutput(ns("monthly_chart"), height = "400px")
           )
         ),
         
@@ -282,7 +290,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
     
     output$timeline_chart <- renderPlotly({
       req(filtered_questions())
-      
+
       weekly_data <- filtered_questions() %>%
         dplyr::group_by(week) %>%
         dplyr::summarise(
@@ -290,9 +298,9 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           .groups = "drop"
         ) %>%
         dplyr::arrange(week)
-      
+
       colors <- ssm_colors()
-      
+
       plot_ly(
         data = weekly_data,
         x = ~week,
@@ -330,6 +338,59 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           showlegend = TRUE,
           plot_bgcolor = "rgba(0,0,0,0)",
           paper_bgcolor = "rgba(0,0,0,0)"
+        )
+    })
+
+    output$monthly_chart <- renderPlotly({
+      req(filtered_questions())
+
+      monthly_data <- filtered_questions() %>%
+        dplyr::mutate(
+          month = lubridate::floor_date(q_date, "month")
+        ) %>%
+        dplyr::group_by(month) %>%
+        dplyr::summarise(
+          questions = dplyr::n(),
+          .groups = "drop"
+        ) %>%
+        dplyr::arrange(month) %>%
+        dplyr::mutate(
+          month_label = format(month, "%b %Y")
+        )
+
+      colors <- ssm_colors()
+
+      plot_ly(
+        data = monthly_data,
+        x = ~month,
+        y = ~questions,
+        type = "bar",
+        marker = list(
+          color = colors$accent_blue,
+          line = list(color = colors$primary, width = 1)
+        ),
+        text = ~questions,
+        textposition = "outside",
+        hovertemplate = paste0(
+          "<b>%{x|%B %Y}</b><br>",
+          "Questions: %{y}<br>",
+          "<extra></extra>"
+        )
+      ) %>%
+        layout(
+          title = if(input$rotation_filter == "all") {
+            "Monthly Question Totals (All Rotations)"
+          } else {
+            paste("Monthly Question Totals:", input$rotation_filter)
+          },
+          xaxis = list(
+            title = "Month",
+            tickformat = "%b %Y"
+          ),
+          yaxis = list(title = "Total Questions", rangemode = "tozero"),
+          plot_bgcolor = "rgba(0,0,0,0)",
+          paper_bgcolor = "rgba(0,0,0,0)",
+          bargap = 0.2
         )
     })
     
