@@ -2,21 +2,25 @@
 % Please edit documentation in R/mod_assessment_viz_wrapper.R
 \name{mod_assessment_viz_wrapper_ui}
 \alias{mod_assessment_viz_wrapper_ui}
-\title{Assessment Visualization Wrapper Module UI}
+\title{Assessment Visualization Wrapper UI}
 \usage{
 mod_assessment_viz_wrapper_ui(
   id,
   title = "Assessment Review",
-  include_questions = TRUE
+  include_questions = TRUE,
+  include_cc_completion = TRUE
 )
 }
 \arguments{
-\item{id}{Module namespace ID}
+\item{id}{Module namespace}
 
-\item{title}{Title for the visualization section}
+\item{title}{Section title (default: "Assessment Review")}
 
-\item{include_questions}{Logical, include questions module (default TRUE)}
+\item{include_questions}{Include questions/conference module (default: TRUE)}
+
+\item{include_cc_completion}{Include CC completion status (default: TRUE)}
 }
 \description{
-Combines plus_delta table, assessment charts, detail viz, and questions into single module
+Wrapper for all assessment visualizations including plus/delta, charts,
+CC completion, detailed breakdown, and questions
 }

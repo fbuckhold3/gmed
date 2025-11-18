@@ -2,7 +2,7 @@
 % Please edit documentation in R/mod_assessment_viz_wrapper.R
 \name{mod_assessment_viz_wrapper_server}
 \alias{mod_assessment_viz_wrapper_server}
-\title{Assessment Visualization Wrapper Module Server}
+\title{Assessment Visualization Wrapper Server}
 \usage{
 mod_assessment_viz_wrapper_server(
   id,
@@ -10,25 +10,31 @@ mod_assessment_viz_wrapper_server(
   record_id,
   data_dict,
   include_questions = TRUE,
+  include_cc_completion = TRUE,
   resident_name = NULL,
+  resident_data = NULL,
   rdm_data_raw = NULL
 )
 }
 \arguments{
-\item{id}{Module namespace ID}
+\item{id}{Module namespace}
 
-\item{rdm_data}{Reactive returning full RDM data (must include assessment and questions forms)}
+\item{rdm_data}{Reactive containing full RDM data (must include assessment and questions)}
 
-\item{record_id}{Reactive returning current resident record_id}
+\item{record_id}{Reactive returning resident record_id}
 
-\item{data_dict}{Reactive or static data dictionary}
+\item{data_dict}{Data dictionary (reactive or static)}
 
-\item{include_questions}{Logical, include questions module (default TRUE)}
+\item{include_questions}{Include questions module (default: TRUE)}
 
-\item{resident_name}{Reactive returning resident name (optional)}
+\item{include_cc_completion}{Include CC completion (default: TRUE)}
 
-\item{rdm_data_raw}{Reactive returning raw assessment data for plus/delta (optional)}
+\item{resident_name}{Optional reactive returning resident name}
+
+\item{resident_data}{Optional reactive returning resident info (for CC completion)}
+
+\item{rdm_data_raw}{Optional raw assessment data (for plus_delta if needed)}
 }
 \description{
-Assessment Visualization Wrapper Module Server
+Assessment Visualization Wrapper Server
 }
