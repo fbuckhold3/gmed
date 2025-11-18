@@ -90,18 +90,7 @@ mod_questions_viz_ui <- function(id, title = "Conference Attendance by Rotation"
                  )
           )
         ),
-        
-        # Rotation selector
-        div(class = "rotation-selector",
-            h4("Filter by Rotation"),
-            selectInput(
-              ns("rotation_filter"),
-              label = NULL,
-              choices = NULL,  # Will populate dynamically
-              width = "100%"
-            )
-        ),
-        
+
         # Charts
         fluidRow(
           column(6,
@@ -120,18 +109,6 @@ mod_questions_viz_ui <- function(id, title = "Conference Attendance by Rotation"
                  h4("Questions per Month"),
                  plotlyOutput(ns("monthly_chart"), height = "400px")
           )
-        ),
-        
-        # Detailed metrics for selected rotation
-        div(style = "margin-top: 2rem;",
-            h4("Rotation Details"),
-            uiOutput(ns("rotation_metrics"))
-        ),
-        
-        # Data table
-        div(style = "margin-top: 2rem;",
-            h4("Question History"),
-            DT::dataTableOutput(ns("questions_table"))
         )
     )
   )
@@ -150,19 +127,19 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
     # Get rotation labels from data dictionary
     rotation_labels <- reactive({
       dict <- if(is.reactive(data_dict)) data_dict() else data_dict
-      
+
       q_rot_row <- dict %>%
         dplyr::filter(field_name == "q_rotation")
-      
+
       if (nrow(q_rot_row) == 0) return(NULL)
-      
+
       parse_choices(q_rot_row$choices[1])
     })
-    
+
     # Filter questions data for this resident
     questions_data <- reactive({
       req(rdm_data(), record_id())
-      
+
       data <- rdm_data() %>%
         dplyr::filter(
           record_id == !!record_id(),
@@ -174,7 +151,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           q_date = as.Date(q_date, format = "%Y-%m-%d"),
           week = lubridate::floor_date(q_date, "week")
         )
-      
+
       # Add rotation labels
       if (!is.null(rotation_labels())) {
         data <- data %>%
@@ -190,34 +167,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         data <- data %>%
           dplyr::mutate(rotation_label = paste("Rotation", q_rotation))
       }
-      
-      return(data)
-    })
-    
-    # Update rotation filter choices
-    observe({
-      req(questions_data())
-      
-      rotations <- questions_data() %>%
-        dplyr::count(rotation_label, sort = TRUE)
-      
-      choices <- c("All Rotations" = "all", 
-                   setNames(rotations$rotation_label, rotations$rotation_label))
-      
-      updateSelectInput(session, "rotation_filter", choices = choices)
-    })
-    
-    # Filtered data based on rotation selection
-    filtered_questions <- reactive({
-      req(questions_data(), input$rotation_filter)
-      
-      data <- questions_data()
-      
-      if (input$rotation_filter != "all") {
-        data <- data %>%
-          dplyr::filter(rotation_label == input$rotation_filter)
-      }
-      
+
       return(data)
     })
     
@@ -289,9 +239,9 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
     })
     
     output$timeline_chart <- renderPlotly({
-      req(filtered_questions())
+      req(questions_data())
 
-      weekly_data <- filtered_questions() %>%
+      weekly_data <- questions_data() %>%
         dplyr::group_by(week) %>%
         dplyr::summarise(
           questions = dplyr::n(),
@@ -328,11 +278,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           hoverinfo = "skip"
         ) %>%
         layout(
-          title = if(input$rotation_filter == "all") {
-            "Questions Over Time (All Rotations)"
-          } else {
-            paste("Questions Over Time:", input$rotation_filter)
-          },
+          title = "Questions Over Time (All Rotations)",
           xaxis = list(title = "Week"),
           yaxis = list(title = "Questions per Week", rangemode = "tozero"),
           showlegend = TRUE,
@@ -342,9 +288,9 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
     })
 
     output$monthly_chart <- renderPlotly({
-      req(filtered_questions())
+      req(questions_data())
 
-      monthly_data <- filtered_questions() %>%
+      monthly_data <- questions_data() %>%
         dplyr::mutate(
           month = lubridate::floor_date(q_date, "month")
         ) %>%
@@ -378,11 +324,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         )
       ) %>%
         layout(
-          title = if(input$rotation_filter == "all") {
-            "Monthly Question Totals (All Rotations)"
-          } else {
-            paste("Monthly Question Totals:", input$rotation_filter)
-          },
+          title = "Monthly Question Totals (All Rotations)",
           xaxis = list(
             title = "Month",
             tickformat = "%b %Y"
@@ -391,100 +333,6 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           plot_bgcolor = "rgba(0,0,0,0)",
           paper_bgcolor = "rgba(0,0,0,0)",
           bargap = 0.2
-        )
-    })
-    
-    # === ROTATION METRICS ===
-    
-    output$rotation_metrics <- renderUI({
-      req(filtered_questions())
-      
-      data <- filtered_questions()
-      
-      if (nrow(data) == 0) {
-        return(div(
-          class = "alert alert-info",
-          icon("info-circle"),
-          " No data for selected rotation."
-        ))
-      }
-      
-      # Calculate metrics
-      weekly_summary <- data %>%
-        dplyr::group_by(week) %>%
-        dplyr::summarise(n = dplyr::n(), .groups = "drop")
-      
-      avg_per_week <- round(mean(weekly_summary$n), 2)
-      median_per_week <- median(weekly_summary$n)
-      weeks_at_target <- sum(weekly_summary$n >= 4)
-      pct_at_target <- round(100 * weeks_at_target / nrow(weekly_summary), 1)
-      
-      fluidRow(
-        column(3,
-               div(class = "metric-card",
-                   div(class = "metric-label", "Average per Week"),
-                   div(class = "metric-value", avg_per_week)
-               )
-        ),
-        column(3,
-               div(class = "metric-card",
-                   div(class = "metric-label", "Median per Week"),
-                   div(class = "metric-value", median_per_week)
-               )
-        ),
-        column(3,
-               div(class = "metric-card",
-                   div(class = "metric-label", "Weeks at Target"),
-                   div(class = "metric-value", paste0(weeks_at_target, "/", nrow(weekly_summary)))
-               )
-        ),
-        column(3,
-               div(class = "metric-card",
-                   div(class = "metric-label", "% Meeting Target"),
-                   div(class = "metric-value", paste0(pct_at_target, "%"))
-               )
-        )
-      )
-    })
-    
-    # === DATA TABLE ===
-    
-    output$questions_table <- DT::renderDataTable({
-      req(filtered_questions())
-      
-      table_data <- filtered_questions() %>%
-        dplyr::select(q_date, rotation_label, q_answer, q_level) %>%
-        dplyr::arrange(desc(q_date)) %>%
-        dplyr::mutate(
-          q_date = format(q_date, "%m/%d/%Y"),
-          level_label = dplyr::case_when(
-            q_level == "1" ~ "Intern",
-            q_level == "2" ~ "PGY2",
-            q_level == "3" ~ "PGY3",
-            TRUE ~ as.character(q_level)
-          )
-        ) %>%
-        dplyr::select(
-          Date = q_date,
-          Rotation = rotation_label,
-          Answer = q_answer,
-          Level = level_label
-        )
-      
-      DT::datatable(
-        table_data,
-        options = list(
-          pageLength = 15,
-          dom = 'frtip',
-          order = list(list(0, 'desc'))
-        ),
-        rownames = FALSE,
-        filter = "top"
-      ) %>%
-        DT::formatStyle(
-          'Answer',
-          fontWeight = 'bold',
-          color = ssm_colors()$primary
         )
     })
   })

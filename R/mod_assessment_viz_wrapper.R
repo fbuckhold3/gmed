@@ -20,24 +20,24 @@ mod_assessment_viz_wrapper_ui <- function(id,
   ns <- NS(id)
 
   tagList(
-    # Plus/Delta feedback table
-    mod_plus_delta_table_ui(ns("plus_delta"), title = "Recent Feedback"),
-
     # Assessment progress charts
     assessment_viz_ui(ns("charts"), title = "Assessment Progress"),
-
-    # CC Completion Status (NEW)
-    if (include_cc_completion) {
-      mod_cc_completion_ui(ns("cc_completion"))
-    },
 
     # Detailed assessment breakdown
     mod_assessment_detail_viz_ui(ns("details")),
 
+    # CC Completion Status
+    if (include_cc_completion) {
+      mod_cc_completion_ui(ns("cc_completion"))
+    },
+
     # Questions/conference attendance
     if (include_questions) {
       mod_questions_viz_ui(ns("questions"), title = "Conference Attendance by Rotation")
-    }
+    },
+
+    # Plus/Delta feedback table
+    mod_plus_delta_table_ui(ns("plus_delta"), title = "Recent Feedback")
   )
 }
 
