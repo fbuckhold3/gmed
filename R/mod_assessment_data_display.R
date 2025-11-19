@@ -93,6 +93,11 @@ mod_assessment_data_display_server <- function(id, selected_category, category_d
       display_data <- display_data %>%
         dplyr::select(dplyr::any_of(all_cols))
 
+      # Ensure we have data
+      if (nrow(display_data) == 0 || ncol(display_data) == 0) {
+        return(NULL)
+      }
+
       # Get readable column names from data dictionary
       col_labels <- sapply(names(display_data), function(field_name) {
         label <- data_dict %>%
@@ -141,6 +146,9 @@ mod_assessment_data_display_server <- function(id, selected_category, category_d
         }
       }
 
+      # Convert to data frame to ensure proper structure
+      display_data_decoded <- as.data.frame(display_data_decoded, stringsAsFactors = FALSE)
+
       # Create datatable
       DT::datatable(
         display_data_decoded,
@@ -148,13 +156,10 @@ mod_assessment_data_display_server <- function(id, selected_category, category_d
         options = list(
           pageLength = 10,
           scrollX = TRUE,
-          scrollY = "400px",
-          dom = 'Bfrtip',
-          buttons = c('copy', 'csv', 'excel')
+          scrollY = "400px"
         ),
         rownames = FALSE,
-        filter = "top",
-        extensions = 'Buttons'
+        filter = "top"
       )
     })
   })
