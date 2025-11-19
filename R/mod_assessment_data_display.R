@@ -98,19 +98,7 @@ mod_assessment_data_display_server <- function(id, selected_category, category_d
         return(NULL)
       }
 
-      # Get readable column names from data dictionary
-      col_labels <- sapply(names(display_data), function(field_name) {
-        label <- data_dict %>%
-          dplyr::filter(field_name == !!field_name) %>%
-          dplyr::pull(field_label)
-
-        if (length(label) > 0 && !is.na(label[1])) {
-          return(label[1])
-        }
-        return(field_name)
-      })
-
-      # Decode choice values
+      # Decode choice values first
       display_data_decoded <- display_data
       for (col_name in names(display_data)) {
         field_info <- data_dict %>%
@@ -149,10 +137,22 @@ mod_assessment_data_display_server <- function(id, selected_category, category_d
       # Convert to data frame to ensure proper structure
       display_data_decoded <- as.data.frame(display_data_decoded, stringsAsFactors = FALSE)
 
+      # Rename columns to readable labels
+      new_names <- sapply(names(display_data_decoded), function(field_name) {
+        label <- data_dict %>%
+          dplyr::filter(field_name == !!field_name) %>%
+          dplyr::pull(field_label)
+
+        if (length(label) > 0 && !is.na(label[1])) {
+          return(label[1])
+        }
+        return(field_name)
+      })
+      names(display_data_decoded) <- new_names
+
       # Create datatable
       DT::datatable(
         display_data_decoded,
-        colnames = col_labels,
         options = list(
           pageLength = 10,
           scrollX = TRUE,
