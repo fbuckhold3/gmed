@@ -417,10 +417,12 @@ mod_assessment_detail_custom_server <- function(id, rdm_data, record_id, data_di
 
       DT::datatable(
         viz_result$text_display_data,
+        colnames = c("Date", "Faculty", "", ""),
         options = list(pageLength = 10, scrollX = TRUE, scrollY = "300px"),
         rownames = FALSE,
         escape = FALSE
-      )
+      ) %>%
+        DT::formatStyle("field_label", fontWeight = "bold")
     })
 
     # Render observation visualization area
@@ -479,6 +481,12 @@ mod_assessment_detail_custom_server <- function(id, rdm_data, record_id, data_di
         )
       }
     })
+
+    # Return reactive values for use by companion modules
+    return(list(
+      selected_category = selected_category,
+      category_data = current_category_data
+    ))
   })
 }
 
