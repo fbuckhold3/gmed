@@ -46,25 +46,22 @@
 #' residents <- app_data$residents
 #' assessment_data <- app_data$assessment_data
 #' }
-load_rdm_simple <- function(rdm_token = NULL, 
+load_rdm_simple <- function(rdm_token = NULL,
                             redcap_url = "https://redcapsurvey.slu.edu/api/",
                             for_app = "general",
                             verbose = TRUE,
                             config_fallback = TRUE) {
-  
-  if (verbose) cat("=== SIMPLE RDM 2.0 DATA LOADER ===\n")
-  
+
   # =========================================================================
   # CONFIGURATION AUTO-DETECTION
   # =========================================================================
-  
+
   # Try to get token from various sources
   if (is.null(rdm_token)) {
     rdm_token <- Sys.getenv("RDM_TOKEN", unset = "")
-    
+
     # If environment variable is empty and config fallback is enabled
     if (rdm_token == "" && config_fallback && file.exists("config.yml")) {
-      if (verbose) cat("Trying config file...\n")
       tryCatch({
         config_data <- config::get()
         rdm_token <- config_data$rdm_token %||% ""
@@ -73,7 +70,7 @@ load_rdm_simple <- function(rdm_token = NULL,
       })
     }
   }
-  
+
   # Validate token
   if (is.null(rdm_token) || rdm_token == "") {
     stop("RDM_TOKEN is required. Set it as:\n",
@@ -81,15 +78,11 @@ load_rdm_simple <- function(rdm_token = NULL,
          "  - Function parameter: load_rdm_simple(rdm_token='your_token')\n",
          "  - Config file: config.yml with rdm_token field")
   }
-  
-  if (verbose) cat("Token configured (length: ", nchar(rdm_token), ")\n")
-  
+
   # =========================================================================
   # STEP 1: LOAD RAW DATA
   # =========================================================================
-  
-  if (verbose) cat("Loading RDM 2.0 data...\n")
-  
+
   # Use your existing proven functions
   raw_data <- load_data_by_forms(
     rdm_token = rdm_token,
@@ -98,34 +91,26 @@ load_rdm_simple <- function(rdm_token = NULL,
     calculate_levels = FALSE, # Don't calculate yet - do it in proper order
     verbose = verbose
   )
-  
-  if (verbose) cat("Raw data loaded\n")
-  
+
   # =========================================================================
   # STEP 2: HISTORICAL CALCULATIONS (BEFORE FILTERING)
   # =========================================================================
-  
-  if (verbose) cat("Calculating historical milestone medians...\n")
+
   historical_medians <- tryCatch({
     calculate_all_milestone_medians(raw_data)
   }, error = function(e) {
     if (verbose) cat("Historical medians calculation failed: ", e$message, "\n")
     list()
   })
-  
-  if (verbose) cat("Historical medians calculated\n")
-  
+
   # =========================================================================
   # STEP 3: FILTER AND PROCESS ACTIVE DATA
   # =========================================================================
-  
-  if (verbose) cat("Filtering archived residents...\n")
+
   clean_data <- filter_archived_residents(raw_data, verbose = verbose)
-  
-  if (verbose) cat("Adding level-at-time calculations...\n")
+
   data_with_levels <- add_level_at_time_to_forms(clean_data)
-  
-  if (verbose) cat("Preparing milestone app data...\n")
+
   milestone_data <- tryCatch({
     prepare_milestone_app_data(data_with_levels)
   }, error = function(e) {
@@ -136,46 +121,45 @@ load_rdm_simple <- function(rdm_token = NULL,
   # =========================================================================
   # STEP 4: EXTRACT AND STANDARDIZE KEY DATASETS
   # =========================================================================
-  
+
   # Extract residents data
   residents <- data_with_levels$forms$resident_data
   if (is.null(residents)) {
     # Try alternatives
-    residents <- data_with_levels$forms$residents %||% 
+    residents <- data_with_levels$forms$residents %||%
       data_with_levels$forms$demographic_data %||%
       data_with_levels$forms[[1]]
   }
-  
+
   # Ensure standard columns exist
   if (!is.null(residents)) {
     residents <- ensure_standard_resident_columns(residents, verbose = verbose)
   }
-  
+
   # Extract assessment data - CRITICAL: this is what gmed modules expect
   assessment_data <- NULL
   if ("assessment" %in% names(data_with_levels$forms)) {
     assessment_data <- data_with_levels$forms$assessment
-    if (verbose) cat("Assessment data extracted: ", nrow(assessment_data), " records\n")
   } else {
     if (verbose) cat("WARNING: No assessment form found\n")
     assessment_data <- data.frame()
   }
-  
+
   # =========================================================================
   # STEP 5: RETURN STANDARDIZED STRUCTURE
   # =========================================================================
-  
+
   result <- list(
     # Key datasets that apps will use
     residents = residents,
     assessment_data = assessment_data,  # Raw assessment data for gmed modules
     all_forms = data_with_levels$forms,
-    
+
     # Supporting data
     historical_medians = historical_medians,
     milestone_data = milestone_data,
     data_dict = raw_data$data_dict,
-    
+
     # Configuration info (for debugging)
     config = list(
       rdm_token = rdm_token,
@@ -183,7 +167,7 @@ load_rdm_simple <- function(rdm_token = NULL,
       for_app = for_app,
       loaded_at = Sys.time()
     ),
-    
+
     # Metadata
     metadata = list(
       total_residents = nrow(residents),
@@ -192,66 +176,53 @@ load_rdm_simple <- function(rdm_token = NULL,
       app_ready = TRUE
     )
   )
-  
-  if (verbose) {
-    cat("=== DATA LOADING COMPLETE ===\n")
-    cat("Residents: ", nrow(residents), "\n")
-    cat("Assessment records: ", nrow(assessment_data), "\n")  
-    cat("Forms available: ", paste(names(data_with_levels$forms), collapse = ", "), "\n")
-    cat("Ready for app type: ", for_app, "\n")
-  }
-  
+
   return(result)
 }
 
 #' Ensure Standard Resident Columns
 #'
 #' Helper to add standard columns that apps expect
-#' 
+#'
 #' @param residents Residents data frame
 #' @param verbose Print messages
 #' @return Residents data with standard columns
 ensure_standard_resident_columns <- function(residents, verbose = TRUE) {
-  
+
   # Standard name column
   if (!"name" %in% names(residents)) {
     name_alternatives <- c("Name", "resident_name", "full_name", "first_name")
     found_col <- intersect(name_alternatives, names(residents))[1]
-    
+
     if (!is.na(found_col)) {
       residents$name <- residents[[found_col]]
-      if (verbose) cat("Using ", found_col, " as name column\n")
     } else {
       residents$name <- paste("Resident", residents$record_id)
-      if (verbose) cat("Created name column from record_id\n")
     }
   }
-  
+
   # Standard Level column
   if (!"Level" %in% names(residents)) {
     level_alternatives <- c("level", "resident_level", "training_level", "pgy", "PGY", "year")
     found_col <- intersect(level_alternatives, names(residents))[1]
-    
+
     if (!is.na(found_col)) {
       residents$Level <- residents[[found_col]]
-      if (verbose) cat("Using ", found_col, " as Level column\n")
     } else {
       residents$Level <- "Unknown"
-      if (verbose) cat("No level column found, using 'Unknown'\n")
     }
   }
-  
+
   # Standard access_code column
   if (!"access_code" %in% names(residents)) {
     code_alternatives <- c("accesscode", "code", "resident_code")
     found_col <- intersect(code_alternatives, names(residents))[1]
-    
+
     if (!is.na(found_col)) {
       residents$access_code <- residents[[found_col]]
-      if (verbose) cat("Using ", found_col, " as access_code column\n")
     }
   }
-  
+
   return(residents)
 }
 
@@ -263,13 +234,11 @@ ensure_standard_resident_columns <- function(residents, verbose = TRUE) {
 #' @return Basic data structure ready for gmed modules
 #' @export
 load_rdm_quick <- function(rdm_token) {
-  cat("Quick loading RDM data for development...\n")
-  
   # Basic load
   data <- load_data_by_forms(rdm_token = rdm_token, verbose = FALSE)
   clean_data <- filter_archived_residents(data, verbose = FALSE)
   final_data <- add_level_at_time_to_forms(clean_data)
-  
+
   list(
     residents = final_data$forms$resident_data,
     assessment_data = final_data$forms$assessment %||% data.frame(),
