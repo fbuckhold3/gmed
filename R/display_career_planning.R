@@ -303,7 +303,6 @@ display_career_planning <- function(rdm_data, record_id, current_period, data_di
   )
 }
 
-
 #' Display Previous Wellness Data with Enhanced Styling
 #'
 #' Displays wellness data from previous period with subtle card styling
