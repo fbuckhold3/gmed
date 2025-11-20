@@ -12,6 +12,7 @@
 #'
 #' @importFrom shiny div icon span h6 strong em p tagList
 #' @importFrom dplyr filter
+#' @importFrom rlang sym    # ← ADD THIS LINE
 #' @export
 display_career_planning <- function(rdm_data, record_id, current_period, data_dict) {
 
