@@ -2,22 +2,23 @@
 % Please edit documentation in R/display_career_planning.R
 \name{display_career_planning}
 \alias{display_career_planning}
-\title{Display Career Planning Data}
+\title{Display Previous Career Planning Data with Enhanced Styling}
 \usage{
 display_career_planning(rdm_data, record_id, current_period, data_dict)
 }
 \arguments{
-\item{rdm_data}{Data frame containing REDCap data}
+\item{rdm_data}{Data frame containing REDCap data OR data structure with $all_forms$s_eval}
 
-\item{record_id}{The record ID to display data for}
+\item{record_id}{Character or numeric record ID}
 
-\item{current_period}{Current period number (1-7)}
+\item{current_period}{Current period number (1-7) or list with period_number, or character name}
 
-\item{data_dict}{Data dictionary for translating coded values}
+\item{data_dict}{Data dictionary for field label lookups}
 }
 \value{
-A tagList containing the formatted display
+Shiny UI element (card with career planning display) or NULL
 }
 \description{
-Shows career planning goals and paths from current or previous periods
+Displays career planning data from previous period with badges, icons, and
+improved visual hierarchy.
 }

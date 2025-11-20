@@ -1,561 +1,373 @@
-#' Display Career Planning Data
-
+#' Display Previous Career Planning Data with Enhanced Styling
 #'
-
-#' Shows career planning goals and paths from current or previous periods
-
+#' Displays career planning data from previous period with badges, icons, and
+#' improved visual hierarchy.
 #'
-
 #' @param rdm_data Data frame containing REDCap data OR data structure with $all_forms$s_eval
-
-#' @param record_id The record ID to display data for
-
-#' @param current_period Current period number (1-7) or list with period_number
-
-#' @param data_dict Data dictionary for translating coded values
-
+#' @param record_id Character or numeric record ID
+#' @param current_period Current period number (1-7) or list with period_number, or character name
+#' @param data_dict Data dictionary for field label lookups
 #'
-
-#' @return A tagList containing the formatted display
-
+#' @return Shiny UI element (card with career planning display) or NULL
+#'
+#' @importFrom shiny div icon span h6 strong em p tagList
+#' @importFrom dplyr filter
 #' @export
-
 display_career_planning <- function(rdm_data, record_id, current_period, data_dict) {
 
- 
-
   # Handle different data structure formats
-
-  # If rdm_data has $all_forms$s_eval, use that; otherwise use rdm_data directly
-
   if (!is.null(rdm_data$all_forms) && !is.null(rdm_data$all_forms$s_eval)) {
-
     s_eval_data <- rdm_data$all_forms$s_eval
-
   } else {
-
     s_eval_data <- rdm_data
-
   }
-
- 
-
-  # Filter to this record
-
-  record_data <- s_eval_data %>%
-
-    dplyr::filter(record_id == !!record_id)
-
- 
 
   # Helper to get field name column
-
   get_field_name_col <- function() {
-
     if ("field_name" %in% names(data_dict)) return("field_name")
-
     if ("Variable / Field Name" %in% names(data_dict)) return("Variable / Field Name")
-
     if ("Variable...Field.Name" %in% names(data_dict)) return("Variable...Field.Name")
-
     stop("Cannot find field name column in data dictionary")
-
   }
-
- 
-
-  # Helper to get field label column
-
-  get_field_label_col <- function() {
-
-    if ("field_label" %in% names(data_dict)) return("field_label")
-
-    if ("Field Label" %in% names(data_dict)) return("Field Label")
-
-    if ("Field.Label" %in% names(data_dict)) return("Field.Label")
-
-    stop("Cannot find field label column in data dictionary")
-
-  }
-
- 
 
   # Helper to get choices column
-
   get_choices_col <- function() {
-
     if ("select_choices_or_calculations" %in% names(data_dict)) return("select_choices_or_calculations")
-
     if ("Choices, Calculations, OR Slider Labels" %in% names(data_dict)) return("Choices, Calculations, OR Slider Labels")
-
     if ("Choices..Calculations..OR.Slider.Labels" %in% names(data_dict)) return("Choices..Calculations..OR.Slider.Labels")
-
     stop("Cannot find choices column in data dictionary")
-
   }
-
- 
 
   field_name_col <- get_field_name_col()
-
-  field_label_col <- get_field_label_col()
-
   choices_col <- get_choices_col()
 
- 
-
-  # Helper function to get field label from data dict
-
-  get_field_label <- function(field_name) {
-
-    label <- data_dict %>%
-
-      dplyr::filter(!!rlang::sym(field_name_col) == field_name) %>%
-
-      dplyr::pull(!!rlang::sym(field_label_col))
-
-    if (length(label) == 0) return(field_name)
-
-    label[1]
-
+  # Helper to get field info from data dict
+  get_field_info <- function(field_name_val) {
+    data_dict %>%
+      dplyr::filter(!!rlang::sym(field_name_col) == !!field_name_val) %>%
+      dplyr::slice(1)
   }
 
- 
+  # Helper to get choices string
+  get_choices_string <- function(field_row) {
+    field_row[[choices_col]]
+  }
 
-  # Helper to parse choices from data dict
+  # Helper to parse choices - returns named vector
+  parse_choices <- function(choices_string) {
+    if (is.na(choices_string) || choices_string == "") return(NULL)
 
-  parse_choices_from_dict <- function(field_name) {
-
-    choices_raw <- data_dict %>%
-
-      dplyr::filter(!!rlang::sym(field_name_col) == field_name) %>%
-
-      dplyr::pull(!!rlang::sym(choices_col))
-
- 
-
-    if (length(choices_raw) == 0 || is.na(choices_raw[1])) return(NULL)
-
- 
-
-    # Parse choices manually
-
-    items <- strsplit(choices_raw[1], "\\|")[[1]]
-
+    # Split by pipe
+    items <- strsplit(choices_string, "\\|")[[1]]
     items <- trimws(items)
 
- 
-
-    result <- list()
+    # Parse each item: "code, label"
+    codes <- character()
+    labels <- character()
 
     for (item in items) {
-
       parts <- strsplit(item, ",", fixed = TRUE)[[1]]
-
       if (length(parts) >= 2) {
-
         code <- trimws(parts[1])
-
         label <- trimws(paste(parts[-1], collapse = ","))
-
-        result[[code]] <- label
-
+        codes <- c(codes, code)
+        labels <- c(labels, label)
       }
-
     }
 
-    return(result)
-
+    # Return named vector: names = labels, values = codes
+    setNames(codes, labels)
   }
-
- 
-
-  # Helper to decode checkbox values
-
-  decode_checkboxes <- function(data_row, field_base_name) {
-
-    # Find all checkbox fields for this base field (field___1, field___2, etc.)
-
-    checkbox_pattern <- paste0("^", field_base_name, "___")
-
-    checkbox_cols <- grep(checkbox_pattern, names(data_row), value = TRUE)
-
- 
-
-    if (length(checkbox_cols) == 0) return(NULL)
-
- 
-
-    # Get the codes that are checked
-
-    checked_codes <- character()
-
-    for (col in checkbox_cols) {
-
-      if (!is.na(data_row[[col]]) && data_row[[col]] == "1") {
-
-        # Extract code from field name (e.g., "s_e_career_path___2" -> "2")
-
-        code <- sub(paste0(field_base_name, "___"), "", col)
-
-        checked_codes <- c(checked_codes, code)
-
-      }
-
-    }
-
- 
-
-    if (length(checked_codes) == 0) return(NULL)
-
- 
-
-    # Get the labels for these codes
-
-    choices <- parse_choices_from_dict(field_base_name)
-
-    if (is.null(choices)) return(paste(checked_codes, collapse = ", "))
-
- 
-
-    labels <- sapply(checked_codes, function(code) {
-
-      choices[[code]] %||% code
-
-    })
-
- 
-
-    return(paste(labels, collapse = ", "))
-
-  }
-
- 
 
   # Convert period to number - handle all types
-
   current_period_num <- if (is.numeric(current_period)) {
-
     current_period
-
   } else if (is.list(current_period) && "period_number" %in% names(current_period)) {
-
     current_period$period_number
-
   } else if (is.character(current_period)) {
-
     period_map <- c(
+      "Entering Residency" = 7, "Mid Intern" = 1, "End Intern" = 2,
+      "Mid PGY2" = 3, "End PGY2" = 4, "Mid PGY3" = 5, "Graduating" = 6
+    )
+    period_map[current_period]
+  } else {
+    as.numeric(current_period)
+  }
 
-      "Entering Residency" = 7,
+  # Get previous period data
+  prev_period <- current_period_num - 1
+  if (prev_period < 1) return(NULL)
 
-      "Mid Intern" = 1,
-
-      "End Intern" = 2,
-
-      "Mid PGY2" = 3,
-
-      "End PGY2" = 4,
-
-      "Mid PGY3" = 5,
-
-      "Graduating" = 6
-
+  # Filter to previous period's data
+  prev_data <- s_eval_data %>%
+    dplyr::filter(
+      record_id == !!record_id,
+      redcap_repeat_instrument == "s_eval",
+      redcap_repeat_instance == prev_period
     )
 
+  if (nrow(prev_data) == 0) {
+    return(NULL)  # Don't show anything if no previous data
+  }
+
+  # Decode career path checkboxes
+  career_cols <- grep("^s_e_career_path___", names(prev_data), value = TRUE)
+  career_selected <- character()
+  if (length(career_cols) > 0) {
+    career_field <- get_field_info("s_e_career_path")
+    career_choices_map <- parse_choices(get_choices_string(career_field))
+
+    for (col in career_cols) {
+      if (!is.na(prev_data[[col]][1]) && prev_data[[col]][1] == "1") {
+        code <- sub("s_e_career_path___", "", col)
+        # Find label for this code
+        label <- names(career_choices_map)[career_choices_map == code]
+        if (length(label) > 0) {
+          career_selected <- c(career_selected, label)
+        }
+      }
+    }
+  }
+
+  # Decode fellowship checkboxes
+  fellow_cols <- grep("^s_e_fellow___", names(prev_data), value = TRUE)
+  fellow_selected <- character()
+  if (length(fellow_cols) > 0) {
+    fellow_field <- get_field_info("s_e_fellow")
+    fellow_choices_map <- parse_choices(get_choices_string(fellow_field))
+
+    for (col in fellow_cols) {
+      if (!is.na(prev_data[[col]][1]) && prev_data[[col]][1] == "1") {
+        code <- sub("s_e_fellow___", "", col)
+        label <- names(fellow_choices_map)[fellow_choices_map == code]
+        if (length(label) > 0) {
+          fellow_selected <- c(fellow_selected, label)
+        }
+      }
+    }
+  }
+
+  # Decode track type checkboxes
+  track_cols <- grep("^s_e_track_type___", names(prev_data), value = TRUE)
+  track_selected <- character()
+  if (length(track_cols) > 0) {
+    track_field <- get_field_info("s_e_track_type")
+    track_choices_map <- parse_choices(get_choices_string(track_field))
+
+    for (col in track_cols) {
+      if (!is.na(prev_data[[col]][1]) && prev_data[[col]][1] == "1") {
+        code <- sub("s_e_track_type___", "", col)
+        label <- names(track_choices_map)[track_choices_map == code]
+        if (length(label) > 0) {
+          track_selected <- c(track_selected, label)
+        }
+      }
+    }
+  }
+
+  # Build visual display with badges
+  content_parts <- list()
+
+  # Career Paths Section
+  if (length(career_selected) > 0) {
+    career_badges <- lapply(career_selected, function(path) {
+      span(
+        class = "badge badge-primary mr-1 mb-1",
+        style = "font-size: 0.9em; padding: 0.4em 0.8em;",
+        path
+      )
+    })
+
+    content_parts <- c(content_parts, list(
+      div(
+        class = "mb-3",
+        div(
+          style = "display: flex; align-items: center; margin-bottom: 0.5rem;",
+          icon("briefcase", class = "mr-2", style = "color: #1976d2;"),
+          strong("Career Paths")
+        ),
+        div(
+          style = "margin-left: 1.5rem;",
+          career_badges
+        ),
+        if (!is.na(prev_data$s_e_career_oth[1]) && prev_data$s_e_career_oth[1] != "") {
+          div(
+            class = "text-muted mt-1",
+            style = "margin-left: 1.5rem; font-size: 0.9em;",
+            em("Other: ", prev_data$s_e_career_oth[1])
+          )
+        }
+      )
+    ))
+  }
+
+  # Fellowship Interests Section
+  if (length(fellow_selected) > 0) {
+    fellow_badges <- lapply(fellow_selected, function(fellow) {
+      span(
+        class = "badge badge-success mr-1 mb-1",
+        style = "font-size: 0.9em; padding: 0.4em 0.8em;",
+        fellow
+      )
+    })
+
+    content_parts <- c(content_parts, list(
+      div(
+        class = "mb-3",
+        div(
+          style = "display: flex; align-items: center; margin-bottom: 0.5rem;",
+          icon("graduation-cap", class = "mr-2", style = "color: #388e3c;"),
+          strong("Fellowship Interests")
+        ),
+        div(
+          style = "margin-left: 1.5rem;",
+          fellow_badges
+        ),
+        if (!is.na(prev_data$s_e_fellow_oth[1]) && prev_data$s_e_fellow_oth[1] != "") {
+          div(
+            class = "text-muted mt-1",
+            style = "margin-left: 1.5rem; font-size: 0.9em;",
+            em("Other: ", prev_data$s_e_fellow_oth[1])
+          )
+        }
+      )
+    ))
+  }
+
+  # Track Information Section
+  if (!is.na(prev_data$s_e_track[1])) {
+    if (prev_data$s_e_track[1] == "1" && length(track_selected) > 0) {
+      track_badges <- lapply(track_selected, function(track) {
+        span(
+          class = "badge badge-info mr-1 mb-1",
+          style = "font-size: 0.9em; padding: 0.4em 0.8em;",
+          track
+        )
+      })
+
+      content_parts <- c(content_parts, list(
+        div(
+          class = "mb-2",
+          div(
+            style = "display: flex; align-items: center; margin-bottom: 0.5rem;",
+            icon("road", class = "mr-2", style = "color: #0288d1;"),
+            strong("Program Tracks")
+          ),
+          div(
+            style = "margin-left: 1.5rem;",
+            track_badges
+          )
+        )
+      ))
+    }
+  }
+
+  # Discussion Topics Section
+  if (!is.na(prev_data$s_e_discussion[1]) && prev_data$s_e_discussion[1] != "") {
+    content_parts <- c(content_parts, list(
+      div(
+        class = "mb-2",
+        div(
+          style = "display: flex; align-items: center; margin-bottom: 0.5rem;",
+          icon("comments", class = "mr-2", style = "color: #7b1fa2;"),
+          strong("Discussion Topics with Mentor")
+        ),
+        div(
+          class = "text-muted",
+          style = "margin-left: 1.5rem; font-size: 0.95em; font-style: italic;",
+          prev_data$s_e_discussion[1]
+        )
+      )
+    ))
+  }
+
+  if (length(content_parts) == 0) {
+    return(NULL)  # Don't show anything if no data
+  }
+
+  return(
+    div(
+      class = "card mb-3",
+      style = "background-color: #fafafa; border-left: 4px solid #1976d2;",
+      div(
+        class = "card-body",
+        h6(
+          class = "card-subtitle mb-3 text-muted",
+          icon("history"),
+          " Career Planning from Period ",
+          prev_period
+        ),
+        content_parts
+      )
+    )
+  )
+}
+
+
+#' Display Previous Wellness Data with Enhanced Styling
+#'
+#' Displays wellness data from previous period with subtle card styling
+#' and history icon.
+#'
+#' @param rdm_data Data frame containing REDCap data OR data structure with $all_forms$s_eval
+#' @param record_id Character or numeric record ID
+#' @param current_period Current period number (1-7) or list with period_number, or character name
+#'
+#' @return Shiny UI element (card with wellness display) or NULL
+#'
+#' @importFrom shiny div icon h6 p
+#' @importFrom dplyr filter
+#' @export
+display_wellness <- function(rdm_data, record_id, current_period) {
+
+  # Handle different data structure formats
+  if (!is.null(rdm_data$all_forms) && !is.null(rdm_data$all_forms$s_eval)) {
+    s_eval_data <- rdm_data$all_forms$s_eval
+  } else {
+    s_eval_data <- rdm_data
+  }
+
+  # Convert period to number - handle all types
+  current_period_num <- if (is.numeric(current_period)) {
+    current_period
+  } else if (is.list(current_period) && "period_number" %in% names(current_period)) {
+    current_period$period_number
+  } else if (is.character(current_period)) {
+    period_map <- c(
+      "Entering Residency" = 7, "Mid Intern" = 1, "End Intern" = 2,
+      "Mid PGY2" = 3, "End PGY2" = 4, "Mid PGY3" = 5, "Graduating" = 6
+    )
     period_map[current_period]
-
   } else {
-
     as.numeric(current_period)
-
   }
 
- 
-
-  # Determine which period to show data FROM
-
-  if (current_period_num == 1) {
-
-    # Period 1: Show UME goals from period 7
-
-    display_period <- 7
-
-    period_data <- record_data %>%
-
-      dplyr::filter(
-
-        redcap_repeat_instrument == "s_eval",  # FIXED: lowercase
-
-        redcap_repeat_instance == display_period  # FIXED: use redcap_repeat_instance
-
-      )
-
- 
-
-    if (nrow(period_data) == 0) {
-
-      return(shiny::tagList(
-
-        shiny::h4("Career Planning Goals"),
-
-        shiny::p("No UME goals data available yet.", class = "text-muted")
-
-      ))
-
-    }
-
- 
-
-    goal1 <- period_data$s_e_ume_goal1[1]
-
-    goal2 <- period_data$s_e_ume_goal2[1]
-
-    goal3 <- period_data$s_e_ume_goal3[1]
-
- 
-
-    return(shiny::tagList(
-
-      shiny::h4("Your UME Goals"),
-
-      shiny::p(class = "text-muted", "From your entry into residency (Period 7)"),
-
-      if (!is.na(goal1) && goal1 != "") {
-
-        shiny::div(
-
-          class = "mb-3",
-
-          shiny::strong(get_field_label("s_e_ume_goal1")),
-
-          shiny::p(goal1)
-
-        )
-
-      },
-
-      if (!is.na(goal2) && goal2 != "") {
-
-        shiny::div(
-
-          class = "mb-3",
-
-          shiny::strong(get_field_label("s_e_ume_goal2")),
-
-          shiny::p(goal2)
-
-        )
-
-      },
-
-      if (!is.na(goal3) && goal3 != "") {
-
-        shiny::div(
-
-          class = "mb-3",
-
-          shiny::strong(get_field_label("s_e_ume_goal3")),
-
-          shiny::p(goal3)
-
-        )
-
-      }
-
-    ))
-
- 
-
-  } else {
-
-    # Period 2+: Show career planning from PREVIOUS period
-
-    previous_period_num <- current_period_num - 1
-
- 
-
-    period_data <- record_data %>%
-
-      dplyr::filter(
-
-        redcap_repeat_instrument == "s_eval",  # FIXED: lowercase
-
-        redcap_repeat_instance == previous_period_num  # FIXED: use redcap_repeat_instance
-
-      )
-
- 
-
-    if (nrow(period_data) == 0) {
-
-      return(shiny::tagList(
-
-        shiny::h4("Career Planning"),
-
-        shiny::p(paste0("No career planning data from Period ", previous_period_num, " yet."),
-
-                class = "text-muted")
-
-      ))
-
-    }
-
- 
-
-    # Get single row
-
-    period_row <- period_data[1, ]
-
- 
-
-    # Decode checkbox fields
-
-    career_path_labels <- decode_checkboxes(period_row, "s_e_career_path")
-
-    fellow_labels <- decode_checkboxes(period_row, "s_e_fellow")
-
-    track_type_labels <- decode_checkboxes(period_row, "s_e_track_type")
-
- 
-
-    # Get text fields
-
-    career_oth <- period_row$s_e_career_oth[1]
-
-    fellow_oth <- period_row$s_e_fellow_oth[1]
-
-    wellness <- period_row$s_e_well[1]
-
-    track <- period_row$s_e_track[1]
-
- 
-
-    return(shiny::tagList(
-
-      shiny::h4(paste0("Career Planning (from Period ", previous_period_num, ")")),
-
- 
-
-      # Wellness
-
-      if (!is.na(wellness) && wellness != "") {
-
-        shiny::div(
-
-          class = "mb-3",
-
-          shiny::strong(get_field_label("s_e_well")),
-
-          shiny::p(wellness)
-
-        )
-
-      },
-
- 
-
-      # Career path
-
-      if (!is.null(career_path_labels) && career_path_labels != "") {
-
-        shiny::div(
-
-          class = "mb-3",
-
-          shiny::strong(get_field_label("s_e_career_path")),
-
-          shiny::p(
-
-            career_path_labels,
-
-            if (!is.na(career_oth) && career_oth != "") {
-
-              shiny::tags$span(
-
-                " (", shiny::em(career_oth), ")"
-
-              )
-
-            }
-
-          )
-
-        )
-
-      },
-
- 
-
-      # Fellowship
-
-      if (!is.null(fellow_labels) && fellow_labels != "") {
-
-        shiny::div(
-
-          class = "mb-3",
-
-          shiny::strong(get_field_label("s_e_fellow")),
-
-          shiny::p(
-
-            fellow_labels,
-
-            if (!is.na(fellow_oth) && fellow_oth != "") {
-
-              shiny::tags$span(
-
-                " (", shiny::em(fellow_oth), ")"
-
-              )
-
-            }
-
-          )
-
-        )
-
-      },
-
- 
-
-      # Track
-
-      if (!is.na(track) && track != "") {
-
-        shiny::div(
-
-          class = "mb-3",
-
-          shiny::strong(get_field_label("s_e_track")),
-
-          shiny::p(
-
-            if (track == "1" || tolower(track) == "yes") {
-
-              if (!is.null(track_type_labels) && track_type_labels != "") {
-
-                paste("Yes:", track_type_labels)
-
-              } else {
-
-                "Yes"
-
-              }
-
-            } else {
-
-              "No"
-
-            }
-
-          )
-
-        )
-
-      }
-
-    ))
-
+  # Get previous period data
+  prev_period <- current_period_num - 1
+  if (prev_period < 1) return(NULL)
+
+  # Filter to previous period's data
+  prev_data <- s_eval_data %>%
+    dplyr::filter(
+      record_id == !!record_id,
+      redcap_repeat_instrument == "s_eval",
+      redcap_repeat_instance == prev_period
+    )
+
+  if (nrow(prev_data) == 0 || is.na(prev_data$s_e_well[1]) || prev_data$s_e_well[1] == "") {
+    return(NULL)  # Don't show anything if no previous data
   }
 
+  return(
+    div(
+      class = "card mb-3",
+      style = "background-color: #f5f5f5; border-left: 4px solid #9575cd;",
+      div(
+        class = "card-body",
+        h6(class = "card-subtitle mb-2 text-muted",
+           icon("history"), " Previous Wellness (Period ", prev_period, ")"),
+        p(class = "card-text", style = "font-style: italic;", prev_data$s_e_well[1])
+      )
+    )
+  )
 }
