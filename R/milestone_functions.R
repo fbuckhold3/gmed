@@ -318,7 +318,7 @@ test_dict_driven_workflow <- function(complete_data) {
   
   # Process all milestone data using data dictionary
   milestone_results <- create_milestone_workflow_from_dict(
-    raw_data = complete_data$all_forms,  # This might need adjustment
+    all_forms = complete_data$all_forms,
     data_dict = complete_data$data_dict,
     resident_data = complete_data$residents,
     verbose = TRUE
