@@ -100,10 +100,11 @@ display_career_planning <- function(rdm_data, record_id, current_period, data_di
   if (prev_period < 1) return(NULL)
 
   # Filter to previous period's data
+  # Use case-insensitive matching for instrument name to handle both "s_eval" and "S Eval"
   prev_data <- s_eval_data %>%
     dplyr::filter(
       record_id == !!record_id,
-      redcap_repeat_instrument == "s_eval",
+      tolower(trimws(redcap_repeat_instrument)) %in% c("s eval", "s_eval"),
       redcap_repeat_instance == prev_period
     )
 
@@ -347,10 +348,11 @@ display_wellness <- function(rdm_data, record_id, current_period) {
   if (prev_period < 1) return(NULL)
 
   # Filter to previous period's data
+  # Use case-insensitive matching for instrument name to handle both "s_eval" and "S Eval"
   prev_data <- s_eval_data %>%
     dplyr::filter(
       record_id == !!record_id,
-      redcap_repeat_instrument == "s_eval",
+      tolower(trimws(redcap_repeat_instrument)) %in% c("s eval", "s_eval"),
       redcap_repeat_instance == prev_period
     )
 
