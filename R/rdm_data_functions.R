@@ -81,9 +81,7 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
   if (!requireNamespace("jsonlite", quietly = TRUE)) {
     stop("Package 'jsonlite' is required for JSON processing")
   }
-  
-  message("Making REDCap API call...")
-  
+
   # Prepare form data for API call - USE JSON FORMAT
   form_data <- list(
     token = token,
@@ -129,9 +127,7 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
   if ("record_id" %in% names(data)) {
     data$record_id <- as.character(data$record_id)
   }
-  
-  message("Successfully pulled ", nrow(data), " rows and ", ncol(data), " columns")
-  
+
   return(data)
 }
 
@@ -187,8 +183,7 @@ get_evaluation_dictionary <- function(token, url) {
   if ("form_name" %in% names(dict)) {
     dict$Form <- dict$form_name
   }
-  
-  message("Retrieved data dictionary with ", nrow(dict), " fields")
+
   return(dict)
 }
 
@@ -270,45 +265,30 @@ load_data_by_forms <- function(rdm_token = NULL,
                                redcap_url = "https://redcapsurvey.slu.edu/api/",
                                filter_archived = TRUE,
                                calculate_levels = TRUE,
-                               raw_or_label = "label",  # ADD THIS PARAMETER
+                               raw_or_label = "label",
                                verbose = TRUE) {
-  
-  if (verbose) message("📊 Loading REDCap data organized by forms...")
-  
+
   # Validate token
   if (is.null(rdm_token)) {
     rdm_token <- Sys.getenv("RDM_TOKEN")
     if (rdm_token == "") {
-      stop("❌ RDM_TOKEN not provided and not found in environment variables")
+      stop("RDM_TOKEN not provided and not found in environment variables")
     }
   }
-  
+
   # Load data dictionary
-  if (verbose) message("📖 Loading data dictionary...")
   data_dict <- get_evaluation_dictionary(token = rdm_token, url = redcap_url)
-  
-  # Load raw data - PASS THROUGH PARAMETER
-  if (verbose) message("📊 Loading raw REDCap data...")
+
+  # Load raw data
   raw_data <- pull_all_redcap_data(
-    token = rdm_token, 
+    token = rdm_token,
     url = redcap_url,
-    raw_or_label = raw_or_label  # ADD THIS
+    raw_or_label = raw_or_label
   )
-  
-  if (verbose) {
-    message("✅ Loaded ", nrow(raw_data), " total records")
-  }
-  
+
   # Get all unique form names from data dictionary
   form_names <- unique(data_dict$form_name)
   form_names <- form_names[!is.na(form_names)]
-  
-  if (verbose) {
-    message("📋 Found ", length(form_names), " forms in data dictionary:")
-    for (form in sort(form_names)) {
-      message("   - ", form)
-    }
-  }
   
   # Initialize result structure
   result <- list(
@@ -323,21 +303,15 @@ load_data_by_forms <- function(rdm_token = NULL,
   
   # Filter archived residents if requested
   if (filter_archived && "res_archive" %in% names(resident_data)) {
-    before_count <- nrow(resident_data)
     resident_data <- resident_data %>%
       dplyr::filter(is.na(res_archive) | (!res_archive %in% c("Yes", "1")))
-    if (verbose) {
-      message("🗂️  Filtered archived residents: ", before_count, " -> ", nrow(resident_data))
-    }
   }
-  
+
   # Calculate levels if requested
   if (calculate_levels) {
-    if (verbose) message("🎓 Calculating resident levels...")
     resident_data <- tryCatch({
       calculate_resident_level(resident_data)
     }, error = function(e) {
-      if (verbose) message("⚠️  Using fallback level calculation")
       resident_data # Return as-is if calculation fails
     })
   }
@@ -391,16 +365,11 @@ for (current_form in form_names) {
       clean_form_name <- tolower(gsub("[^a-zA-Z0-9_]", "_", current_form))
       clean_form_name <- gsub("_+", "_", clean_form_name)  # Remove multiple underscores
       clean_form_name <- gsub("^_|_$", "", clean_form_name)  # Remove leading/trailing underscores
-      
+
       result$forms[[clean_form_name]] <- form_data
-      
-      if (verbose) {
-        message("   ", current_form, " (", clean_form_name, "): ", 
-                nrow(form_data), " records, ", length(form_specific_fields), " fields")
-      }
     }
   }
-  
+
   # Add metadata summary
   result$metadata <- list(
     total_records = nrow(raw_data),
@@ -409,12 +378,7 @@ for (current_form in form_names) {
     all_form_names = form_names,
     loaded_at = Sys.time()
   )
-  
-  if (verbose) {
-    message("✅ Data organized by forms successfully!")
-    message("📋 Available forms with data: ", paste(names(result$forms), collapse = ", "))
-  }
-  
+
   return(result)
 }
 
@@ -556,91 +520,56 @@ debug_data_dict <- function(data_dict) {
 #' clean_data <- filter_archived_residents(data, archive_field = "archived")
 #' }
 filter_archived_residents <- function(data, archive_field = "res_archive", verbose = TRUE) {
-  
+
   # Validate input
   if (!is.list(data) || !"forms" %in% names(data)) {
     stop("Data must be a list containing 'forms' element (output from load_data_by_forms)")
   }
-  
+
   if (!"resident_data" %in% names(data$forms)) {
-    if (verbose) cat("⚠️ No resident_data form found - returning data unchanged\n")
+    if (verbose) cat("No resident_data form found - returning data unchanged\n")
     return(data)
   }
-  
+
   resident_data <- data$forms$resident_data
-  
+
   if (!archive_field %in% names(resident_data)) {
-    if (verbose) cat("⚠️ No", archive_field, "column found - returning data unchanged\n")
+    if (verbose) cat("No", archive_field, "column found - returning data unchanged\n")
     return(data)
   }
-  
+
   # Find archived record_ids
   # Archive values: "Yes", "Y", "1", 1, "true", "True", "TRUE"
   archive_values <- c("Yes", "Y", "1", 1, "true", "True", "TRUE")
-  
+
   archived_record_ids <- resident_data %>%
     dplyr::filter(!!rlang::sym(archive_field) %in% archive_values) %>%
     dplyr::pull(record_id)
-  
-  # Summary before filtering
-  if (verbose) {
-    total_residents <- nrow(resident_data)
-    archived_count <- length(archived_record_ids)
-    active_count <- total_residents - archived_count
-    
-    cat("=== FILTERING ARCHIVED RESIDENTS ===\n")
-    cat("📊 Total residents:", total_residents, "\n")
-    cat("🗂️  Archived residents:", archived_count, "\n") 
-    cat("✅ Active residents:", active_count, "\n")
-    
-    if (archived_count > 0) {
-      cat("🔄 Removing archived residents from all forms...\n")
-    }
-  }
-  
+
   # If no archived residents, return unchanged
   if (length(archived_record_ids) == 0) {
-    if (verbose) cat("✅ No archived residents to filter\n")
     return(data)
   }
-  
+
   # Filter archived residents from all forms
   data$forms <- lapply(names(data$forms), function(form_name) {
     form_data <- data$forms[[form_name]]
-    
+
     # Only filter forms that have record_id column
     if ("record_id" %in% names(form_data)) {
-      before_count <- nrow(form_data)
-      
       # Remove archived record_ids
-      filtered_data <- form_data %>% 
+      filtered_data <- form_data %>%
         dplyr::filter(!record_id %in% archived_record_ids)
-      
-      after_count <- nrow(filtered_data)
-      
-      # Report filtering for this form
-      if (verbose && before_count != after_count) {
-        records_removed <- before_count - after_count
-        cat("   ", form_name, ":", before_count, "→", after_count, 
-            "(removed", records_removed, ")\n")
-      }
-      
+
       return(filtered_data)
-      
+
     } else {
       # Forms without record_id remain unchanged
-      if (verbose && nrow(form_data) > 0) {
-        cat("   ", form_name, ": no record_id column - unchanged\n")
-      }
       return(form_data)
     }
-    
+
   }) %>% setNames(names(data$forms))
-  
-  if (verbose) {
-    cat("✅ Archive filtering complete\n")
-  }
-  
+
   return(data)
 }
 
@@ -798,56 +727,37 @@ calculate_level_at_time <- function(data, resident_lookup, date_col_name) {
 #'
 #' @return Same data structure with level columns added to specified forms
 #' @export
-add_level_at_time_to_forms <- function(data_list, 
-                                       forms = c("assessment" = "ass_date", 
-                                                 "faculty_evaluation" = "fac_eval_date", 
+add_level_at_time_to_forms <- function(data_list,
+                                       forms = c("assessment" = "ass_date",
+                                                 "faculty_evaluation" = "fac_eval_date",
                                                  "questions" = "q_date"),
                                        verbose = TRUE) {
-  
-  if (verbose) cat("=== ADDING LEVEL AT TIME TO SPECIFIED FORMS ===\n")
-  
+
   # Get resident lookup data
   resident_lookup <- data_list$resident_data %>%
     dplyr::select(record_id, type, grad_yr)
-  
-  if (verbose) cat("Using resident lookup with", nrow(resident_lookup), "residents\n")
-  
+
   # Process each specified form
   for (form_name in names(forms)) {
     date_col <- forms[[form_name]]
-    
+
     if (form_name %in% names(data_list$forms)) {
       form_data <- data_list$forms[[form_name]]
-      
+
       if (nrow(form_data) > 0 && date_col %in% names(form_data)) {
-        
-        if (verbose) cat("Adding level to", form_name, "using", date_col, "\n")
-        
         # Calculate level at time
         form_data_with_level <- calculate_level_at_time(
-          form_data, 
-          resident_lookup, 
+          form_data,
+          resident_lookup,
           date_col
         )
-        
+
         # Update the form data
         data_list$forms[[form_name]] <- form_data_with_level
-        
-        if (verbose) {
-          level_counts <- table(form_data_with_level$level, useNA = "always")
-          cat("  Level distribution:", paste(names(level_counts), "=", level_counts, collapse = ", "), "\n")
-        }
-        
-      } else {
-        if (verbose) cat("Skipping", form_name, "- no data or no", date_col, "column\n")
       }
-    } else {
-      if (verbose) cat("Form", form_name, "not found in data\n")
     }
   }
-  
-  if (verbose) cat("Level at time calculation complete\n")
-  
+
   return(data_list)
 }
 
