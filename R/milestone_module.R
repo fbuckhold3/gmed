@@ -295,26 +295,38 @@ mod_miles_rating_server <- function(id, period) {
       key <- selectionKey()
       sel <- state$selections[[key]]
       period_val <- period()
-      
+
       # Determine if we need explanation
       needsExplanation <- !is.null(sel) &&
         !is.null(thresholds[[period_val]]) &&
         sel >= thresholds[[period_val]] &&
         period_val != "Interim Review"
-      
+
       # Determine if Next should be disabled
       disableNext <- is.null(sel) ||
         (needsExplanation && (is.null(input$explanation) ||
                                 trimws(input$explanation) == ""))
-      
+
+      # Check if we're at the final milestone (ics3)
+      isAtFinalMilestone <- state$currentSetIndex == length(imageSets) &&
+        state$currentImageIndex == length(currentSet()$images)
+
       div(class="card",
           div(class="card-body",
-              fluidRow(
-                column(6, actionButton(ns("prev"), "Previous", class="btn-primary", width="100%")),
-                column(6, actionButton(ns("next"), "Next",
-                                       class=if(disableNext) "btn-primary disabled" else "btn-primary",
-                                       width="100%"))
-              )
+              if (isAtFinalMilestone) {
+                # Only show Previous button at final milestone
+                fluidRow(
+                  column(12, actionButton(ns("prev"), "Previous", class="btn-primary", width="100%"))
+                )
+              } else {
+                # Show both buttons for all other milestones
+                fluidRow(
+                  column(6, actionButton(ns("prev"), "Previous", class="btn-primary", width="100%")),
+                  column(6, actionButton(ns("next"), "Next",
+                                         class=if(disableNext) "btn-primary disabled" else "btn-primary",
+                                         width="100%"))
+                )
+              }
           )
       )
     })
