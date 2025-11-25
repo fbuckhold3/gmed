@@ -228,10 +228,10 @@ mod_miles_rating_server <- function(id, period) {
           file.path("www", "milestones", image_file),
           # Relative path
           file.path("milestones", image_file),
-          # System file from imres package (fallback)
-          system.file("www", image_file, package="imres"),
+          # System file from gmed package (fallback)
+          system.file("www", "milestones", image_file, package="gmed"),
           # GitHub fallback
-          paste0("https://raw.githubusercontent.com/fbuckhold3/imres.ccc.dashboard/main/www/milestones/", image_file)
+          paste0("https://raw.githubusercontent.com/fbuckhold3/gmed/main/www/milestones/", image_file)
         )
         
         # Find first existing path
