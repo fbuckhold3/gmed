@@ -76,7 +76,7 @@ raw_data <- load_data_by_forms(
     # Calculate current levels
     if ("type" %in% names(residents) && "grad_yr" %in% names(residents)) {
       current_year <- as.numeric(format(Sys.Date(), "%Y"))
-      academic_year <- ifelse(as.numeric(format(Sys.Date(), "%m")) >= 7, current_year, current_year + 1)
+      academic_year <- ifelse(as.numeric(format(Sys.Date(), "%m")) >= 7, current_year, current_year - 1)
 
       residents <- residents %>%
         dplyr::mutate(
