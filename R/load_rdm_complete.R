@@ -81,8 +81,11 @@ raw_data <- load_data_by_forms(
       residents <- residents %>%
         dplyr::mutate(
           Level = dplyr::case_when(
-            # Handle Categorical residents (type = 2)
-            type == 2 & !is.na(grad_yr) ~ {
+            # Handle Preliminary residents - always Intern
+            type == "Preliminary" ~ "Intern",
+
+            # Handle Categorical residents - calculate based on grad_yr
+            type == "Categorical" & !is.na(grad_yr) ~ {
               years_to_grad <- as.numeric(grad_yr) - academic_year
               dplyr::case_when(
                 years_to_grad == 3 ~ "Intern",
@@ -90,11 +93,10 @@ raw_data <- load_data_by_forms(
                 years_to_grad == 1 ~ "PGY3",
                 years_to_grad == 0 ~ "Graduating",
                 years_to_grad < 0 ~ "Graduated",
+                years_to_grad > 3 ~ "Pre-Intern",
                 TRUE ~ "Unknown"
               )
             },
-            # Handle Preliminary residents (type = 1) - always Intern
-            type == 1 ~ "Intern",
             TRUE ~ "Unknown"
           )
         )
