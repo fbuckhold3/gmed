@@ -23,26 +23,30 @@ NULL
 #' @return List of milestone configurations found
 #' @export
 extract_milestone_configs_from_dict <- function(data_dict, verbose = TRUE) {
-  
-  if (verbose) message("Extracting milestone configurations from data dictionary...")
-  
+
+  if (verbose) {
+    message("Extracting milestone configurations from data dictionary...")
+  }
+
   # Only the three patterns you actually have
   milestone_patterns <- c(
     "^rep_(pc|mk|sbp|pbl|prof|ics)\\d+$",           # REP program
     "^rep_(pc|mk|sbp|pbl|prof|ics)\\d+_self$",      # REP self
     "^acgme_(pc|mk|sbp|pbl|prof|ics)\\d+$"          # ACGME program
   )
-  
+
   configs <- list()
-  
+
   # Get unique form names that have milestone fields
   milestone_forms <- data_dict %>%
     dplyr::filter(grepl(paste(milestone_patterns, collapse = "|"), field_name)) %>%
     dplyr::pull(form_name) %>%
     unique() %>%
     na.omit()
-  
-  if (verbose) message("Found milestone fields in forms: ", paste(milestone_forms, collapse = ", "))
+
+  if (verbose) {
+    message("Found milestone fields in forms: ", paste(milestone_forms, collapse = ", "))
+  }
   
   # For each form, analyze its milestone pattern
   for (form_name in milestone_forms) {
@@ -120,8 +124,10 @@ extract_milestone_configs_from_dict <- function(data_dict, verbose = TRUE) {
       message("  Date columns: ", paste(date_cols, collapse = ", "))
     }
   }
-  
-  if (verbose) message("Extracted ", length(configs), " milestone configurations")
+
+  if (verbose) {
+    message("Extracted ", length(configs), " milestone configurations")
+  }
   
   return(configs)
 }
@@ -164,23 +170,29 @@ create_universal_period_mapping <- function() {
 #' @param verbose Logical. Print processing details
 #' @return List with processed milestone data by configuration
 #' @export
-create_milestone_workflow_from_dict <- function(all_forms, data_dict, resident_data = NULL, 
+create_milestone_workflow_from_dict <- function(all_forms, data_dict, resident_data = NULL,
                                                 forms_to_process = NULL, verbose = TRUE) {
-  
-  if (verbose) message("=== Data Dictionary-Driven Milestone Workflow ===")
-  
+
+  if (verbose) {
+    message("=== Data Dictionary-Driven Milestone Workflow ===")
+  }
+
   # Extract milestone configurations from data dictionary
   configs <- extract_milestone_configs_from_dict(data_dict, verbose)
-  
+
   if (length(configs) == 0) {
-    if (verbose) message("No milestone configurations found")
+    if (verbose) {
+      message("No milestone configurations found")
+    }
     return(list())
   }
-  
+
   # Filter to specific forms if requested
   if (!is.null(forms_to_process)) {
     configs <- configs[grepl(paste(forms_to_process, collapse = "|"), names(configs))]
-    if (verbose) message("Filtered to ", length(configs), " configurations for specified forms")
+    if (verbose) {
+      message("Filtered to ", length(configs), " configurations for specified forms")
+    }
   }
   
   # Get universal period mapping
@@ -191,28 +203,33 @@ create_milestone_workflow_from_dict <- function(all_forms, data_dict, resident_d
   
   for (config_name in names(configs)) {
     config <- configs[[config_name]]
-    
-    if (verbose) message("Processing: ", config_name)
-    
+
+    if (verbose) {
+      message("Processing: ", config_name)
+    }
+
     # Use all_forms data directly instead of complex filtering
     form_data <- all_forms[[config$form_name]]
-    
+
     if (is.null(form_data) || nrow(form_data) == 0) {
-      if (verbose) message("  No data found for ", config$form_name)
+      if (verbose) {
+        message("  No data found for ", config$form_name)
+      }
       next
     }
-    
+
     # Standardize period column name
     primary_period_col <- config$period_columns[1]  # Use first period column found
     if (!primary_period_col %in% names(form_data)) {
-      if (verbose) message("  Period column ", primary_period_col, " not found")
+      if (verbose) {
+        message("  Period column ", primary_period_col, " not found")
+      }
       next
     }
-    
+
     # Process the data - keep original period column name!
     period_sym <- rlang::sym(primary_period_col)
 
-    # DEBUG: Print what we're joining
     if (verbose) {
       message("  Primary period column: ", primary_period_col)
       message("  Form data columns before join: ", paste(head(names(form_data), 10), collapse = ", "))
@@ -276,8 +293,10 @@ create_milestone_workflow_from_dict <- function(all_forms, data_dict, resident_d
       }
     }
   }
-  
-  if (verbose) message("Completed processing ", length(results), " milestone configurations")
+
+  if (verbose) {
+    message("Completed processing ", length(results), " milestone configurations")
+  }
   
   return(results)
 }
@@ -291,21 +310,25 @@ create_milestone_workflow_from_dict <- function(all_forms, data_dict, resident_d
 #' @param milestone_system "rep" or "acgme"
 #' @return Processed milestone data
 #' @export
-get_milestone_data <- function(workflow_results, milestone_type = "program", milestone_system = "rep") {
-  
+get_milestone_data <- function(workflow_results, milestone_type = "program", milestone_system = "rep", verbose = FALSE) {
+
   # Find matching configuration
   pattern <- paste0("_", milestone_system, "_", milestone_type, "$")
   matching_configs <- names(workflow_results)[grepl(pattern, names(workflow_results))]
-  
+
   if (length(matching_configs) == 0) {
-    message("No data found for ", milestone_system, " ", milestone_type)
+    if (verbose) {
+      message("No data found for ", milestone_system, " ", milestone_type)
+    }
     return(NULL)
   }
-  
+
   # Use first match
   result <- workflow_results[[matching_configs[1]]]
-  message("Using ", result$config$form_name, " (", result$n_rows, " rows)")
-  
+  if (verbose) {
+    message("Using ", result$config$form_name, " (", result$n_rows, " rows)")
+  }
+
   return(result)
 }
 
@@ -455,17 +478,8 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
                       "Entering Residency" = 7,
                       as.numeric(period_text))
 
-  
-  # Debug
-  cat("\n=== SPIDER PLOT FINAL DEBUG ===\n")
-  cat("resident_id:", resident_id, "\n")
-  cat("period_text:", period_text, "\n")
-  cat("milestone_type:", milestone_type, "\n")
-  
   # Get milestone columns
   milestone_cols <- get_milestone_columns_simple(milestone_data, milestone_type)
-  
-  cat("Found", length(milestone_cols), "milestone columns\n")
   
   if (length(milestone_cols) == 0) {
     return(plotly::plot_ly() %>% 
@@ -486,8 +500,6 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
                       "End PGY3" = 6,
                       "Entering Residency" = 7,
                       NULL)
-  
-  cat("Mapped period_text to period_num:", period_num, "\n")
 
   # Dynamically detect which period field exists in the data
   period_field <- NULL
@@ -506,16 +518,12 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
              ))
   }
 
-  cat("Using period field:", period_field, "\n")
-
   # Create a symbol for dynamic evaluation
   period_sym <- rlang::sym(period_field)
 
   # Filter individual resident's scores for the period using numeric period
   individual_data <- milestone_data %>%
     dplyr::filter(record_id == !!resident_id, !!period_sym == !!period_num)
-  
-  cat("Individual data rows:", nrow(individual_data), "\n")
   
   if (nrow(individual_data) == 0) {
     return(plotly::plot_ly() %>% 
@@ -543,23 +551,17 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
       dplyr::arrange(desc(redcap_repeat_instance)) %>%
       dplyr::slice(1)
   }
-  
+
   individual_scores <- individual_data %>%
     dplyr::select(dplyr::all_of(milestone_cols))
-  
-  cat("Individual scores:", as.numeric(individual_scores[1,]), "\n")
-  
+
   # Filter median scores for the period using text period name
   median_scores <- median_data %>%
     dplyr::filter(period_name == !!period_text) %>%
     dplyr::select(dplyr::all_of(milestone_cols))
   
-  cat("Median data rows:", nrow(median_scores), "\n")
-  
   if (nrow(median_scores) == 0) {
     median_scores <- NULL
-  } else {
-    cat("Median scores:", as.numeric(median_scores[1,]), "\n")
   }
   
   # Create clean category labels
@@ -654,12 +656,7 @@ get_milestone_columns_simple <- function(data, type = "program") {
   }
   
   milestone_cols <- grep(pattern, names(data), value = TRUE)
-  
-  message("Found ", length(milestone_cols), " milestone columns for type '", type, "'")
-  if (length(milestone_cols) > 0) {
-    message("Sample columns: ", paste(head(milestone_cols, 5), collapse = ", "))
-  }
-  
+
   return(milestone_cols)
 }
 
@@ -687,17 +684,13 @@ process_milestone_data_simple <- function(milestone_data, type = "program") {
   }
 
   if (is.null(milestone_data) || nrow(milestone_data) == 0) {
-    message("No ", type, " milestone data to process")
     return(NULL)
   }
-
-  message("Processing ", type, " milestone data: ", nrow(milestone_data), " rows")
 
   # Get milestone columns
   milestone_cols <- get_milestone_columns_simple(milestone_data, type)
 
   if (length(milestone_cols) == 0) {
-    message("No milestone columns found for type: ", type)
     return(NULL)
   }
 
@@ -713,8 +706,6 @@ process_milestone_data_simple <- function(milestone_data, type = "program") {
   } else {
     stop("No recognized period field found in data. Expected one of: prog_mile_period, prog_mile_period_self, acgme_mile_period")
   }
-
-  message("Using period field: ", period_field)
 
   # Create a symbol for dynamic evaluation
   period_sym <- rlang::sym(period_field)
@@ -738,8 +729,6 @@ process_milestone_data_simple <- function(milestone_data, type = "program") {
     ) %>%
     # Remove rows with all NA milestone scores
     dplyr::filter(dplyr::if_any(dplyr::all_of(milestone_cols), ~ !is.na(.x)))
-
-  message("After processing: ", nrow(processed_data), " rows with valid milestone data")
 
   return(processed_data)
 }
@@ -773,7 +762,6 @@ calculate_milestone_medians_simple <- function(processed_milestone_data) {
   ]
 
   if (length(milestone_cols) == 0) {
-    message("No numeric milestone columns found for median calculation")
     return(NULL)
   }
 
@@ -801,7 +789,6 @@ calculate_milestone_medians_simple <- function(processed_milestone_data) {
       .groups = "drop"
     )
 
-  message("Calculated medians for ", nrow(medians), " periods")
   return(medians)
 }
 
@@ -989,14 +976,11 @@ convert_rep_to_acgme_format <- function(rep_milestone_data) {
   if (is.null(rep_milestone_data) || nrow(rep_milestone_data) == 0) {
     return(rep_milestone_data)
   }
-  
-  message("Converting REP milestone data to ACGME format")
-  
+
   # Get REP milestone columns
   rep_cols <- grep("^rep_(pc|mk|sbp|pbl|prof|ics)\\d+", names(rep_milestone_data), value = TRUE)
-  
+
   if (length(rep_cols) == 0) {
-    message("No REP milestone columns found to convert")
     return(rep_milestone_data)
   }
   
@@ -1008,8 +992,7 @@ convert_rep_to_acgme_format <- function(rep_milestone_data) {
     new_col <- gsub("^rep_", "acgme_", col)
     acgme_data[[new_col]] <- acgme_data[[col]]
   }
-  
-  message("Converted ", length(rep_cols), " REP columns to ACGME format")
+
   return(acgme_data)
 }
 
@@ -1085,13 +1068,7 @@ check_milestone_completeness <- function(milestone_data, milestone_format = "aut
     milestone_columns_found = length(milestone_cols),
     high_missing_fields = high_missing_fields
   )
-  
-  message("Milestone completeness check:")
-  message("- Total records: ", total_records)
-  message("- Complete records: ", complete_records)
-  message("- Completion rate: ", round(completion_rate * 100, 1), "%")
-  message("- Format: ", milestone_format)
-  
+
   return(result)
 }
 
