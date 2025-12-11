@@ -3,20 +3,23 @@
 #' Streamlined data loading that preserves historical data for medians while using
 #' your existing gmed functions. Calculates medians BEFORE filtering archived residents.
 #'
-#' @param rdm_token Character. RDM REDCap API token. If NULL, attempts to retrieve from 
+#' @param rdm_token Character. RDM REDCap API token. If NULL, attempts to retrieve from
 #'   environment variable RDM_TOKEN.
 #' @param redcap_url Character. REDCap API URL. Default: "https://redcapsurvey.slu.edu/api/"
 #' @param verbose Logical. Whether to print detailed progress messages during loading.
 #' @param ensure_gmed_columns Logical. Whether to verify and create required columns for
 #'   gmed module compatibility.
+#' @param use_cache Logical. Whether to use cached data dictionary and milestone medians
+#'   to speed up loading. Default: TRUE. Use clear_rdm_cache() to clear cached data.
 #'
 #' @return List containing RDM 2.0 data structure with historical medians preserved
 #' @export
-load_rdm_complete <- function(rdm_token = NULL, 
+load_rdm_complete <- function(rdm_token = NULL,
                               redcap_url = "https://redcapsurvey.slu.edu/api/",
                               verbose = TRUE,
                               ensure_gmed_columns = TRUE,
-                              raw_or_label = "label") {
+                              raw_or_label = "label",
+                              use_cache = TRUE) {
   
   # TOKEN HANDLING
   if (is.null(rdm_token)) {
@@ -28,28 +31,64 @@ load_rdm_complete <- function(rdm_token = NULL,
   }
 
   # STEP 1: LOAD ALL RAW DATA (INCLUDING ARCHIVED) USING EXISTING FUNCTION
-raw_data <- load_data_by_forms(
-  rdm_token = rdm_token,
-  redcap_url = redcap_url,
-  filter_archived = FALSE,
-  calculate_levels = FALSE,
-  raw_or_label = raw_or_label,
-  verbose = verbose
-)
+  if (verbose) message("Loading raw data from REDCap...")
+  raw_data <- load_data_by_forms(
+    rdm_token = rdm_token,
+    redcap_url = redcap_url,
+    filter_archived = FALSE,
+    calculate_levels = FALSE,
+    raw_or_label = raw_or_label,
+    verbose = FALSE  # Suppress verbose from load_data_by_forms
+  )
 
-  # STEP 2: LOAD DATA DICTIONARY
-  data_dict <- get_evaluation_dictionary(token = rdm_token, url = redcap_url)
+  # STEP 2: LOAD DATA DICTIONARY (WITH CACHING)
+  dict_cache_key <- paste0("data_dict_", redcap_url)
+  if (use_cache) {
+    data_dict <- get_cached(dict_cache_key)
+    if (!is.null(data_dict)) {
+      if (verbose) message("Using cached data dictionary")
+    }
+  } else {
+    data_dict <- NULL
+  }
+
+  if (is.null(data_dict)) {
+    if (verbose) message("Loading data dictionary from REDCap...")
+    data_dict <- get_evaluation_dictionary(token = rdm_token, url = redcap_url)
+    if (use_cache) {
+      set_cached(dict_cache_key, data_dict)
+    }
+  }
 
   # STEP 3: CALCULATE HISTORICAL MILESTONE MEDIANS (BEFORE FILTERING!)
-  historical_milestone_medians <- tryCatch({
-    calculate_all_milestone_medians(raw_data, verbose = verbose)
-  }, error = function(e) {
-    if (verbose) message("Milestone median calculation failed: ", e$message)
-    list()
-  })
+  # Create cache key based on number of records (invalidates when data changes)
+  medians_cache_key <- paste0("milestone_medians_", nrow(raw_data$raw_data))
+
+  if (use_cache) {
+    historical_milestone_medians <- get_cached(medians_cache_key)
+    if (!is.null(historical_milestone_medians)) {
+      if (verbose) message("Using cached milestone medians")
+    }
+  } else {
+    historical_milestone_medians <- NULL
+  }
+
+  if (is.null(historical_milestone_medians)) {
+    if (verbose) message("Calculating milestone medians from historical data...")
+    historical_milestone_medians <- tryCatch({
+      calculate_all_milestone_medians(raw_data, verbose = FALSE)
+    }, error = function(e) {
+      if (verbose) message("Milestone median calculation failed: ", e$message)
+      list()
+    })
+    if (use_cache && length(historical_milestone_medians) > 0) {
+      set_cached(medians_cache_key, historical_milestone_medians)
+    }
+  }
 
   # STEP 4: NOW FILTER ARCHIVED RESIDENTS USING EXISTING FUNCTION
-  filtered_data <- filter_archived_residents(raw_data, verbose = verbose)
+  if (verbose) message("Filtering archived residents...")
+  filtered_data <- filter_archived_residents(raw_data, verbose = FALSE)
 
   # STEP 5: PROCESS RESIDENT LEVELS ON FILTERED DATA
   residents <- filtered_data$forms$resident_data
@@ -119,17 +158,20 @@ raw_data <- load_data_by_forms(
   }
 
   # STEP 7: CREATE MILESTONE WORKFLOW FROM FILTERED DATA
+  if (verbose) message("Creating milestone workflow...")
   milestone_workflow <- tryCatch({
     create_milestone_workflow_from_dict(
       all_forms = filtered_data$forms,
       data_dict = data_dict,
       resident_data = residents,
-      verbose = verbose
+      verbose = FALSE
     )
   }, error = function(e) {
     if (verbose) message("Milestone workflow creation failed: ", e$message)
     NULL
   })
+
+  if (verbose) message("Data loading complete!")
   
   # STEP 8: RETURN COMPREHENSIVE DATA STRUCTURE
   result <- list(
