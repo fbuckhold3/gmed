@@ -2,62 +2,123 @@
 
 ## Overview
 
-I've created `analyze_gmed_usage.R` - a comprehensive script that will scan all your local repositories and identify exactly which gmed functions are being used.
+I've created **TWO analysis scripts** that work together to give you the complete picture:
+
+1. **analyze_gmed_usage.R** - Scans your 8 repos to find which functions are used externally
+2. **analyze_internal_dependencies.R** - Analyzes internal gmed dependencies to identify which "unused" functions are actually needed by other gmed functions
 
 ## Quick Start
 
-### Step 1: Copy the script to your gmed directory
+### Step 1: Pull the branch with both scripts
 
 ```bash
-# The script is ready in the cloud environment
-# You'll need to pull it from the branch I created
 cd /Users/fredbuckhold/Documents/GitHub/gmed
 git fetch origin claude/remove-console-logging-01MmXpQw8nRXvLwjKEMNwuk8
 git checkout claude/remove-console-logging-01MmXpQw8nRXvLwjKEMNwuk8
 ```
 
-### Step 2: Run the analysis
+### Step 2: Run BOTH analyses in order
 
 ```bash
-# From your gmed directory
+# First: Find external usage (in your 8 repos)
 Rscript analyze_gmed_usage.R
+
+# Second: Analyze internal dependencies (within gmed itself)
+Rscript analyze_internal_dependencies.R
 ```
 
-### Step 3: Review the results
+### Step 3: Review the complete results
 
-The script will generate three files:
+After running both scripts, you'll have **6 output files**:
 
-1. **gmed_usage_report.txt** - Comprehensive human-readable report
-2. **gmed_usage_report.csv** - Spreadsheet with function usage matrix
-3. **gmed_unused_functions.txt** - Simple list of functions not found in any repo
+#### From External Analysis:
+1. **gmed_usage_report.txt** - Which repos use which functions
+2. **gmed_usage_report.csv** - Function usage matrix
+3. **gmed_unused_functions.txt** - Functions not found in repos
 
-## What the Script Does
+#### From Internal Analysis:
+4. **gmed_internal_dependencies.txt** - Complete dependency analysis with 3-tier classification
+5. **gmed_dependency_tree.csv** - Full dependency matrix (open in Excel)
+6. **gmed_final_classification.txt** - Simple list of what to keep vs deprecate
 
-The script will:
+## What the Scripts Do
 
-1. ✅ Load all 173 exported functions from your gmed NAMESPACE
+### Script 1: External Usage Analysis (`analyze_gmed_usage.R`)
+
+1. ✅ Load all exported functions from your gmed NAMESPACE
 2. ✅ Scan all 8 repositories for R files
 3. ✅ Extract all `gmed::function_name()` calls
 4. ✅ Identify which files use `library(gmed)`
 5. ✅ Create a usage matrix showing which functions are used in which repos
 6. ✅ Categorize functions as:
-   - **MULTIPLE REPOS** - Used in 2+ projects (keep these!)
-   - **SINGLE REPO** - Used in only 1 project (review these)
-   - **UNUSED** - Not found in any repo (candidates for deprecation)
+   - **MULTIPLE REPOS** - Used in 2+ projects
+   - **SINGLE REPO** - Used in only 1 project
+   - **UNUSED** - Not found in any repo
+
+### Script 2: Internal Dependency Analysis (`analyze_internal_dependencies.R`)
+
+1. ✅ Parse all R files in the gmed package
+2. ✅ Build a complete dependency map (which functions call which)
+3. ✅ Identify which "unused" functions are actually needed internally
+4. ✅ Calculate dependency depth and complexity
+5. ✅ Classify ALL functions into 3 tiers:
+   - **TIER 1: Externally Used** - Used in your 8 repos → DO NOT DEPRECATE
+   - **TIER 2: Internal Dependencies** - Not used in repos but needed by Tier 1 → DO NOT DEPRECATE
+   - **TIER 3: Truly Unused** - Not used anywhere → SAFE TO DEPRECATE
+
+## The 3-Tier Classification System
+
+This answers your question: **"Are some of these functions used in gmed functions themselves?"**
+
+### Tier 1: Externally Used (✓ Keep)
+Functions directly called in your 8 repositories.
+
+**Example:**
+```r
+# In your dashboard:
+data <- gmed::load_rdm_complete()  # ← Tier 1
+```
+
+### Tier 2: Internal Dependencies (✓ Keep)
+Functions not used in your repos BUT called by Tier 1 functions.
+
+**Example:**
+```r
+# Inside gmed package:
+load_rdm_complete <- function() {
+  dict <- get_evaluation_dictionary()  # ← Tier 2 (needed by Tier 1)
+  medians <- calculate_milestone_medians()  # ← Tier 2 (needed by Tier 1)
+  # ...
+}
+```
+
+### Tier 3: Truly Unused (⚠️ Deprecate)
+Functions not used in repos AND not needed by any other gmed function.
+
+**Example:**
+```r
+# Old legacy function nobody uses:
+old_legacy_function <- function() {
+  # Not called anywhere, not needed
+}
+```
+
+## Why This Matters
+
+Without internal dependency analysis:
+- **114 functions** appear "unused"
+- But many are actually needed by other gmed functions!
+
+With internal dependency analysis:
+- **Tier 1 + Tier 2** = Functions you must keep
+- **Tier 3 only** = Functions safe to deprecate
 
 ## Expected Output
 
-### Console Output
+### From Script 1 (External Usage):
 ```
 =============================================================================
 GMED FUNCTION USAGE ANALYZER
-=============================================================================
-
-Checking gmed directory...
-Loading gmed NAMESPACE...
-Found 173 exported functions in gmed
-
-Analyzing repositories...
 =============================================================================
 
 Analyzing imslu.ccc.dashboard ...
@@ -67,104 +128,192 @@ Analyzing imslu.ccc.dashboard ...
 
 [... continues for all repos ...]
 
+SUMMARY:
+  Total exported functions:      163
+  Functions used in repos:       53
+  Functions NOT used anywhere:   114
+  Usage rate:                    32.5%
+```
+
+### From Script 2 (Internal Dependencies):
+```
+=============================================================================
+GMED INTERNAL DEPENDENCY ANALYZER
+=============================================================================
+
+Step 1: Loading external usage data...
+Found 53 functions used in external repos
+
+Step 2: Loading NAMESPACE...
+Found 163 exported functions
+
+Step 3: Building internal dependency map...
+Analyzing 47 R files in gmed/R/
+Dependency map complete!
+
+Step 4: Classifying functions into tiers...
+
+Classification complete!
+  Tier 1 (Externally used):        53 functions
+  Tier 2 (Internal dependencies):   28 functions
+  Tier 3 (Truly unused):            82 functions
+
 =============================================================================
 ANALYSIS COMPLETE!
 =============================================================================
 
-SUMMARY:
-  Total exported functions:      173
-  Functions used in repos:       51
-  Functions NOT used anywhere:   122
-  Usage rate:                    29.5%
+FINAL CLASSIFICATION:
+  Tier 1 (Externally used):        53 functions - DO NOT DEPRECATE
+  Tier 2 (Internal dependencies):  28 functions - DO NOT DEPRECATE
+  Tier 3 (Truly unused):           82 functions - SAFE TO DEPRECATE
 
-OUTPUT FILES:
-  1. gmed_usage_report.txt - Detailed text report
-  2. gmed_usage_report.csv - CSV matrix of function usage
-  3. gmed_unused_functions.txt - List of unused functions
+KEY INSIGHTS:
+  - Total functions to keep:       81
+  - Functions safe to deprecate:   82
+  - Cleanup potential:             50.3%
 ```
 
-### Report Example
+**Key Insight:** Of the 114 "unused" functions, 28 are actually needed internally! Only 82 are truly safe to deprecate.
 
-The `gmed_usage_report.txt` will show:
+### Report Examples
+
+#### From `gmed_internal_dependencies.txt`:
 
 ```
-REPOSITORY ANALYSIS
+TIER 1: EXTERNALLY USED FUNCTIONS (53 functions)
 -----------------------------------------------------------------------------
+These functions are directly used in your 8 repositories.
+DO NOT DEPRECATE - These are your core API!
 
-imslu.ccc.dashboard
-  R files found:              45
-  Files using gmed:           12
-  Unique gmed functions used: 23
+load_rdm_complete                         [calls 5 functions, depth 2]
+  Calls: get_evaluation_dictionary, calculate_all_milestone_medians, ...
 
-  Functions used:
-    - load_rdm_complete
-    - create_milestone_spider_plot_final
-    - extract_milestone_configs_from_dict
-    [... etc ...]
+create_milestone_spider_plot_final        [calls 3 functions, depth 1]
+  Calls: extract_milestone_configs_from_dict, validate_data, ...
 
+[... etc ...]
+
+TIER 2: INTERNAL DEPENDENCIES (28 functions)
 -----------------------------------------------------------------------------
+These functions are NOT used in external repos, but ARE needed by Tier 1.
+DO NOT DEPRECATE - Required for Tier 1 functions to work!
 
-UNUSED FUNCTIONS (122 functions)
+get_evaluation_dictionary                 [needed by 3 Tier 1 functions]
+  Needed by: load_rdm_complete, load_evaluation_data, ...
+  Calls: parse_redcap_metadata, clean_variable_names
+
+calculate_all_milestone_medians           [needed by 2 Tier 1 functions]
+  Needed by: load_rdm_complete, prepare_milestone_data
+  Calls: calculate_milestone_median, filter_milestone_data
+
+[... etc ...]
+
+TIER 3: TRULY UNUSED FUNCTIONS (82 functions)
 -----------------------------------------------------------------------------
-The following functions are exported but not found in any analyzed repo:
+These functions are NOT used externally AND NOT needed internally.
+SAFE TO DEPRECATE - Review and remove these!
 
-  - old_function_1
-  - legacy_helper_2
+old_legacy_function_1                     [completely isolated]
+old_legacy_function_2                     [orphan - calls 2 functions but unused]
+
+[... etc ...]
+```
+
+#### From `gmed_final_classification.txt`:
+
+```
+=== TIER 1: EXTERNALLY USED (53 functions) ===
+DO NOT DEPRECATE - Core API functions
+
+  calculate_all_milestone_medians
+  create_milestone_spider_plot_final
+  load_rdm_complete
   [... etc ...]
 
-RECOMMENDATION: Review these functions for potential deprecation.
+=== TIER 2: INTERNAL DEPENDENCIES (28 functions) ===
+DO NOT DEPRECATE - Needed by Tier 1 functions
+
+  get_evaluation_dictionary
+  calculate_milestone_median
+  parse_redcap_metadata
+  [... etc ...]
+
+=== TIER 3: TRULY UNUSED (82 functions) ===
+SAFE TO DEPRECATE - Not used anywhere
+
+  old_legacy_function_1
+  old_legacy_function_2
+  [... etc ...]
 ```
 
 ## What to Do Next
 
-### 1. Review the Text Report
-Open `gmed_usage_report.txt` and read through:
-- Which repos use which functions
-- Functions used in multiple repos (these are critical!)
-- Functions used in only one repo (might be project-specific)
-- Unused functions (candidates for deprecation)
+### 1. Review the Final Classification (START HERE!)
 
-### 2. Review the CSV in Excel/R
-Open `gmed_usage_report.csv` for an interactive view:
-- Sort by `total_repos` column to see most-used functions
-- Filter by `status` to see UNUSED, SINGLE REPO, or MULTIPLE REPOS
-- Each repo has a column showing ✓ if the function is used
+Open **`gmed_final_classification.txt`** - this is your action plan:
+- **Tier 1 + Tier 2** = Keep these (81 functions)
+- **Tier 3 only** = Safe to deprecate (82 functions)
 
-### 3. Make Decisions
+### 2. Review the Detailed Analysis
 
-#### ✅ SAFE TO KEEP (Functions used in multiple repos)
-These are your core functions - **do NOT deprecate**
+Open **`gmed_internal_dependencies.txt`** to understand:
+- Which Tier 1 functions call which Tier 2 functions
+- Why each Tier 2 function is needed
+- Which Tier 3 functions are "orphans" vs "completely isolated"
+- Dependency statistics (most complex functions, hub functions, etc.)
 
-#### ⚠️ REVIEW NEEDED (Functions used in single repo)
-- If the repo is important → keep the function
-- If the repo is archived/legacy → consider deprecation
-- If easily replaced → consider deprecation
+### 3. Review the Dependency Matrix
 
-#### 🚨 CANDIDATES FOR DEPRECATION (Unused functions)
-Before removing, check:
-- Is it used in internal scripts not in these 8 repos?
-- Is it part of a public API that external users might use?
-- Is it recently added and just not adopted yet?
-- Is it a helper that shouldn't have been exported?
+Open **`gmed_dependency_tree.csv`** in Excel/R to:
+- Sort by `tier` to see all functions in each tier
+- Sort by `num_dependents` to find critical hub functions
+- Sort by `dependency_depth` to find complex dependency chains
+- See exactly which functions call which in the `calls_functions` column
 
-### 4. Compare with My Previous Analysis
+### 4. Make Deprecation Decisions
 
-I previously analyzed these repos via GitHub's web interface and found:
-- **51 actively used functions** (web analysis)
-- **94 potentially unused functions** (web analysis)
+#### ✅ Tier 1 - KEEP (53 functions)
+These are your core API - actively used in dashboards.
+**Action:** No changes needed
 
-The local analysis should be more accurate because it can:
-- See uncommitted local changes
-- Search through all file types (.R, .Rmd, etc.)
-- Find usage in commented code or development branches
+#### ✅ Tier 2 - KEEP (28 functions)
+These are internal helpers required by Tier 1.
+**Action:** Consider making these internal-only (not exported) in future versions
+
+#### ⚠️ Tier 3 - DEPRECATE (82 functions)
+Not used anywhere - safe to remove.
+**Action:**
+1. Add `.Deprecated()` warnings now
+2. Update documentation to mark as deprecated
+3. Remove in next major version
 
 ### 5. Validate Console Logging Changes
 
-After you review the usage analysis, you can confidently merge the changes I made because:
-- I only modified functions that ARE being used (based on web analysis)
-- The changes are backward compatible (just cleaner output)
-- No function signatures were changed
-- All changes are in the `verbose` parameter handling
+The functions I modified (for console logging cleanup) are:
+- `create_milestone_spider_plot_final` - Tier 1 ✓
+- `calculate_all_milestone_medians` - Tier 1 ✓
+- `load_rdm_complete` - Tier 1 ✓
+- `extract_milestone_configs_from_dict` - Tier 1 or 2 ✓
+
+**All are actively used** - safe to merge the changes!
+
+### 6. Next Steps for Package Cleanup
+
+Based on your analysis results:
+
+1. **Short term (this week):**
+   - Merge the console logging cleanup branch
+   - Review Tier 3 list for any false positives
+
+2. **Medium term (next sprint):**
+   - Add `.Deprecated()` warnings to Tier 3 functions
+   - Update DESCRIPTION with deprecation notes
+   - Inform users in release notes
+
+3. **Long term (next major version):**
+   - Remove Tier 3 functions completely
+   - Consider making Tier 2 functions internal-only
+   - Reduce exported API to just Tier 1
 
 ## Troubleshooting
 
