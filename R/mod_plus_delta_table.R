@@ -226,17 +226,18 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
       # Filter by record_id and assessment fields
       filtered_data <- data %>%
         dplyr::filter(record_id == !!record_id()) %>%
-        dplyr::filter(!is.na(redcap_repeat_instrument) & 
-                        redcap_repeat_instrument == "assessment") %>%
+        dplyr::filter(!is.na(redcap_repeat_instrument) &
+                        tolower(trimws(redcap_repeat_instrument)) == "assessment") %>%
         dplyr::select(
           record_id,
           redcap_repeat_instance,
           ass_date,
           ass_level,
           ass_plus,
-          ass_delta, 
+          ass_delta,
           ass_faculty,
-          ass_specialty
+          ass_specialty,
+          dplyr::any_of("source_form")
         ) %>%
         # Only keep rows that have either plus or delta content
         dplyr::filter(
@@ -248,12 +249,12 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
       
       if (nrow(filtered_data) == 0) {
         return(data.frame(
-          Date = character(0),
-          Level = character(0),
-          Faculty = character(0),
-          Specialty = character(0),
-          Plus = character(0),
-          Delta = character(0)
+          Date     = character(0),
+          Rotation = character(0),
+          Level    = character(0),
+          Faculty  = character(0),
+          Plus     = character(0),
+          Delta    = character(0)
         ))
       }
       
@@ -263,10 +264,11 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
       # In the plus_delta_data reactive, replace the select() call with:
       
       result <- filtered_data %>%
-        # FIXED: Use ass_level instead of level
-        dplyr::select(record_id, ass_date, ass_level, ass_faculty, ass_specialty, ass_plus, ass_delta) %>%
+        dplyr::select(record_id, ass_date, ass_level, ass_faculty, ass_specialty,
+                      ass_plus, ass_delta,
+                      dplyr::any_of(c("ass_rotator", "source_form"))) %>%
         dplyr::filter(
-          (!is.na(ass_plus) & nzchar(trimws(ass_plus))) | 
+          (!is.na(ass_plus) & nzchar(trimws(ass_plus))) |
             (!is.na(ass_delta) & nzchar(trimws(ass_delta)))
         ) %>%
         dplyr::mutate(
@@ -322,12 +324,29 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
           Delta = dplyr::case_when(
             !is.na(ass_delta) & nzchar(trimws(ass_delta)) ~ trimws(ass_delta),
             TRUE ~ "Not provided"
-          )
+          ),
+
+          # Rotation: prefer ass_rotator, then source_form, then specialty
+          Rotation = {
+            rot_val <- if ("ass_rotator" %in% names(dplyr::cur_data()))
+              dplyr::cur_data()[["ass_rotator"]] else rep(NA_character_, dplyr::n())
+            sf_val  <- if ("source_form"  %in% names(dplyr::cur_data()))
+              dplyr::cur_data()[["source_form"]]  else rep(NA_character_, dplyr::n())
+            dplyr::case_when(
+              !is.na(rot_val) & nzchar(trimws(rot_val)) ~ trimws(rot_val),
+              !is.na(sf_val)  & grepl("cc",        tolower(sf_val)) ~ "Continuity Clinic",
+              !is.na(sf_val)  & grepl("inpatient", tolower(sf_val)) ~ "Inpatient",
+              !is.na(sf_val)  & grepl("consult",   tolower(sf_val)) ~ "Consult",
+              !is.na(sf_val)  & grepl("day",       tolower(sf_val)) ~ "Day Assessment",
+              !is.na(sf_val)  & grepl("bridge",    tolower(sf_val)) ~ "Bridge Clinic",
+              !is.na(sf_val)  & !is.na(sf_val)                      ~ sf_val,
+              !is.na(ass_specialty) & nzchar(trimws(ass_specialty))  ~ trimws(ass_specialty),
+              TRUE ~ "\u2014"
+            )
+          }
         ) %>%
-        # FIXED: Sort by the proper date column (newest first)
         dplyr::arrange(dplyr::desc(sort_date)) %>%
-        # Remove the helper column
-        dplyr::select(Date, Level, Faculty, Specialty, Plus, Delta)
+        dplyr::select(Date, Rotation, Level, Faculty, Plus, Delta)
       
       return(result)
     })
@@ -375,12 +394,18 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
           color = '#1976d2'
         ) %>%
         DT::formatStyle(
+          'Rotation',
+          fontWeight = 'bold',
+          backgroundColor = '#e3f0fb',
+          color = '#0066a1'
+        ) %>%
+        DT::formatStyle(
           'Level',
           fontWeight = 'bold',
           backgroundColor = '#f3e5f5',  # Light purple
           color = '#7b1fa2'
         )
-      
+
       return(dt)
     })
     

@@ -332,29 +332,51 @@ calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
     
     message("Current academic year: ", current_academic_year)
     
-    # Ensure grad_yr is numeric
+    # Normalise type: accept both raw numeric codes (1/2) and text labels
+    # Data dict: 1 = Preliminary, 2 = Categorical
     resident_data <- resident_data %>%
       dplyr::mutate(
-        grad_yr = suppressWarnings(as.numeric(.data$grad_yr))
+        .type_norm = dplyr::case_when(
+          tolower(as.character(.data$type)) %in% c("1", "preliminary", "prelim") ~ "preliminary",
+          tolower(as.character(.data$type)) %in% c("2", "categorical")           ~ "categorical",
+          TRUE ~ tolower(as.character(.data$type))
+        )
       )
-    
-    # Calculate Level based on type and grad_yr (matches your working coach app)
+
+    # Normalise grad_yr: accept both raw dropdown codes and actual years.
+    # Data dict codes: 1=2023, 2=2024, …, 13=2035  (code + 2022)
+    #                  14=2000, 15=2001, …, 36=2022  (code + 1986) — alumni
+    # Actual years are > 100 and pass through unchanged.
+    resident_data <- resident_data %>%
+      dplyr::mutate(
+        .gyr_raw = suppressWarnings(as.numeric(.data$grad_yr)),
+        .grad_yr_actual = dplyr::case_when(
+          .data$.gyr_raw >= 1  & .data$.gyr_raw <= 13 ~ .data$.gyr_raw + 2022,
+          .data$.gyr_raw >= 14 & .data$.gyr_raw <= 36 ~ .data$.gyr_raw + 1986,
+          .data$.gyr_raw > 100                         ~ .data$.gyr_raw,
+          TRUE ~ NA_real_
+        )
+      )
+
+    # Calculate Level based on normalised type and decoded grad_yr
     resident_data <- resident_data %>%
       dplyr::mutate(
         Level = dplyr::case_when(
-          # Preliminary residents are always Interns (one year program)
-          tolower(.data$type) %in% c("preliminary", "prelim") ~ "Intern",
-          
-          # Categorical residents based on graduation year
-          tolower(.data$type) == "categorical" & .data$grad_yr == current_academic_year + 3 ~ "Intern",  # PGY1
-          tolower(.data$type) == "categorical" & .data$grad_yr == current_academic_year + 2 ~ "PGY2",    # PGY2
-          tolower(.data$type) == "categorical" & .data$grad_yr == current_academic_year + 1 ~ "PGY3",    # PGY3
-          
+          # Preliminary residents are always Interns (one-year programme)
+          .data$.type_norm == "preliminary" ~ "Intern",
+
+          # Categorical residents: PGY determined by years until graduation
+          .data$.type_norm == "categorical" & .data$.grad_yr_actual == current_academic_year + 3 ~ "Intern",  # PGY1
+          .data$.type_norm == "categorical" & .data$.grad_yr_actual == current_academic_year + 2 ~ "PGY2",    # PGY2
+          .data$.type_norm == "categorical" & .data$.grad_yr_actual == current_academic_year + 1 ~ "PGY3",    # PGY3
+          .data$.type_norm == "categorical" & .data$.grad_yr_actual <= current_academic_year     ~ "Graduating",
+
           # Default for unmatched cases
           !is.na(.data$type) & !is.na(.data$grad_yr) ~ "Intern",
           TRUE ~ "Intern"
         )
-      )
+      ) %>%
+      dplyr::select(-.type_norm, -.gyr_raw, -.grad_yr_actual)
     
     # METHOD 2: Simple year field (legacy apps)
   } else if ("year" %in% names(resident_data)) {
@@ -377,13 +399,15 @@ calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
     resident_data$Level <- "Intern"
   }
   
-  # Report level distribution
+  # Report level distribution — use single-bracket [ to avoid subscript errors
+  # when a level is absent (single-resident filtered data only has one level)
   if ("Level" %in% names(resident_data)) {
-    level_counts <- table(resident_data$Level)
-    message("Level distribution: ", 
-            "Intern: ", level_counts[["Intern"]] %||% 0, ", ",
-            "PGY2: ", level_counts[["PGY2"]] %||% 0, ", ",
-            "PGY3: ", level_counts[["PGY3"]] %||% 0)
+    lc <- function(key) {
+      v <- table(resident_data$Level)[key]
+      if (is.na(v)) 0L else as.integer(v)
+    }
+    message("Level distribution: Intern: ", lc("Intern"),
+            ", PGY2: ", lc("PGY2"), ", PGY3: ", lc("PGY3"))
   }
   
   return(resident_data)

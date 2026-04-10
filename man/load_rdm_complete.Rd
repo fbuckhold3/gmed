@@ -9,7 +9,8 @@ load_rdm_complete(
   redcap_url = "https://redcapsurvey.slu.edu/api/",
   verbose = TRUE,
   ensure_gmed_columns = TRUE,
-  raw_or_label = "label"
+  raw_or_label = "label",
+  use_cache = TRUE
 )
 }
 \arguments{
@@ -22,6 +23,9 @@ environment variable RDM_TOKEN.}
 
 \item{ensure_gmed_columns}{Logical. Whether to verify and create required columns for
 gmed module compatibility.}
+
+\item{use_cache}{Logical. Whether to use cached data dictionary and milestone medians
+to speed up loading. Default: TRUE. Use clear_rdm_cache() to clear cached data.}
 }
 \value{
 List containing RDM 2.0 data structure with historical medians preserved

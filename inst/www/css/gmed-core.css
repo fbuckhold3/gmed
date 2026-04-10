@@ -9,11 +9,11 @@
   --ssm-secondary-blue: #0066a1;
   --ssm-light-blue: #4a90a4;
   --ssm-accent-blue: #2196f3;
-  
+
   /* Legacy Coaching Colors (mapped to SSM) */
   --coach-primary: var(--ssm-secondary-blue);    /* Was #0072B2 */
   --coach-secondary: var(--ssm-light-blue);      /* Was #56B4E9 */
-  
+
   /* Status Colors */
   --ssm-success-green: #00a651;
   --ssm-warning-orange: #ff8c00;
@@ -21,17 +21,22 @@
   --ssm-neutral-gray: #6c757d;
   --ssm-light-gray: #f8f9fa;
   --ssm-white: #ffffff;
-  
+
   /* Text Colors */
   --ssm-text-primary: #2c3e50;
   --ssm-text-secondary: #546e7a;
   --ssm-text-muted: #6c757d;
+
+  /* Layout */
+  --ssm-bg: #f3f6fa;
+  --ssm-border: #dde5ed;
+  --ssm-border-input: #cdd5df;
 }
 
 /* Base Typography */
 body {
-  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--ssm-bg);
   color: var(--ssm-text-primary);
   line-height: 1.6;
   font-size: 16px;

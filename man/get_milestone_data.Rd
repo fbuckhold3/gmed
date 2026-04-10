@@ -7,7 +7,8 @@
 get_milestone_data(
   workflow_results,
   milestone_type = "program",
-  milestone_system = "rep"
+  milestone_system = "rep",
+  verbose = FALSE
 )
 }
 \arguments{

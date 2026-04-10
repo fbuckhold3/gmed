@@ -67,10 +67,14 @@ mod_assessment_detail_custom_ui <- function(id) {
       ),
       div(
         class = "card-body",
-        p(class = "text-muted mb-3",
-          "View your assessment data organized by rotation type and evaluation category."),
+        p(class = "text-muted mb-1",
+          "Select a rotation type below to view your scores for that category."),
 
         # Category buttons
+        tags$p(
+          style = "font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#6c757d; margin-bottom:6px;",
+          tags$i(class="bi bi-hand-index me-1"), "Select a category:"
+        ),
         uiOutput(ns("category_buttons")),
 
         # Visualization output
@@ -325,11 +329,20 @@ mod_assessment_detail_custom_server <- function(id, rdm_data, record_id, data_di
         "13" = "Emergency Condition (Rapid/Code)"
       )
 
-      # Build list of available types
+      # Build list of available types.
+      # Data may be loaded with raw_or_label = "label" (type_code is already
+      # the display name) OR "raw" (type_code is a numeric string like "1").
+      # Handle both gracefully.
       type_list <- lapply(obs_type_values, function(type_code) {
+        type_key <- as.character(type_code)
+        display_name <- if (type_key %in% names(obs_type_names)) {
+          obs_type_names[[type_key]]
+        } else {
+          type_key   # already a label — use as-is
+        }
         list(
           code = type_code,
-          name = obs_type_names[[as.character(type_code)]],
+          name = display_name,
           fields = cat_info$fields,
           field_info = cat_info$field_info
         )
@@ -490,7 +503,25 @@ mod_assessment_detail_custom_server <- function(id, rdm_data, record_id, data_di
   })
 }
 
-#' Process data for scale visualization
+#' Parse REDCap choice string into a named character vector (code -> label)
+#' @keywords internal
+parse_redcap_choices <- function(choices_str) {
+  if (is.null(choices_str) || is.na(choices_str) || !nzchar(trimws(choices_str)))
+    return(character(0))
+  parts <- trimws(strsplit(choices_str, "\\|")[[1]])
+  result <- character(0)
+  for (part in parts) {
+    kv <- strsplit(part, ",\\s*", perl = TRUE)[[1]]
+    if (length(kv) >= 2) {
+      code  <- trimws(kv[1])
+      label <- trimws(paste(kv[-1], collapse = ", "))
+      result[code] <- label
+    }
+  }
+  result
+}
+
+#' Process data for scale visualization — shows labeled response distribution
 #' @keywords internal
 create_scale_visualization_data <- function(data, cat_info) {
 
@@ -498,82 +529,105 @@ create_scale_visualization_data <- function(data, cat_info) {
   viz_data <- data %>%
     dplyr::select(record_id, ass_date, ass_faculty, dplyr::all_of(cat_info$fields)) %>%
     tidyr::pivot_longer(
-      cols = dplyr::all_of(cat_info$fields),
-      names_to = "field",
+      cols      = dplyr::all_of(cat_info$fields),
+      names_to  = "field",
       values_to = "value"
     ) %>%
     dplyr::filter(!is.na(value), value != "", value != "0")
 
   if (nrow(viz_data) == 0) {
-    return(list(
-      has_data = FALSE,
-      has_numeric = FALSE,
-      display_data = data.frame(),
-      plot = NULL
-    ))
+    return(list(has_data = FALSE, has_numeric = FALSE,
+                display_data = data.frame(), plot = NULL))
   }
 
-  # Get field labels from cat_info
-  field_labels <- setNames(
-    cat_info$field_info$field_label,
-    cat_info$field_info$field_name
-  )
+  # Field labels
+  field_labels <- setNames(cat_info$field_info$field_label,
+                           cat_info$field_info$field_name)
 
-  # Add readable field names
+  # Parse choice map from data dict (use first field that has choices)
+  choice_map <- character(0)
+  if ("select_choices_or_calculations" %in% names(cat_info$field_info)) {
+    for (ch in cat_info$field_info$select_choices_or_calculations) {
+      m <- parse_redcap_choices(ch)
+      if (length(m) > 0) { choice_map <- m; break }
+    }
+  }
+
   viz_data <- viz_data %>%
     dplyr::mutate(
-      field_label = field_labels[field],
-      # Try to convert to numeric for summarization
-      value_numeric = suppressWarnings(as.numeric(value))
+      field_label   = field_labels[field],
+      value_numeric = suppressWarnings(as.numeric(value)),
+      response_label = dplyr::case_when(
+        length(choice_map) > 0 & !is.na(value_numeric) &
+          as.character(value_numeric) %in% names(choice_map)
+          ~ choice_map[as.character(value_numeric)],
+        TRUE ~ as.character(value)
+      )
     )
 
-  # Create summary by field
-  summary_data <- viz_data %>%
-    dplyr::filter(!is.na(value_numeric)) %>%
-    dplyr::group_by(field_label) %>%
-    dplyr::summarise(
-      mean_score = mean(value_numeric, na.rm = TRUE),
-      median_score = median(value_numeric, na.rm = TRUE),
-      n_assessments = dplyr::n_distinct(record_id, ass_date),
-      .groups = "drop"
-    ) %>%
-    dplyr::arrange(desc(mean_score))
-
-  # Create plotly chart if we have numeric data
-  plot_obj <- NULL
-  has_numeric <- nrow(summary_data) > 0
+  numeric_data <- dplyr::filter(viz_data, !is.na(value_numeric))
+  has_numeric  <- nrow(numeric_data) > 0
+  plot_obj     <- NULL
 
   if (has_numeric) {
-    plot_obj <- plotly::plot_ly(
-      data = summary_data,
-      x = ~mean_score,
-      y = ~reorder(field_label, mean_score),
-      type = "bar",
-      orientation = "h",
-      marker = list(color = "#667eea"),
-      text = ~paste0("Mean: ", round(mean_score, 2),
-                    "<br>Median: ", round(median_score, 2),
-                    "<br>N: ", n_assessments),
-      hoverinfo = "text"
-    ) %>%
-      plotly::layout(
-        title = list(text = paste("Average Scores -", cat_info$name), x = 0),
-        xaxis = list(title = "Average Score"),
-        yaxis = list(title = ""),
-        margin = list(l = 250)
+    # ── Distribution chart ──────────────────────────────────────────────────
+    # Count responses per question per label; color from low (warm) to high (cool)
+    dist_data <- numeric_data %>%
+      dplyr::group_by(field_label, response_label, value_numeric) %>%
+      dplyr::summarise(count = n(), .groups = "drop") %>%
+      dplyr::arrange(value_numeric)
+
+    ordered_labels <- dist_data %>%
+      dplyr::distinct(value_numeric, response_label) %>%
+      dplyr::arrange(value_numeric) %>%
+      dplyr::pull(response_label)
+
+    n_lvl   <- length(ordered_labels)
+    palette <- grDevices::colorRampPalette(
+      c("#c0392b", "#e67e22", "#f1c40f", "#27ae60", "#1a6b3a")
+    )(max(n_lvl, 2))
+    level_colors <- setNames(palette, ordered_labels)
+
+    dist_data$response_label <- factor(dist_data$response_label,
+                                       levels = ordered_labels)
+
+    plot_obj <- plotly::plot_ly()
+    for (lbl in ordered_labels) {
+      sub <- dplyr::filter(dist_data, response_label == lbl)
+      plot_obj <- plotly::add_trace(
+        plot_obj,
+        data        = sub,
+        x           = ~count,
+        y           = ~field_label,
+        type        = "bar",
+        orientation = "h",
+        name        = lbl,
+        marker      = list(color = level_colors[[lbl]]),
+        text        = ~paste0(lbl, ": ", count),
+        hoverinfo   = "text"
       )
+    }
+
+    plot_obj <- plotly::layout(
+      plot_obj,
+      barmode = "stack",
+      xaxis   = list(title = "Number of assessments", dtick = 1),
+      yaxis   = list(title = "", automargin = TRUE),
+      margin  = list(l = 10, r = 10, b = 60, t = 40),
+      legend  = list(orientation = "h", y = -0.25, x = 0,
+                     title = list(text = "Rating"))
+    )
   }
 
-  # Create display data
   display_data <- viz_data %>%
-    dplyr::select(ass_date, ass_faculty, field_label, value) %>%
-    dplyr::arrange(desc(ass_date))
+    dplyr::select(ass_date, ass_faculty, field_label, response_label) %>%
+    dplyr::arrange(dplyr::desc(ass_date))
 
   return(list(
-    has_data = TRUE,
-    has_numeric = has_numeric,
-    display_data = display_data,
-    plot = plot_obj,
+    has_data      = TRUE,
+    has_numeric   = has_numeric,
+    display_data  = display_data,
+    plot          = plot_obj,
     n_assessments = nrow(data)
   ))
 }
