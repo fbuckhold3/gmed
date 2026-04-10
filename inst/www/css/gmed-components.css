@@ -559,3 +559,182 @@
     border-radius: 0 8px 8px 0;
   }
 }
+
+/* ============================================================================
+   LOGIN SCREEN  (Design A — Clean/Clinical)
+   ============================================================================ */
+.gmed-login-wrap {
+  width: 100%;
+  padding-top: 16px;
+}
+
+.gmed-login-logo {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.gmed-login-wordmark {
+  display: inline-block;
+  background: var(--ssm-primary-blue);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 5px 12px;
+  border-radius: 3px;
+  margin-bottom: 12px;
+}
+
+.gmed-login-logo h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ssm-primary-blue);
+  margin: 0;
+}
+
+.gmed-login-logo p {
+  font-size: 0.8rem;
+  color: var(--ssm-text-secondary);
+  margin: 3px 0 0;
+}
+
+.gmed-login-disclaimer {
+  background: #f8fafc;
+  border: 1px solid var(--ssm-border);
+  border-left: 4px solid var(--ssm-secondary-blue);
+  border-radius: 4px;
+  padding: 16px 18px;
+  font-size: 0.82rem;
+  color: #4a5568;
+  line-height: 1.7;
+  margin-bottom: 24px;
+}
+
+.gmed-login-code-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 6px;
+}
+
+.gmed-login-code-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--ssm-border-input);
+  border-radius: 5px;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.gmed-login-code-input:focus {
+  border-color: var(--ssm-secondary-blue);
+}
+
+.gmed-login-btn {
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px;
+  background: var(--ssm-primary-blue);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.gmed-login-btn:hover {
+  background: var(--ssm-secondary-blue);
+}
+
+.gmed-login-error {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: #c53030;
+}
+
+/* ============================================================================
+   NAV BLOCKS  (Home Screen — Design A)
+   ============================================================================ */
+.gmed-page-header {
+  background: var(--ssm-primary-blue);
+  color: white;
+  padding: 22px 28px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.gmed-page-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.gmed-page-header p {
+  margin: 4px 0 0;
+  opacity: 0.7;
+  font-size: 0.82rem;
+}
+
+.gmed-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.gmed-nav-block {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid var(--ssm-secondary-blue);
+  border-radius: 6px;
+  padding: 18px 18px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  transition: box-shadow 0.2s, transform 0.15s;
+  user-select: none;
+}
+
+.gmed-nav-block:hover {
+  box-shadow: 0 4px 18px rgba(0, 102, 161, 0.14);
+  transform: translateY(-2px);
+}
+
+.gmed-nav-block-icon {
+  color: var(--ssm-secondary-blue);
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.gmed-nav-block-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a2c3d;
+  margin-bottom: 3px;
+}
+
+.gmed-nav-block-desc {
+  font-size: 0.75rem;
+  color: #6b7c8d;
+}
+
+@media (max-width: 768px) {
+  .gmed-nav-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .gmed-nav-grid { grid-template-columns: 1fr; }
+  .gmed-login-wrap { padding: 12px; }
+}

@@ -26,9 +26,10 @@ mod_cc_completion_ui <- function(id) {
       div(
         class = "card-body",
         p(class = "text-muted mb-3",
-          "Track your continuity clinic assessments. Four assessments are expected per academic year."),
+          "Track your continuity clinic assessments. Four per academic year are expected.",
+          tags$small(class = "d-block mt-1", style = "color:#6c757d;",
+                     "Click a completed quarter to see details.")),
 
-        # Year tabs or accordion
         uiOutput(ns("completion_display"))
       )
     ),
@@ -50,6 +51,14 @@ mod_cc_completion_ui <- function(id) {
         .quarter-card.pending {
           background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
           border-color: #ffc107;
+        }
+        .quarter-card-clickable {
+          cursor: pointer;
+          transition: box-shadow 0.2s, transform 0.15s;
+        }
+        .quarter-card-clickable:hover {
+          box-shadow: 0 4px 12px rgba(0,102,161,0.18);
+          transform: translateY(-2px);
         }
         .quarter-header {
           display: flex;
@@ -80,6 +89,10 @@ mod_cc_completion_ui <- function(id) {
 #' @export
 mod_cc_completion_server <- function(id, rdm_data, record_id, resident_data = NULL) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    # Track which quarter card was last clicked
+    selected_quarter <- reactiveVal(NULL)
 
     # Calculate completion status
     completion_data <- reactive({
@@ -90,50 +103,33 @@ mod_cc_completion_server <- function(id, rdm_data, record_id, resident_data = NU
         dplyr::filter(
           record_id == !!record_id(),
           !is.na(redcap_repeat_instrument),
-          redcap_repeat_instrument == "assessment",
+          tolower(trimws(redcap_repeat_instrument)) == "assessment",
           !is.na(ass_cc_quart),
           ass_cc_quart != ""
         ) %>%
         dplyr::select(record_id, redcap_repeat_instance,
                      ass_cc_quart, ass_date, ass_faculty, ass_level)
 
-      # Determine academic years to show
+      # ── Number of years to show based on PGY level ──────────────────────────
+      current_year  <- as.integer(format(Sys.Date(), "%Y"))
+      current_month <- as.integer(format(Sys.Date(), "%m"))
+      current_acy   <- if (current_month >= 7L) current_year else current_year - 1L
+
+      n_years <- 2L  # sensible default
       if (!is.null(resident_data) && !is.null(resident_data())) {
-        res_info <- resident_data()
-
-        # Calculate which years based on grad year and type
-        # For now, show last 3 academic years
-        current_year <- as.numeric(format(Sys.Date(), "%Y"))
-        current_month <- as.numeric(format(Sys.Date(), "%m"))
-
-        if (current_month >= 7) {
-          current_academic_year <- current_year
-        } else {
-          current_academic_year <- current_year - 1
+        lvl <- resident_data()$Level
+        if (length(lvl) > 0 && !is.na(lvl[1])) {
+          n_years <- switch(as.character(lvl[1]),
+            "Intern"     = 1L,
+            "PGY1"       = 1L,
+            "PGY2"       = 2L,
+            "PGY3"       = 3L,
+            "Graduating" = 3L,
+            2L   # default
+          )
         }
-
-        academic_years <- c(
-          current_academic_year - 2,
-          current_academic_year - 1,
-          current_academic_year
-        )
-      } else {
-        # Default: show last 3 years
-        current_year <- as.numeric(format(Sys.Date(), "%Y"))
-        current_month <- as.numeric(format(Sys.Date(), "%m"))
-
-        if (current_month >= 7) {
-          current_academic_year <- current_year
-        } else {
-          current_academic_year <- current_year - 1
-        }
-
-        academic_years <- c(
-          current_academic_year - 2,
-          current_academic_year - 1,
-          current_academic_year
-        )
       }
+      academic_years <- seq.int(current_acy - n_years + 1L, current_acy)
 
       # Build completion structure for each year
       result <- lapply(academic_years, function(year) {
@@ -196,37 +192,80 @@ mod_cc_completion_server <- function(id, rdm_data, record_id, resident_data = NU
         # Count completed quarters
         completed_count <- sum(sapply(year_info$quarters, function(q) q$completed))
 
-        # Create quarter cards
+        # Create quarter cards — completed ones expand inline on click
         quarter_cards <- lapply(year_info$quarters, function(quarter) {
           card_class <- if (quarter$completed) "quarter-card completed" else "quarter-card pending"
-          icon_html <- if (quarter$completed) {
+          icon_html  <- if (quarter$completed)
             icon("check-circle", class = "quarter-icon text-success")
-          } else {
+          else
             icon("circle", class = "quarter-icon text-warning")
-          }
 
-          status_text <- if (quarter$completed) {
-            paste0("Completed by ", quarter$faculty, " on ",
-                  format(as.Date(quarter$date), "%b %d, %Y"))
-          } else {
-            "Not yet completed"
-          }
+          collapse_id <- paste0("qd-", year_info$academic_year, "-", quarter$quarter)
 
-          div(
-            class = card_class,
+          level_label <- if (quarter$completed) {
+            switch(as.character(quarter$level),
+              "1" = "Intern", "Intern" = "Intern",
+              "2" = "PGY2",   "PGY2"  = "PGY2",
+              "3" = "PGY3",   "PGY3"  = "PGY3",
+              as.character(quarter$level))
+          } else NULL
+
+          if (quarter$completed) {
             div(
-              class = "quarter-header",
-              icon_html,
-              paste("Quarter", quarter$quarter)
-            ),
-            div(
-              class = "quarter-details",
-              status_text
+              class = paste(card_class, "quarter-card-clickable p-0"),
+              style = "overflow:hidden;",
+              # ── Header row (always visible, toggles detail) ──
+              tags$button(
+                class            = "btn w-100 text-start p-3",
+                style            = "background:none; border:none;",
+                `data-bs-toggle` = "collapse",
+                `data-bs-target` = paste0("#", collapse_id),
+                `aria-expanded`  = "false",
+                div(class = "quarter-header mb-1", icon_html,
+                    paste("Quarter", quarter$quarter)),
+                div(class = "quarter-details",
+                    paste0(quarter$faculty, " \u00b7 ",
+                           format(as.Date(quarter$date), "%b %d, %Y"))),
+                tags$small(style = "color:#0066a1; font-size:0.72rem;",
+                           "View details \u203a")
+              ),
+              # ── Collapsible detail ───────────────────────────
+              div(
+                id    = collapse_id,
+                class = "collapse",
+                div(
+                  style = "background:#f0f6fb; border-top:1px solid #c8dff0; padding:10px 14px;",
+                  div(class = "row g-2",
+                    div(class = "col-6",
+                      tags$small(class = "text-muted d-block", "DATE"),
+                      tags$span(style = "font-size:0.85rem; font-weight:600;",
+                                format(as.Date(quarter$date), "%B %d, %Y"))
+                    ),
+                    div(class = "col-6",
+                      tags$small(class = "text-muted d-block", "FACULTY"),
+                      tags$span(style = "font-size:0.85rem; font-weight:600;",
+                                quarter$faculty)
+                    ),
+                    div(class = "col-6 mt-2",
+                      tags$small(class = "text-muted d-block", "LEVEL"),
+                      tags$span(style = "font-size:0.85rem; font-weight:600;",
+                                level_label)
+                    )
+                  )
+                )
+              )
             )
-          )
+          } else {
+            div(
+              class = card_class,
+              div(class = "quarter-header", icon_html,
+                  paste("Quarter", quarter$quarter)),
+              div(class = "quarter-details", "Not yet completed")
+            )
+          }
         })
 
-        # Year accordion item
+        # Year accordion item — most recent year open by default
         div(
           class = "accordion-item",
           div(
@@ -236,29 +275,28 @@ mod_cc_completion_server <- function(id, rdm_data, record_id, resident_data = NU
               type = "button",
               `data-bs-toggle` = "collapse",
               `data-bs-target` = paste0("#collapse-year-", i),
-              `aria-expanded` = if (i == length(years_data)) "true" else "false",
-              `aria-controls` = paste0("collapse-year-", i),
-              paste0("Academic Year ", year_info$year_label, " (",
-                    completed_count, " of 4 completed)")
+              `aria-expanded`  = if (i == length(years_data)) "true" else "false",
+              `aria-controls`  = paste0("collapse-year-", i),
+              paste0("Academic Year ", year_info$year_label,
+                     " (", completed_count, " of 4 completed)")
             )
           ),
           div(
-            id = paste0("collapse-year-", i),
-            class = if (i == length(years_data)) "accordion-collapse collapse show" else "accordion-collapse collapse",
+            id    = paste0("collapse-year-", i),
+            class = if (i == length(years_data))
+              "accordion-collapse collapse show" else "accordion-collapse collapse",
             `data-bs-parent` = "#ccAccordion",
-            div(
-              class = "accordion-body",
-              quarter_cards
-            )
+            div(class = "accordion-body",
+                div(style = "display:grid; grid-template-columns: repeat(4,1fr); gap:12px;",
+                    quarter_cards))
           )
         )
       })
 
-      div(
-        class = "accordion",
-        id = "ccAccordion",
-        accordion_items
-      )
+      div(class = "accordion", id = "ccAccordion", accordion_items)
     })
+
+    # Detail is now handled inline via Bootstrap collapse — no server output needed
+
   })
 }

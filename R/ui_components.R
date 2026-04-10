@@ -385,3 +385,132 @@ gmed_step_indicator <- function(current_step,
     step_text
   )
 }
+
+#' GMED Login Page
+#'
+#' Renders the standard Design A login screen with SSM branding, a disclaimer
+#' block, and an access code input. Used as the entry point for all resident-
+#' and faculty-facing GMED applications.
+#'
+#' @param id Input ID for the access code field (default: "access_code").
+#'   The sign-in button fires \code{<id>_btn} as a Shiny input value.
+#' @param app_title Main application title shown below the wordmark
+#' @param app_subtitle Subtitle / program line shown below the title
+#' @param org_eyebrow Small all-caps wordmark pill (default: "SSM HEALTH · SLUCARE")
+#' @param disclaimer_text Full text of the terms/disclaimer paragraph. If NULL
+#'   a standard IMSLU disclaimer is used.
+#' @param btn_label Label for the sign-in button (default: "Sign In")
+#'
+#' @return Shiny tagList with the login screen UI
+#' @export
+gmed_login_page <- function(id              = "access_code",
+                            app_title       = "IMSLU Resident Portal",
+                            app_subtitle    = "Internal Medicine Residency",
+                            org_eyebrow     = "SSM HEALTH \u00b7 SLUCARE",
+                            disclaimer_text = NULL,
+                            btn_label       = "Sign In") {
+
+  if (is.null(disclaimer_text)) {
+    disclaimer_text <- paste(
+      "This application contains confidential educational and performance data",
+      "for use by authorized Internal Medicine residency program participants only.",
+      "Information within this system is protected under FERPA and applicable",
+      "institutional privacy policies. Access is restricted to the named resident",
+      "and authorized program personnel. Unauthorized access, use, disclosure,",
+      "or distribution of this information is strictly prohibited.",
+      "All activity within this system may be monitored and logged."
+    )
+  }
+
+  shiny::div(
+    class = "gmed-login-wrap",
+
+    # Branding
+    shiny::div(
+      class = "gmed-login-logo",
+      shiny::div(class = "gmed-login-wordmark", org_eyebrow),
+      shiny::tags$h3(app_title),
+      shiny::tags$p(app_subtitle)
+    ),
+
+    # Disclaimer
+    shiny::div(class = "gmed-login-disclaimer", disclaimer_text),
+
+    # Access code field
+    shiny::div(class = "gmed-login-code-label", "Access Code"),
+    shiny::tags$input(
+      id            = id,
+      class         = "gmed-login-code-input",
+      type          = "password",
+      placeholder   = "Enter your access code",
+      autocomplete  = "off"
+    ),
+
+    # Sign-in button
+    shiny::tags$button(
+      btn_label,
+      class   = "gmed-login-btn",
+      onclick = sprintf("Shiny.setInputValue('%s_btn', Math.random(), {priority: 'event'})", id)
+    ),
+
+    # Error message placeholder
+    shiny::uiOutput(paste0(id, "_error"))
+  )
+}
+
+#' GMED Navigation Blocks
+#'
+#' Renders the Design A home screen: a dark header bar followed by a 3-column
+#' grid of clickable navigation blocks. Clicking a block fires \code{input_id}
+#' with the block's \code{id} value.
+#'
+#' @param blocks List of block definitions. Each element is a named list with:
+#'   \describe{
+#'     \item{id}{Character — value sent to Shiny when clicked}
+#'     \item{label}{Character — bold block title}
+#'     \item{icon}{Character — Bootstrap Icons name (e.g. \code{"clipboard2-check-fill"})}
+#'     \item{desc}{Character — small descriptive line below label}
+#'   }
+#' @param title Text for the dark page header
+#' @param subtitle Optional subtitle line in the header (default: NULL)
+#' @param input_id Shiny input ID that receives the clicked block id (default: "nav_block")
+#'
+#' @return Shiny tagList with header and block grid
+#' @export
+gmed_nav_blocks <- function(blocks,
+                            title    = "IMSLU Resident Dashboard",
+                            subtitle = NULL,
+                            input_id = "nav_block") {
+
+  shiny::tagList(
+
+    # Page header
+    shiny::div(
+      class = "gmed-page-header",
+      shiny::tags$h2(title),
+      if (!is.null(subtitle)) shiny::tags$p(subtitle)
+    ),
+
+    # Block grid
+    shiny::div(
+      class = "gmed-nav-grid",
+      lapply(blocks, function(b) {
+        shiny::div(
+          class   = "gmed-nav-block",
+          onclick = sprintf(
+            "Shiny.setInputValue('%s', '%s', {priority: 'event'})",
+            input_id, b$id
+          ),
+          shiny::div(
+            class = "gmed-nav-block-icon",
+            shiny::tags$i(class = paste0("bi bi-", b$icon))
+          ),
+          shiny::div(
+            shiny::div(class = "gmed-nav-block-label", b$label),
+            shiny::div(class = "gmed-nav-block-desc",  b$desc)
+          )
+        )
+      })
+    )
+  )
+}

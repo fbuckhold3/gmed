@@ -12,26 +12,36 @@
 #' @return List containing processed milestone data and medians for each form
 #' @export
 calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
-  
-  if (verbose) cat("=== CALCULATING MILESTONE MEDIANS FOR ALL FORMS ===\n")
-  
+
+  if (verbose) {
+    message("=== CALCULATING MILESTONE MEDIANS FOR ALL FORMS ===")
+  }
+
   # Check available milestone forms
   milestone_forms <- c("milestone_entry", "milestone_selfevaluation_c33c", "acgme_miles")
   available_forms <- intersect(milestone_forms, names(data_list$forms))
-  
-  if (verbose) cat("Available forms:", paste(available_forms, collapse = ", "), "\n")
+
+  if (verbose) {
+    message("Available forms: ", paste(available_forms, collapse = ", "))
+  }
   
   # Store results
   results <- list()
   
   for (form_name in available_forms) {
-    if (verbose) cat("\n--- Processing", form_name, "---\n")
-    
+    if (verbose) {
+      message("\n--- Processing ", form_name, " ---")
+    }
+
     form_data <- data_list$forms[[form_name]]
-    if (verbose) cat("Raw data rows:", nrow(form_data), "\n")
-    
+    if (verbose) {
+      message("Raw data rows: ", nrow(form_data))
+    }
+
     if (nrow(form_data) == 0) {
-      if (verbose) cat("No data - skipping\n")
+      if (verbose) {
+        message("No data - skipping")
+      }
       next
     }
     
@@ -54,13 +64,15 @@ calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
       milestone_cols <- rep_program_cols
       milestone_type <- "program"
     } else {
-      if (verbose) cat("No milestone columns found - skipping\n")
+      if (verbose) {
+        message("No milestone columns found - skipping")
+      }
       next
     }
-    
+
     if (verbose) {
-      cat("Using", length(milestone_cols), milestone_type, "milestone columns\n")
-      cat("Sample columns:", paste(head(milestone_cols, 3), collapse = ", "), "\n")
+      message("Using ", length(milestone_cols), " ", milestone_type, " milestone columns")
+      message("Sample columns: ", paste(head(milestone_cols, 3), collapse = ", "))
     }
     
     # Process the data
@@ -75,10 +87,12 @@ calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
       
       # Process milestone data using gmed function
       processed_data <- process_milestone_data_simple(form_data, type = milestone_type)
-      
+
       if (!is.null(processed_data)) {
-        if (verbose) cat("Processed rows:", nrow(processed_data), "\n")
-        
+        if (verbose) {
+          message("Processed rows: ", nrow(processed_data))
+        }
+
         # Calculate medians manually (works for all column patterns)
         medians <- processed_data %>%
           dplyr::group_by(prog_mile_period, period_name) %>%
@@ -87,10 +101,12 @@ calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
             n_residents = dplyr::n(),
             .groups = "drop"
           )
-        
+
         if (nrow(medians) > 0) {
-          if (verbose) cat("SUCCESS: Calculated medians for", nrow(medians), "periods\n")
-          
+          if (verbose) {
+            message("SUCCESS: Calculated medians for ", nrow(medians), " periods")
+          }
+
           # Store results
           results[[form_name]] <- list(
             processed_data = processed_data,
@@ -99,33 +115,39 @@ calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
             columns = milestone_cols,
             form_name = form_name
           )
-          
+
         } else {
-          if (verbose) cat("No medians calculated\n")
+          if (verbose) {
+            message("No medians calculated")
+          }
         }
-        
+
       } else {
-        if (verbose) cat("Failed to process data\n")
+        if (verbose) {
+          message("Failed to process data")
+        }
       }
-      
+
     }, error = function(e) {
-      if (verbose) cat("Error:", e$message, "\n")
+      if (verbose) {
+        message("Error: ", e$message)
+      }
     })
   }
   
   # Summary
   if (verbose) {
-    cat("\n=== MILESTONE MEDIANS SUMMARY ===\n")
+    message("\n=== MILESTONE MEDIANS SUMMARY ===")
     for (form_name in names(results)) {
       result <- results[[form_name]]
-      cat(form_name, ":\n")
-      cat("  Type:", result$type, "\n")
-      cat("  Columns:", length(result$columns), "\n") 
-      cat("  Periods:", nrow(result$medians), "\n")
-      cat("  ✅ SUCCESS\n")
+      message(form_name, ":")
+      message("  Type: ", result$type)
+      message("  Columns: ", length(result$columns))
+      message("  Periods: ", nrow(result$medians))
+      message("  \u2705 SUCCESS")
     }
   }
-  
+
   return(results)
 }
 
@@ -140,15 +162,21 @@ calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
 #' @return List with organized milestone data ready for app usage
 #' @export
 prepare_milestone_app_data <- function(data_list, verbose = TRUE) {
-  
-  if (verbose) cat("=== PREPARING MILESTONE APP DATA ===\n")
-  
+
+  if (verbose) {
+    message("=== PREPARING MILESTONE APP DATA ===")
+  }
+
   # Step 1: Calculate milestone medians
-  if (verbose) cat("1. Calculating milestone medians...\n")
+  if (verbose) {
+    message("1. Calculating milestone medians...")
+  }
   milestone_results <- calculate_all_milestone_medians(data_list, verbose = verbose)
-  
+
   # Step 2: Filter archived residents from individual data
-  if (verbose) cat("2. Filtering archived residents...\n")
+  if (verbose) {
+    message("2. Filtering archived residents...")
+  }
   
   # Get clean resident list (non-archived)
   clean_residents <- data_list$resident_data
@@ -158,16 +186,20 @@ prepare_milestone_app_data <- function(data_list, verbose = TRUE) {
     archived_names <- clean_residents %>%
       dplyr::filter(res_archive == "Yes") %>%
       dplyr::pull(name)
-    
+
     if (length(archived_names) > 0) {
-      if (verbose) cat("   Found", length(archived_names), "archived residents to remove\n")
+      if (verbose) {
+        message("   Found ", length(archived_names), " archived residents to remove")
+      }
       clean_residents <- clean_residents %>%
         dplyr::filter(!name %in% archived_names)
     }
   }
-  
+
   # Step 3: Calculate resident levels
-  if (verbose) cat("3. Calculating resident levels...\n")
+  if (verbose) {
+    message("3. Calculating resident levels...")
+  }
   clean_residents <- calculate_resident_level(clean_residents)
   
   # Step 4: Create cleaned milestone datasets (individuals only, no archived)
@@ -188,10 +220,10 @@ prepare_milestone_app_data <- function(data_list, verbose = TRUE) {
     }
     
     cleaned_milestone_data[[form_name]] <- clean_milestone_data
-    
+
     if (verbose) {
-      cat("   ", form_name, ": ", nrow(result$processed_data), " -> ", 
-          nrow(clean_milestone_data), " rows after archive filter\n")
+      message("   ", form_name, ": ", nrow(result$processed_data), " -> ",
+          nrow(clean_milestone_data), " rows after archive filter")
     }
   }
   
@@ -218,15 +250,15 @@ prepare_milestone_app_data <- function(data_list, verbose = TRUE) {
     # Raw data (if needed for other purposes)
     raw_data = data_list
   )
-  
+
   if (verbose) {
-    cat("4. Final app data structure:\n")
-    cat("   - milestone_individual: individual resident milestone data\n")
-    cat("   - milestone_medians: median reference data by period\n") 
-    cat("   - residents:", nrow(app_data$residents), "active residents\n")
-    cat("   - milestone_metadata: column info and form types\n")
+    message("4. Final app data structure:")
+    message("   - milestone_individual: individual resident milestone data")
+    message("   - milestone_medians: median reference data by period")
+    message("   - residents: ", nrow(app_data$residents), " active residents")
+    message("   - milestone_metadata: column info and form types")
   }
-  
+
   return(app_data)
 }
 

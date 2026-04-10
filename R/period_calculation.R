@@ -7,6 +7,10 @@
 #' @param type Numeric or Character. Residency type: 1/"Preliminary" or 2/"Categorical"
 #' @param current_date Date. Current date for calculation (default: Sys.Date())
 #' @param data_dict Optional. Data dictionary data frame to pull labels from REDCap
+#' @param period7_open_month Integer (1-6). Month in the residency start year when the
+#'   Entering Residency (Period 7) self-evaluation becomes accessible to incoming interns
+#'   BEFORE their official July 1 start date. Default: 3 (March 1). Set to 7 to disable
+#'   early access (original behavior).
 #'
 #' @return List with elements:
 #'   \item{pgy_year}{Numeric. Current PGY year (1, 2, or 3)}
@@ -15,11 +19,12 @@
 #'   \item{academic_year}{Character. Current academic year (e.g., "2024-2025")}
 #'   \item{months_into_year}{Numeric. Months into current academic year}
 #'   \item{is_valid}{Logical. TRUE if resident is currently in training}
-#'   
+#'   \item{is_prestart}{Logical. TRUE if in the pre-start Period 7 window (March-June)}
+#'
 #' @details
 #' Self-evaluation periods (note: starts at 7, not 0):
 #' \itemize{
-#'   \item 7 = Entering Residency (July 1 - Sept 30, PGY1)
+#'   \item 7 = Entering Residency (opens March 1 pre-start; July 1 - Sept 30 of PGY1)
 #'   \item 1 = Mid Intern (Oct 1 - Jan 31, PGY1)
 #'   \item 2 = End Intern (Feb 1 - June 30, PGY1)
 #'   \item 3 = Mid PGY2 (Oct 1 - Jan 31, PGY2)
@@ -30,7 +35,11 @@
 #'
 #' Preliminary residents only experience periods 7, 1, 2.
 #' After graduation, period_number = NA and is_valid = FALSE.
-#' 
+#'
+#' Incoming interns: the Period 7 eval is accessible starting on
+#' \code{period7_open_month}/1 of their start year (default: March 1), even before
+#' the official July 1 start date. These residents have \code{is_prestart = TRUE}.
+#'
 #' If data_dict is provided, period names and type labels will be pulled from
 #' REDCap data dictionary. Otherwise, falls back to hardcoded labels.
 #'
@@ -40,6 +49,14 @@
 #' # Categorical resident graduating 2026, checked in December 2024
 #' calculate_pgy_and_period(2026, 2, as.Date("2024-12-15"))
 #' # Returns: PGY2, period 3 (Mid PGY2)
+#'
+#' # Incoming intern graduating 2029, checking in April 2026 (pre-start)
+#' calculate_pgy_and_period(2029, 2, as.Date("2026-04-09"))
+#' # Returns: PGY1, period 7 (Entering Residency), is_prestart = TRUE
+#'
+#' # Same intern before March 1 — still blocked
+#' calculate_pgy_and_period(2029, 2, as.Date("2026-02-15"))
+#' # Returns: is_valid = FALSE, "Pre-residency"
 #'
 #' # With data dictionary for dynamic labels
 #' calculate_pgy_and_period(2026, 2, as.Date("2024-12-15"), data_dict = my_data_dict)
@@ -51,21 +68,23 @@
 #' # Recent graduate (after June 30)
 #' calculate_pgy_and_period(2024, 2, as.Date("2024-08-01"))
 #' # Returns: Graduated, period NA, is_valid = FALSE
-calculate_pgy_and_period <- function(grad_yr, 
+calculate_pgy_and_period <- function(grad_yr,
                                      type = 2,
                                      current_date = Sys.Date(),
-                                     data_dict = NULL) {
+                                     data_dict = NULL,
+                                     period7_open_month = 3L) {
   
   # Validate inputs
   if (is.na(grad_yr) || is.null(grad_yr)) {
     return(list(
-      pgy_year = NA,
-      period_number = NA,
-      period_name = "Unknown",
-      academic_year = NA,
+      pgy_year         = NA,
+      period_number    = NA,
+      period_name      = "Unknown",
+      academic_year    = NA,
       months_into_year = NA,
-      is_valid = FALSE,
-      error = "Missing graduation year"
+      is_valid         = FALSE,
+      is_prestart      = FALSE,
+      error            = "Missing graduation year"
     ))
   }
   
@@ -112,27 +131,56 @@ calculate_pgy_and_period <- function(grad_yr,
   grad_date <- as.Date(paste0(grad_yr, "-06-30"))
   if (current_date > grad_date) {
     return(list(
-      pgy_year = NA,
-      period_number = NA,
-      period_name = "Graduated",
-      academic_year = academic_year,
+      pgy_year        = NA,
+      period_number   = NA,
+      period_name     = "Graduated",
+      academic_year   = academic_year,
       months_into_year = NA,
-      is_valid = FALSE,
-      message = "Resident has graduated"
+      is_valid        = FALSE,
+      is_prestart     = FALSE,
+      message         = "Resident has graduated"
     ))
   }
   
-  # Check if before residency start
-  residency_start <- as.Date(paste0(start_year, "-07-01"))
-  if (current_date < residency_start) {
+  # Check if before residency start — with early-access window for Period 7.
+  # Incoming interns can access the Entering Residency self-eval starting on
+  # period7_open_month/01 of their start year (default: March 1).
+  residency_start  <- as.Date(paste0(start_year, "-07-01"))
+  open_month       <- max(1L, min(6L, as.integer(period7_open_month)))
+  period7_open     <- as.Date(paste0(start_year, "-",
+                                     formatC(open_month, width = 2, flag = "0"),
+                                     "-01"))
+
+  if (current_date < period7_open) {
+    # Truly before the early-access window — no access yet
     return(list(
-      pgy_year = 0,
-      period_number = NA,
-      period_name = "Pre-residency",
-      academic_year = academic_year,
+      pgy_year        = 0,
+      period_number   = NA,
+      period_name     = "Pre-residency",
+      academic_year   = academic_year,
       months_into_year = NA,
-      is_valid = FALSE,
-      message = "Resident has not started yet"
+      is_valid        = FALSE,
+      is_prestart     = FALSE,
+      message         = "Resident has not started yet"
+    ))
+  }
+
+  if (current_date < residency_start) {
+    # In the early-access window (e.g., March 1 – June 30 of start year).
+    # Treat as Period 7 / PGY-1 so the Entering Residency eval is accessible.
+    type_label <- translate_resident_type(type_numeric, data_dict = data_dict)
+    return(list(
+      pgy_year         = 1,
+      period_number    = 7,
+      period_name      = get_period_label(7),
+      academic_year    = paste0(start_year, "-", start_year + 1L),
+      months_into_year = 0,
+      is_valid         = TRUE,
+      is_prestart      = TRUE,
+      grad_yr          = grad_yr,
+      type             = type_label,
+      type_code        = type_numeric,
+      message          = "Incoming resident \u2014 Entering Residency evaluation available"
     ))
   }
   
@@ -171,13 +219,14 @@ calculate_pgy_and_period <- function(grad_yr,
   } else if (is_preliminary && pgy_year > 1) {
     # Preliminary residents shouldn't be beyond PGY1
     return(list(
-      pgy_year = pgy_year,
-      period_number = NA,
-      period_name = "Invalid - Prelim beyond PGY1",
-      academic_year = academic_year,
+      pgy_year         = pgy_year,
+      period_number    = NA,
+      period_name      = "Invalid - Prelim beyond PGY1",
+      academic_year    = academic_year,
       months_into_year = months_into_year,
-      is_valid = FALSE,
-      error = "Preliminary resident should have graduated"
+      is_valid         = FALSE,
+      is_prestart      = FALSE,
+      error            = "Preliminary resident should have graduated"
     ))
   }
   
@@ -188,15 +237,16 @@ calculate_pgy_and_period <- function(grad_yr,
   type_label <- translate_resident_type(type_numeric, data_dict = data_dict)
   
   return(list(
-    pgy_year = pgy_year,
-    period_number = period_number,
-    period_name = period_name,
-    academic_year = academic_year,
+    pgy_year         = pgy_year,
+    period_number    = period_number,
+    period_name      = period_name,
+    academic_year    = academic_year,
     months_into_year = round(months_into_year, 1),
-    is_valid = !is.na(period_number),
-    grad_yr = grad_yr,
-    type = type_label,
-    type_code = type_numeric
+    is_valid         = !is.na(period_number),
+    is_prestart      = FALSE,
+    grad_yr          = grad_yr,
+    type             = type_label,
+    type_code        = type_numeric
   ))
 }
 
@@ -365,11 +415,16 @@ get_resident_periods <- function(type) {
   type_numeric <- as.numeric(type)
   if (is.na(type_numeric)) {
     type_str <- tolower(trimws(as.character(type)))
-    type_numeric <- if (grepl("prelim", type_str)) 1 else 2
+    type_numeric <- if (grepl("prelim", type_str)) 1L
+                    else if (grepl("dismiss", type_str)) 3L
+                    else 2L
   }
-  
+
+  # type 3 = Dismissed — no self-evaluation periods
+  if (!is.na(type_numeric) && type_numeric == 3L) return(integer(0))
+
   is_preliminary <- (type_numeric == 1)
-  
+
   if (is_preliminary) {
     return(c(7, 1, 2))
   } else {
