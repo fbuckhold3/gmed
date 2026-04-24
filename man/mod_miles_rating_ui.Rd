@@ -2,7 +2,7 @@
 % Please edit documentation in R/milestone_module.R
 \name{mod_miles_rating_ui}
 \alias{mod_miles_rating_ui}
-\title{Module UI for Milestone Rating (your working version with fixes)}
+\title{Module UI for Milestone Rating}
 \usage{
 mod_miles_rating_ui(id)
 }
@@ -10,5 +10,5 @@ mod_miles_rating_ui(id)
 \item{id}{module id}
 }
 \description{
-Module UI for Milestone Rating (your working version with fixes)
+Module UI for Milestone Rating
 }

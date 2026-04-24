@@ -8,7 +8,7 @@ gmed_login_page(
   id = "access_code",
   app_title = "IMSLU Resident Portal",
   app_subtitle = "Internal Medicine Residency",
-  org_eyebrow = "SSM HEALTH · SLUCARE",
+  org_eyebrow = "SSM HEALTH <U+00B7> SLUCARE",
   disclaimer_text = NULL,
   btn_label = "Sign In"
 )

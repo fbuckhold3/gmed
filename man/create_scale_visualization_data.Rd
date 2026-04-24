@@ -2,11 +2,11 @@
 % Please edit documentation in R/mod_assessment_detail_custom.R
 \name{create_scale_visualization_data}
 \alias{create_scale_visualization_data}
-\title{Process data for scale visualization}
+\title{Process data for scale visualization — shows labeled response distribution}
 \usage{
 create_scale_visualization_data(data, cat_info)
 }
 \description{
-Process data for scale visualization
+Process data for scale visualization — shows labeled response distribution
 }
 \keyword{internal}

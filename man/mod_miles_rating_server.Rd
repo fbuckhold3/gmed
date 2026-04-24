@@ -2,15 +2,18 @@
 % Please edit documentation in R/milestone_module.R
 \name{mod_miles_rating_server}
 \alias{mod_miles_rating_server}
-\title{Module Server for Milestone Rating (your working version with fixes)}
+\title{Module Server for Milestone Rating}
 \usage{
 mod_miles_rating_server(id, period)
 }
 \arguments{
 \item{id}{module id}
 
-\item{period}{reactive returning the selected period}
+\item{period}{reactive returning the selected period label (e.g. "Mid PGY2")}
 }
 \description{
-Module Server for Milestone Rating (your working version with fixes)
+Presents all 22 ACGME milestones one at a time with a clickable dot-map
+navigation header. Scoring auto-advances to the next unrated item. No
+"Submit" button — \code{done} becomes TRUE reactively once all items are
+rated and any required explanations are provided.
 }

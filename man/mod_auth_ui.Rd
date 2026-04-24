@@ -8,7 +8,7 @@ mod_auth_ui(
   id,
   app_title = "IMSLU Resident Portal",
   app_subtitle = "Internal Medicine Residency",
-  org_eyebrow = "SSM HEALTH · SLUCARE",
+  org_eyebrow = "SSM HEALTH <U+00B7> SLUCARE",
   disclaimer_text = NULL
 )
 }

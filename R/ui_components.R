@@ -495,21 +495,36 @@ gmed_nav_blocks <- function(blocks,
     shiny::div(
       class = "gmed-nav-grid",
       lapply(blocks, function(b) {
-        shiny::div(
-          class   = "gmed-nav-block",
-          onclick = sprintf(
-            "Shiny.setInputValue('%s', '%s', {priority: 'event'})",
-            input_id, b$id
-          ),
+        if (isTRUE(b$disabled)) {
           shiny::div(
-            class = "gmed-nav-block-icon",
-            shiny::tags$i(class = paste0("bi bi-", b$icon))
-          ),
-          shiny::div(
-            shiny::div(class = "gmed-nav-block-label", b$label),
-            shiny::div(class = "gmed-nav-block-desc",  b$desc)
+            class = "gmed-nav-block gmed-nav-block-disabled",
+            shiny::div(
+              class = "gmed-nav-block-icon",
+              shiny::tags$i(class = paste0("bi bi-", b$icon))
+            ),
+            shiny::div(
+              shiny::div(class = "gmed-nav-block-label", b$label),
+              shiny::div(class = "gmed-nav-block-desc",  b$desc),
+              shiny::div(class = "gmed-nav-block-soon", "Coming soon")
+            )
           )
-        )
+        } else {
+          shiny::div(
+            class   = "gmed-nav-block",
+            onclick = sprintf(
+              "Shiny.setInputValue('%s', '%s', {priority: 'event'})",
+              input_id, b$id
+            ),
+            shiny::div(
+              class = "gmed-nav-block-icon",
+              shiny::tags$i(class = paste0("bi bi-", b$icon))
+            ),
+            shiny::div(
+              shiny::div(class = "gmed-nav-block-label", b$label),
+              shiny::div(class = "gmed-nav-block-desc",  b$desc)
+            )
+          )
+        }
       })
     )
   )

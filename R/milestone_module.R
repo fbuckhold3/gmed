@@ -1,436 +1,513 @@
-#' Module UI for Milestone Rating (your working version with fixes)
+#' Module UI for Milestone Rating
 #' @param id module id
 #' @export
 mod_miles_rating_ui <- function(id) {
   ns <- NS(id)
   tagList(
+    # Custom message handler for scrolling the score row into view. Registered
+    # once on the client; server calls session$sendCustomMessage("milestone_scroll_to_row", ...)
+    # only when the active milestone actually changes, so typing in the
+    # description textarea never triggers a scroll/focus jump.
+    tags$script(HTML(
+      "if (!window.__milestone_scroll_bound) {
+         Shiny.addCustomMessageHandler('milestone_scroll_to_row', function(msg) {
+           setTimeout(function(){
+             var el = document.getElementById(msg.id);
+             if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
+           }, 50);
+         });
+         window.__milestone_scroll_bound = true;
+       }"
+    )),
     div(id = ns("moduleContainer"),
-        uiOutput(ns("progressSection")),
-        uiOutput(ns("mainContent")),
-        # Placeholder for the inline explanation box - moved above navigation buttons
-        uiOutput(ns("explanationUI")),
-        uiOutput(ns("navigationButtons")),
-        # Final submit - now rendered conditionally via server
-        uiOutput(ns("submitButtonUI"))
+        uiOutput(ns("domainMap")),      # clickable dot map showing completion per domain
+        uiOutput(ns("mainContent")),    # current image + score buttons
+        uiOutput(ns("explanationUI")),  # high-rating justification (conditional)
+        uiOutput(ns("navigationButtons"))
     )
   )
 }
 
-#' Module Server for Milestone Rating (your working version with fixes)
+#' Module Server for Milestone Rating
 #'
-#' @param id module id
-#' @param period reactive returning the selected period
+#' Presents all 22 ACGME milestones one at a time with a clickable dot-map
+#' navigation header. Scoring auto-advances to the next unrated item. No
+#' "Submit" button — \code{done} becomes TRUE reactively once all items are
+#' rated and any required explanations are provided.
+#'
+#' @param id          module id
+#' @param period      reactive returning the selected period label (e.g. "Mid PGY2")
+#' @param prev_scores optional reactive returning a named list mapping item keys
+#'                    (e.g. \code{PC_1}, \code{MK_2}) to the resident's rating
+#'                    from their most recent prior self-evaluation. Displayed as
+#'                    a "Last period: N" hint above the score buttons so the
+#'                    resident can see what they rated last time. Defaults to
+#'                    \code{reactive(NULL)}.
+#' @param initial_scores optional reactive returning a named list of item key →
+#'                       integer score to prefill into the module when the
+#'                       period changes (e.g. ratings already saved for the
+#'                       current period). Lets a resident return to a partially
+#'                       completed self-eval and see their prior selections.
+#' @param initial_descs  optional reactive returning a named list of item key →
+#'                       description text to prefill alongside \code{initial_scores}.
 #' @export
-mod_miles_rating_server <- function(id, period) {
+mod_miles_rating_server <- function(id, period,
+                                    prev_scores    = shiny::reactive(NULL),
+                                    initial_scores = shiny::reactive(NULL),
+                                    initial_descs  = shiny::reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    
-    # thresholds for when to require explanation
-    thresholds <- list(
-      "Entering Residency" = 3,
-      "Mid Intern"          = 4,
-      "End Intern"          = 5,
-      "Mid PGY2"            = 6,
-      "End PGY2"            = 7,
-      "Mid PGY3"            = 8,
-      "Graduating"          = 9
-    )
-    
-    # image sets (same as before)
+
+    # ── Milestone definitions ───────────────────────────────────────────────
     imageSets <- list(
-      PC = list(
-        title = "Patient Care",
-        images = paste0("pc", 1:6, ".png"),
-        imageTitles = c("History","Physical Examination","Clinical Reasoning",
-                        "Patient Management - Inpatient","Patient Management - Outpatient","Digital Health")
-      ),
-      MK = list(
-        title = "Medical Knowledge",
-        images = paste0("mk", 1:3, ".png"),
-        imageTitles = c("Applied Foundational Sciences","Therapeutic Knowledge","Knowledge of Diagnostic Testing")
-      ),
-      SBP = list(
-        title = "Systems-Based Practice",
-        images = paste0("sbp", 1:3, ".png"),
-        imageTitles = c("Patient Safety and Quality Improvement",
-                        "System Navigation for Patient-Centered Care",
-                        "Physician Role in Health Care Systems")
-      ),
-      PBLI = list(
-        title = "Practice-Based Learning and Improvement",
-        images = c("pbli1.png","pbli2.png"),
-        imageTitles = c("Evidence-Based and Informed Practice","Reflective Practice and Commitment to Personal Growth")
-      ),
-      PROF = list(
-        title = "Professionalism",
-        images = paste0("prof", 1:4, ".png"),
-        imageTitles = c("Professional Behavior","Ethical Principles","Accountability/Conscientiousness",
-                        "Knowledge of Systemic and Individual Factors of Well-Being")
-      ),
-      ICS = list(
-        title = "Interpersonal and Communication Skills",
-        images = paste0("ics", 1:3, ".png"),
-        imageTitles = c("Patient- and Family-Centered Communication",
-                        "Interprofessional and Team Communication",
-                        "Communication within Health Care Systems")
-      )
+      PC   = list(title = "Patient Care",
+                  images      = paste0("pc",   1:6, ".png"),
+                  imageTitles = c("History-taking & Interviewing",
+                                  "Physical Examination",
+                                  "Clinical Reasoning",
+                                  "Patient Management \u2014 Inpatient",
+                                  "Patient Management \u2014 Outpatient / Preventive",
+                                  "Digital Health")),
+      MK   = list(title = "Medical Knowledge",
+                  images      = paste0("mk",   1:3, ".png"),
+                  imageTitles = c("Applied Foundational Sciences",
+                                  "Therapeutic Knowledge",
+                                  "Knowledge of Diagnostic Testing")),
+      SBP  = list(title = "Systems-Based Practice",
+                  images      = paste0("sbp",  1:3, ".png"),
+                  imageTitles = c("Patient Safety & Quality Improvement",
+                                  "System Navigation for Patient-Centered Care",
+                                  "Physician Role in Health Care Systems")),
+      PBLI = list(title = "Practice-Based Learning",
+                  images      = c("pbli1.png", "pbli2.png"),
+                  imageTitles = c("Evidence-Based & Informed Practice",
+                                  "Reflective Practice & Personal Growth")),
+      PROF = list(title = "Professionalism",
+                  images      = paste0("prof", 1:4, ".png"),
+                  imageTitles = c("Professional Behavior",
+                                  "Ethical Principles",
+                                  "Accountability / Conscientiousness",
+                                  "Well-Being")),
+      ICS  = list(title = "Interpersonal & Communication",
+                  images      = paste0("ics",  1:3, ".png"),
+                  imageTitles = c("Patient- & Family-Centered Communication",
+                                  "Interprofessional & Team Communication",
+                                  "Communication within Health Care Systems"))
     )
-    
-    # state
+
+    # Flat ordered list of all keys: PC_1 … ICS_3
+    allKeys <- unlist(lapply(names(imageSets), function(d)
+      paste0(d, "_", seq_along(imageSets[[d]]$images))), use.names = FALSE)
+
+    totalN <- length(allKeys)  # 22
+
+    # Explanation required when self-rating >= threshold for the period
+    thresholds <- list(
+      "Entering Residency" = 3, "Mid Intern" = 4, "End Intern" = 5,
+      "Mid PGY2" = 6, "End PGY2" = 7, "Mid PGY3" = 8, "Graduating" = 9
+    )
+
+    # ── Reactive state ───────────────────────────────────────────────────────
     state <- reactiveValues(
-      currentSetIndex   = 1,
-      currentImageIndex = 1,
-      selections        = list(),
-      descriptions      = list(),
-      pendingSelection  = list(key = NULL, value = NULL)
+      setIdx   = 1L,   # current domain index
+      imgIdx   = 1L,   # current image within domain
+      selections  = list(),   # key → integer 1-9
+      descriptions = list()   # key → character
     )
-    
-    # helpers
-    currentSetName   <- reactive(names(imageSets)[ state$currentSetIndex ])
-    currentSet       <- reactive(imageSets[[ state$currentSetIndex ]])
-    currentImageFile <- reactive(currentSet()$images[ state$currentImageIndex ])
-    selectionKey     <- reactive(paste0(currentSetName(), "_", state$currentImageIndex))
-    
-    # Fixed imagesDone reactive to avoid the "non-function" error
-    totalImages <- reactive(sum(sapply(imageSets, function(z) length(z$images))))
-    imagesDone <- reactive({
-      base <- if(state$currentSetIndex > 1) {
-        sum(sapply(imageSets[1:(state$currentSetIndex-1)], function(z) length(z$images)))
-      } else {
-        0
+
+    # ── Prefill from saved data ─────────────────────────────────────────────
+    # When a period changes (or initial_scores() arrives late from the data
+    # fetch), seed the module's state so returning residents see what they
+    # already rated. We only overwrite keys that aren't already present in
+    # state$selections (so in-session edits are never clobbered by a later
+    # re-fetch of the saved REDCap row).
+    seeded_for <- reactiveVal(NULL)
+    observe({
+      pv <- tryCatch(period(), error = function(e) NULL)
+      if (is.null(pv) || !nzchar(pv)) return()
+      init <- tryCatch(initial_scores(), error = function(e) NULL)
+      id_init <- tryCatch(initial_descs(),  error = function(e) NULL)
+      # Re-seed whenever the period changes; skip if we've already seeded this
+      # period and nothing new arrived.
+      tag <- paste0(pv, "|",
+                    length(init %||% list()), "|",
+                    length(id_init %||% list()))
+      if (isTRUE(identical(tag, seeded_for()))) return()
+      seeded_for(tag)
+      # On period change, clear prior session state so we don't carry
+      # selections across periods.
+      state$selections  <- list()
+      state$descriptions <- list()
+      state$setIdx <- 1L
+      state$imgIdx <- 1L
+      if (is.list(init)) {
+        for (k in names(init)) {
+          v <- suppressWarnings(as.integer(init[[k]]))
+          if (!is.na(v)) state$selections[[k]] <- v
+        }
       }
-      return(base + state$currentImageIndex - 1)
+      if (is.list(id_init)) {
+        for (k in names(id_init)) {
+          d <- id_init[[k]]
+          if (!is.null(d) && nzchar(trimws(as.character(d))))
+            state$descriptions[[k]] <- as.character(d)
+        }
+      }
+      # Land on the first unrated item (if any) so the user picks up where
+      # they left off; otherwise stay on PC_1.
+      if (length(state$selections) > 0) {
+        unrated <- setdiff(allKeys, names(state$selections))
+        if (length(unrated) > 0) .goToKey(unrated[1])
+      }
     })
-    
-    # Check if all milestone ratings are complete
+
+    # ── Derived helpers ──────────────────────────────────────────────────────
+    curDomain  <- reactive(names(imageSets)[state$setIdx])
+    curSet     <- reactive(imageSets[[state$setIdx]])
+    curKey     <- reactive(paste0(curDomain(), "_", state$imgIdx))
+    curImgFile <- reactive(curSet()$images[state$imgIdx])
+    uiState    <- reactive(if (is.null(period()) || !nzchar(period())) "none" else "active")
+
+    # All complete: all rated + explanations where needed
     allComplete <- reactive({
-      expectedKeys <- unlist(lapply(seq_along(imageSets), function(i) {
-        setName <- names(imageSets)[i]
-        imageCount <- length(imageSets[[i]]$images)
-        paste0(setName, "_", seq_len(imageCount))
-      }))
-      
-      # Check if all expected keys have selections
-      allSelected <- all(expectedKeys %in% names(state$selections))
-      
-      # Check if all required explanations are provided
-      if(allSelected) {
-        periodVal <- period()
-        if(!is.null(periodVal) && periodVal != "" && periodVal != "Interim Review") {
-          threshold <- thresholds[[periodVal]]
-          if(!is.null(threshold)) {
-            needsExplanation <- sapply(names(state$selections), function(key) {
-              state$selections[[key]] >= threshold
-            })
-            
-            if(any(needsExplanation)) {
-              keysNeedingExplanation <- names(state$selections)[needsExplanation]
-              allExplanations <- all(keysNeedingExplanation %in% names(state$descriptions))
-              return(allExplanations)
-            }
-          }
-        }
-        return(TRUE)
-      }
-      return(FALSE)
+      if (!all(allKeys %in% names(state$selections))) return(FALSE)
+      pv  <- period()
+      thr <- if (!is.null(pv)) thresholds[[pv]] else NULL
+      if (is.null(thr)) return(TRUE)
+      hi  <- Filter(function(k) isTRUE(state$selections[[k]] >= thr), allKeys)
+      all(vapply(hi, function(k)
+        k %in% names(state$descriptions) &&
+        nzchar(trimws(state$descriptions[[k]] %||% "")), logical(1)))
     })
-    
-    uiState <- reactive({
-      if (is.null(period()) || period()=="") "none" else "active"
-    })
-    
-    # progress UI
-    output$progressSection <- renderUI({
-      req(uiState()=="active")
-      pct <- round(100 * imagesDone()/totalImages(), 1)
-      tagList(
-        div(class="d-flex justify-content-between mb-2",
-            lapply(seq_along(imageSets), function(i){
-              cls <- if (i< state$currentSetIndex) "text-success"
-              else if (i==state$currentSetIndex) "text-primary fw-bold"
-              else "text-muted"
-              span(class=cls, imageSets[[i]]$title)
-            })
-        ),
-        div(class="text-center mb-2", paste0(imagesDone()," of ", totalImages()," (",pct,"%)")),
-        div(class="progress mb-3",
-            div(class="progress-bar", role="progressbar",
-                style=paste0("width:",pct,"%"),
-                `aria-valuenow`=pct, `aria-valuemin`=0, `aria-valuemax`=100
-            )
-        )
-      )
-    })
-    
-    # Conditional submit button UI
-    output$submitButtonUI <- renderUI({
+
+    # ── Navigate to a specific key ──────────────────────────────────────────
+    .goToKey <- function(key) {
+      parts <- strsplit(key, "_")[[1]]
+      dom   <- parts[1]; idx <- as.integer(parts[2])
+      si    <- which(names(imageSets) == dom)
+      if (length(si) == 1) { state$setIdx <- si; state$imgIdx <- idx }
+    }
+
+    # After scoring, jump to the next unrated item (wraps around)
+    .advanceToUnrated <- function() {
+      cur_pos <- which(allKeys == isolate(curKey()))
+      if (length(cur_pos) == 0) return()
+      after <- c(seq(cur_pos + 1, totalN), seq_len(cur_pos - 1))
+      sels  <- isolate(names(state$selections))
+      nxt   <- Find(function(k) !(k %in% sels), allKeys[after])
+      if (!is.null(nxt)) .goToKey(nxt)
+      # If all done, stay on current — no action needed
+    }
+
+    # ── Domain dot-map header ───────────────────────────────────────────────
+    output$domainMap <- renderUI({
       req(uiState() == "active")
-      if(allComplete()) {
-        div(
-          class = "mt-4 text-center",
-          actionButton(ns("done"), "Submit Milestones",
-                       class = "btn-success btn-lg",
-                       style = "width: 50%;")
-        )
-      } else {
-        div(
-          class = "mt-4 text-center text-muted",
-          "Complete all milestone ratings to enable submission"
-        )
+      n_rated <- sum(allKeys %in% names(state$selections))
+
+      if (allComplete()) {
+        return(div(
+          class = "d-flex align-items-center gap-2 mb-3 py-2 px-3",
+          style = "background:#f0faf4; border-radius:8px; border:1px solid #a5d6a7;",
+          tags$i(class = "bi bi-check-circle-fill", style = "color:#2e7d32; font-size:1.1rem;"),
+          tags$span(style = "font-weight:700; color:#1a6b3a; font-size:0.88rem;",
+                    "All 22 milestones rated \u2014 your scores have been auto-saved.")
+        ))
       }
-    })
-    
-    # main image + score buttons (FIXED: Updated for 1-9 scale and local images)
-    output$mainContent <- renderUI({
-      if (uiState()=="none") return(div("Please select a period to begin."))
-      key <- selectionKey()
-      sel <- state$selections[[key]]
-      tagList(
-        div(class="card",
-            div(class="card-header",
-                paste0(currentSet()$title," – ", currentSetName(),
-                       " ", state$currentImageIndex," of ",length(currentSet()$images))
-            ),
-            div(style="position: relative;",
-                imageOutput(ns("mainImage"), height="auto"),
-                # buttons 1–9 (FIXED: Now shows 1-9 instead of blank buttons)
-                div(style="position: relative; height:40px; width:1140px; margin-top:10px;",
-                    lapply(1:9, function(i) {
-                      left <- 100 + (i-1)*120
-                      bg <- if (!is.null(sel) && sel==i) "#4CAF50" else "#f0f0f0"
-                      clr <- if (!is.null(sel) && sel==i) "white" else "black"
-                      div(style=paste0("position:absolute; left:",left,"px; top:0;"),
-                          tags$button(id=ns(paste0("box_",i)),
-                                      class="action-button",
-                                      style=paste0("width:30px;height:30px;padding:0;
-                                               background:",bg,";color:",clr,";
-                                               border:1px solid #ccc;
-                                               font-weight:bold;"),
-                                      i  # FIXED: Show the number instead of HTML("&nbsp;")
-                          )
-                      )
-                    })
-                )
-            )
-        )
-      )
-    })
-    
-    # FIXED: Image loading - try multiple paths
-    observe({
-      req(uiState()=="active", currentImageFile())
-      output$mainImage <- renderImage({
-        image_file <- currentImageFile()
-        
-        # Try multiple possible image paths
-        possible_paths <- c(
-          # Local www folder (for standalone testing)
-          file.path("www", "milestones", image_file),
-          # Relative path
-          file.path("milestones", image_file),
-          # System file from gmed package (fallback)
-          system.file("www", "milestones", image_file, package="gmed"),
-          # GitHub fallback
-          paste0("https://raw.githubusercontent.com/fbuckhold3/gmed/main/www/milestones/", image_file)
-        )
-        
-        # Find first existing path
-        image_src <- NULL
-        for (path in possible_paths) {
-          if (file.exists(path) || grepl("^https://", path)) {
-            image_src <- path
-            break
-          }
-        }
-        
-        # Fallback to a placeholder if no image found
-        if (is.null(image_src)) {
-          # Create a simple placeholder
-          image_src <- "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwMCIgaGVpZ2h0PSI2MDAiIHZpZXdCb3g9IjAgMCAxMjAwIDYwMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEyMDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjZjBmMGYwIi8+Cjx0ZXh0IHg9IjYwMCIgeT0iMzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM2NjYiPkltYWdlIE5vdCBGb3VuZDogPC90ZXh0Pgo8dGV4dCB4PSI2MDAiIHk9IjMzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE4IiBmaWxsPSIjNjY2Ij5NSUxFU1RPTkVTPC90ZXh0Pgo8L3N2Zz4="
-        }
-        
-        list(src = image_src,
-             width = "1200px",
-             height = "auto",
-             alt = paste("Milestone:", image_file))
-      }, deleteFile=FALSE)
-    })
-    
-    # Handle explanation UI updates
-    observe({
-      req(uiState() == "active")
-      key <- selectionKey()
-      sel <- state$selections[[key]]  # Get current selection
-      
-      # Only proceed with explanation UI if we have a selection
-      if (!is.null(sel)) {
-        period_val <- period()
-        needsExplanation <- !is.null(thresholds[[period_val]]) &&
-          sel >= thresholds[[period_val]] &&
-          period_val != "Interim Review"
-        
-        if (needsExplanation) {
-          # Load existing explanation for this specific key if it exists
-          existingExplanation <- if(key %in% names(state$descriptions)) state$descriptions[[key]] else NULL
-          
-          output$explanationUI <- renderUI({
-            textAreaInput(ns("explanation"),
-                          "This rating is a bit higher than expected for your level of training (which may be deserving). Please take a moment to justify this rating.",
-                          value = existingExplanation,
-                          rows = 3,
-                          width = "100%")
-          })
-        } else {
-          output$explanationUI <- renderUI(NULL)
-        }
-      } else {
-        # No selection yet, so no explanation UI
-        output$explanationUI <- renderUI(NULL)
-      }
-    })
-    
-    # navigation buttons
-    output$navigationButtons <- renderUI({
-      req(uiState()=="active")
-      key <- selectionKey()
-      sel <- state$selections[[key]]
-      period_val <- period()
 
-      # Determine if we need explanation
-      needsExplanation <- !is.null(sel) &&
-        !is.null(thresholds[[period_val]]) &&
-        sel >= thresholds[[period_val]] &&
-        period_val != "Interim Review"
+      domain_blocks <- lapply(names(imageSets), function(d) {
+        keys_d  <- paste0(d, "_", seq_along(imageSets[[d]]$images))
+        rated_d <- keys_d %in% names(state$selections)
+        is_cur  <- d == curDomain()
 
-      # Determine if Next should be disabled
-      disableNext <- is.null(sel) ||
-        (needsExplanation && (is.null(input$explanation) ||
-                                trimws(input$explanation) == ""))
-
-      # Check if we're at the final milestone (ics3)
-      isAtFinalMilestone <- state$currentSetIndex == length(imageSets) &&
-        state$currentImageIndex == length(currentSet()$images)
-
-      div(class="card",
-          div(class="card-body",
-              if (isAtFinalMilestone) {
-                # Only show Previous button at final milestone
-                fluidRow(
-                  column(12, actionButton(ns("prev"), "Previous", class="btn-primary", width="100%"))
-                )
-              } else {
-                # Show both buttons for all other milestones
-                fluidRow(
-                  column(6, actionButton(ns("prev"), "Previous", class="btn-primary", width="100%")),
-                  column(6, actionButton(ns("next"), "Next",
-                                         class=if(disableNext) "btn-primary disabled" else "btn-primary",
-                                         width="100%"))
-                )
-              }
+        dots <- lapply(seq_along(keys_d), function(j) {
+          k     <- keys_d[j]
+          done  <- rated_d[j]
+          is_this <- isTRUE(k == curKey())
+          bg    <- if (is_this) "#003d5c"
+                   else if (done) "#2e7d32"
+                   else "#dee2e6"
+          tags$span(
+            style = paste0("display:inline-block; width:14px; height:14px;",
+                           " border-radius:50%; background:", bg, ";",
+                           " margin:1px; cursor:pointer;",
+                           if (is_this) " box-shadow:0 0 0 2px #7fb3d3;" else ""),
+            title = paste0(imageSets[[d]]$imageTitles[j],
+                           if (done) " \u2713" else " (not yet rated)"),
+            onclick = sprintf("Shiny.setInputValue('%s','%s',{priority:'event'})",
+                              ns("jump_to"), k)
           )
+        })
+
+        n_d <- sum(rated_d); tot_d <- length(keys_d); all_d <- n_d == tot_d
+        div(class = "me-3 mb-1",
+          tags$span(style = paste0("font-size:0.7rem; font-weight:", if(is_cur)"700" else "500",
+                                   "; color:", if(all_d)"#2e7d32" else if(is_cur)"#003d5c" else "#6c757d",
+                                   "; display:block; margin-bottom:2px;"),
+                    paste0(imageSets[[d]]$title, " ", n_d, "/", tot_d)),
+          dots
+        )
+      })
+
+      pct <- round(100 * n_rated / totalN)
+      div(class = "mb-3",
+        div(class = "d-flex justify-content-between align-items-center mb-1",
+          tags$span(style = "font-size:0.78rem; font-weight:600; color:#003d5c;",
+                    paste0("Milestone Self-Assessment \u2014 ", n_rated, " of ", totalN, " rated")),
+          tags$span(style = paste0("font-size:0.78rem; font-weight:700; color:",
+                                   if(pct == 100) "#2e7d32" else "#0066a1"),
+                    paste0(pct, "%"))
+        ),
+        div(class = "progress mb-3", style = "height:5px;",
+          div(class = "progress-bar",
+              style = paste0("width:", pct, "%; background:",
+                             if(pct == 100) "#2e7d32" else "#0066a1", ";"))),
+        div(class = "d-flex flex-wrap", domain_blocks)
       )
     })
-    
-    # Score click handler
-    observe({
-      req(uiState()=="active")
-      for (i in 1:9) {
-        local({
-          ii <- i
-          observeEvent(input[[paste0("box_",ii)]], {
-            key    <- selectionKey()
-            period_val <- period()
-            overTh <- !is.null(thresholds[[period_val]]) &&
-              ii >= thresholds[[period_val]] &&
-              period_val != "Interim Review"
-            
-            # Save the numeric score
-            state$selections[[key]] <- ii
-            
-            # Update pending selection if explanation needed
-            if (overTh) {
-              state$pendingSelection <- list(key=key, value=ii)
-            } else {
-              state$pendingSelection <- list(key=NULL, value=NULL)
-              state$descriptions[[key]] <- NULL  # Clear any existing description if no longer needed
-            }
-          }, ignoreInit=TRUE)
-        })
-      }
-    })
-    
-    # Next button handler
-    observeEvent(input[["next"]], {
-      key <- selectionKey()
-      
-      if (is.null(state$selections[[key]])) {
-        showNotification("Pick a score first", type="error")
-        return()
-      }
-      
-      # Check if explanation is needed
-      period_val <- period()
+
+    # ── Main image + score buttons ──────────────────────────────────────────
+    output$mainContent <- renderUI({
+      if (uiState() == "none") return(div("Select a period to begin."))
+      req(allComplete() == FALSE)   # hide image when all done (map shows the success msg)
+
+      key <- curKey()
       sel <- state$selections[[key]]
-      needsExplanation <- !is.null(sel) &&
-        !is.null(thresholds[[period_val]]) &&
-        sel >= thresholds[[period_val]] &&
-        period_val != "Interim Review"
-      
-      if (needsExplanation) {
-        # Save current explanation if it exists
-        if (!is.null(input$explanation) && nzchar(trimws(input$explanation))) {
-          state$descriptions[[key]] <- input$explanation
-        }
-        
-        # Check if explanation is required but missing
-        if (is.null(state$descriptions[[key]]) ||
-            trimws(state$descriptions[[key]]) == "") {
-          showNotification("Please provide an explanation for this rating", type="error")
+      pv  <- period()
+      thr <- thresholds[[pv]]
+
+      # Score buttons positioned to align with the 5-column grid above:
+      #   v=1 at 10%, v=2 at 20%, … v=9 at 90% of the grid width.
+      # Odd values sit under column centers (1,3,5,7,9 → cols 1,2,3,4,5);
+      # even values sit on column boundaries.
+      score_btns <- lapply(1:9, function(v) {
+        is_sel   <- isTRUE(sel == v)
+        high     <- !is.null(thr) && v >= thr
+        bg  <- if (is_sel && high) "#e65100" else if (is_sel) "#003d5c" else "#f5f5f5"
+        col <- if (is_sel) "white" else "#546e7a"
+        brd <- if (is_sel) bg else "#dee2e6"
+        tags$button(
+          type  = "button",
+          id    = ns(paste0("box_", v)),
+          class = "action-button",
+          style = paste0("position:absolute; left:", v * 10, "%;",
+                         " top:50%; transform:translate(-50%,-50%);",
+                         " width:40px; height:40px; padding:0;",
+                         " background:", bg, "; color:", col, ";",
+                         " border:1px solid ", brd, ";",
+                         " border-radius:5px; font-size:0.95rem;",
+                         " font-weight:", if(is_sel)"700" else "500", ";",
+                         " cursor:pointer;"),
+          v
+        )
+      })
+
+      # Previous self-eval rating for this item (if supplied by the app)
+      ps_list <- tryCatch(prev_scores(), error = function(e) NULL)
+      prev_v  <- if (!is.null(ps_list) && key %in% names(ps_list)) ps_list[[key]] else NULL
+      prev_badge <- if (!is.null(prev_v) && !is.na(prev_v) && nzchar(as.character(prev_v)))
+        tags$span(style = "background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe;
+                           border-radius:20px; padding:2px 10px; font-size:0.72rem;
+                           font-weight:600; margin-left:8px;",
+                  tags$i(class = "bi bi-clock-history me-1"),
+                  paste0("Last self-eval: ", prev_v))
+      else NULL
+
+      div(
+        # Header: domain + item title
+        div(class = "d-flex align-items-baseline justify-content-between mb-2",
+          div(
+            tags$span(style = "font-weight:700; color:#003d5c; font-size:0.95rem;",
+                      paste0(curDomain(), state$imgIdx, " \u2014 ", curSet()$imageTitles[state$imgIdx])),
+            prev_badge),
+          tags$span(style = "font-size:0.75rem; color:#9e9e9e;",
+                    paste0(curSet()$title))
+        ),
+        # Milestone image (cap at 55vh so score row is always visible) +
+        # STICKY score row pinned to bottom of viewport so users never have to
+        # scroll to reach the rating buttons.
+        div(style = "width:100%; max-width:1140px;",
+          # Image — constrained height keeps score row in view on any screen
+          div(style = "max-height:55vh; overflow:auto; border-radius:4px;",
+              uiOutput(ns("milestoneImage"))),
+          # Label
+          div(style = "font-size:0.78rem; color:#546e7a; margin:10px 0 2px;",
+              "Your rating \u2014 click the number that best matches your level:"),
+          # Sticky button row: stays pinned at the bottom of the viewport so
+          # entering scores never requires scrolling.
+          div(id = ns("scoreRow"),
+              style = "position:sticky; bottom:0; z-index:10;
+                       background:rgba(255,255,255,0.96);
+                       backdrop-filter:blur(4px);
+                       border-top:1px solid #e0e0e0;
+                       padding:8px 0;
+                       width:100%; height:64px;",
+              score_btns)
+        )
+      )
+    })
+
+    # (Scroll-to-row observer removed — score row is now position:sticky at
+    # the bottom of the viewport, so it's always visible without scrolling.)
+
+    # Image rendering (reactive to current image file)
+    output$milestoneImage <- renderUI({
+      req(uiState() == "active", !allComplete())
+      img_file <- curImgFile()
+
+      # addResourcePath("milestones", ...) is registered in the app's global.R
+      # so images are always served as milestones/<file>.png
+      img_src <- paste0("milestones/", img_file)
+
+      tags$img(src = img_src,
+               style = "width:100%; max-width:1140px; border-radius:4px; border:1px solid #e0e0e0;",
+               alt  = paste("Milestone grid:", img_file))
+    })
+
+    # ── Explanation UI ──────────────────────────────────────────────────────
+    # Give each milestone its OWN input ID (explanation_PC_1, explanation_MK_3,
+    # etc.) so Shiny's client-side input cache can't bleed one item's typed
+    # text onto another. Each key's textarea is a fresh DOM node with its own
+    # bound input value.
+    .expl_id <- function(key) paste0("explanation_", key)
+
+    output$explanationUI <- renderUI({
+      req(uiState() == "active")
+      key <- curKey()
+      sel <- state$selections[[key]]
+      if (is.null(sel)) return(NULL)
+      pv  <- isolate(period())
+      thr <- thresholds[[pv]]
+      if (is.null(thr) || sel < thr) return(NULL)
+
+      # Form wrapper with onsubmit=return false prevents Enter from submitting
+      # the surrounding Shiny form (which was causing the "gray flash").
+      tags$form(onsubmit = "return false;",
+        div(class = "mt-2 p-2",
+            style = "background:#fff3e0; border-left:3px solid #e65100; border-radius:4px;",
+          tags$p(style = "font-size:0.78rem; color:#bf360c; margin:0 0 5px;",
+                 tags$i(class = "bi bi-info-circle me-1"),
+                 "This rating is higher than typical for your training level. ",
+                 "Please briefly justify it before moving on."),
+          textAreaInput(ns(.expl_id(key)),
+                        label = NULL,
+                        value = isolate(state$descriptions[[key]] %||% ""),
+                        rows  = 2,
+                        width = "100%",
+                        placeholder = "Brief justification\u2026")
+        )
+      )
+    })
+
+    # Current textarea value for the active milestone (each key has its own id)
+    cur_explanation <- reactive({
+      key <- curKey()
+      val <- input[[.expl_id(key)]]
+      if (is.null(val)) "" else val
+    })
+
+    # Persist typing to state (debounced). Because the input ID is unique per
+    # key, writes here never affect a different milestone's saved text.
+    expl_debounced <- debounce(cur_explanation, 400)
+    observeEvent(expl_debounced(), {
+      key <- isolate(curKey())
+      if (is.null(key) || is.null(isolate(state$selections[[key]]))) return()
+      state$descriptions[[key]] <- expl_debounced()
+    }, ignoreNULL = FALSE, ignoreInit = TRUE)
+
+    # ── Navigation buttons ──────────────────────────────────────────────────
+    output$navigationButtons <- renderUI({
+      req(uiState() == "active", !allComplete())
+      key <- curKey()
+      sel <- state$selections[[key]]
+      pv  <- period()
+      thr <- thresholds[[pv]]
+
+      needs_exp   <- !is.null(sel) && !is.null(thr) && sel >= thr
+      cur_expl    <- cur_explanation()
+      disable_nxt <- is.null(sel) ||
+                     (needs_exp && !nzchar(trimws(cur_expl %||% "")))
+
+      # Is there a previous item?
+      cur_pos  <- which(allKeys == key)
+      has_prev <- length(cur_pos) > 0 && cur_pos > 1
+
+      div(class = "d-flex gap-2 mt-3",
+        if (has_prev)
+          actionButton(ns("prev"), label = tagList(tags$i(class="bi bi-chevron-left me-1"), "Previous"),
+                       class = "btn btn-sm btn-outline-secondary"),
+        actionButton(ns("nxt"),
+                     label = tagList("Next \u2014 skip to unrated",
+                                     tags$i(class="bi bi-chevron-right ms-1")),
+                     class = paste("btn btn-sm",
+                                   if (disable_nxt) "btn-outline-secondary disabled"
+                                   else "btn-outline-primary"))
+      )
+    })
+
+    # ── Score click handlers ─────────────────────────────────────────────────
+    for (v in 1:9) {
+      local({
+        vv <- v
+        observeEvent(input[[paste0("box_", vv)]], {
+          key <- isolate(curKey())
+          state$selections[[key]] <- vv
+          # Clear stale description if rating drops below threshold
+          pv  <- isolate(period())
+          thr <- thresholds[[pv]]
+          if (!is.null(thr) && vv < thr) state$descriptions[[key]] <- NULL
+          # Auto-advance only when no explanation is required. Delay ~350 ms
+          # so the selected-button "fill" is visible before the screen moves.
+          needs_exp <- !is.null(thr) && vv >= thr
+          if (!needs_exp) {
+            shinyjs::delay(350, .advanceToUnrated())
+          }
+        }, ignoreInit = TRUE)
+      })
+    }
+
+    # ── Dot-map jump ─────────────────────────────────────────────────────────
+    observeEvent(input$jump_to, {
+      req(nzchar(input$jump_to))
+      # Save explanation for current key before jumping
+      key <- isolate(curKey())
+      ce  <- isolate(cur_explanation())
+      if (nzchar(trimws(ce %||% "")))
+        state$descriptions[[key]] <- trimws(ce)
+      .goToKey(input$jump_to)
+    })
+
+    # ── Previous button ───────────────────────────────────────────────────────
+    observeEvent(input$prev, {
+      key <- isolate(curKey())
+      ce  <- isolate(cur_explanation())
+      if (nzchar(trimws(ce %||% "")))
+        state$descriptions[[key]] <- trimws(ce)
+      cur_pos <- which(allKeys == key)
+      if (length(cur_pos) > 0 && cur_pos > 1) .goToKey(allKeys[cur_pos - 1])
+    })
+
+    # ── Next (skip to unrated) button ─────────────────────────────────────────
+    observeEvent(input$nxt, {
+      key <- isolate(curKey())
+      sel <- isolate(state$selections[[key]])
+      pv  <- isolate(period())
+      thr <- thresholds[[pv]]
+      needs_exp <- !is.null(sel) && !is.null(thr) && sel >= thr
+      ce <- isolate(cur_explanation())
+      if (needs_exp) {
+        if (nzchar(trimws(ce %||% "")))
+          state$descriptions[[key]] <- trimws(ce)
+        else {
+          showNotification("Please briefly justify this rating before moving on.", type = "warning")
           return()
         }
       }
-      
-      # If we get here, we can proceed with navigation
-      if (state$currentImageIndex < length(currentSet()$images)) {
-        state$currentImageIndex <- state$currentImageIndex + 1
-      } else if (state$currentSetIndex < length(imageSets)) {
-        state$currentSetIndex <- state$currentSetIndex + 1
-        state$currentImageIndex <- 1
-      }
-      
-      # Reset pending selection after successful navigation
-      state$pendingSelection <- list(key = NULL, value = NULL)
+      .advanceToUnrated()
     })
-    
-    # Previous button handler
-    observeEvent(input$prev, {
-      key <- selectionKey()
-      
-      # Save current explanation if needed
-      if (!is.null(input$explanation) && nzchar(trimws(input$explanation))) {
-        state$descriptions[[key]] <- input$explanation
-      }
-      
-      # Navigate
-      if (state$currentImageIndex > 1) {
-        state$currentImageIndex <- state$currentImageIndex - 1
-      } else if (state$currentSetIndex > 1) {
-        state$currentSetIndex <- state$currentSetIndex - 1
-        state$currentImageIndex <- length(imageSets[[state$currentSetIndex]]$images)
-      }
-      
-      # Reset pending selection after navigation
-      state$pendingSelection <- list(key = NULL, value = NULL)
-    })
-    
-    # Handle the done button
-    observeEvent(input$done, {
-      # Just trigger the event without any subscript calls that might cause issues
-    })
-    
-    # final return
+
+    # ── Return interface (unchanged) ─────────────────────────────────────────
     list(
-      done   = reactive(input$done),
+      done   = reactive(allComplete()),
       scores = reactive(state$selections),
       desc   = reactive(state$descriptions)
     )
