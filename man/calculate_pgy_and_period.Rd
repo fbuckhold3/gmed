@@ -8,7 +8,8 @@ calculate_pgy_and_period(
   grad_yr,
   type = 2,
   current_date = Sys.Date(),
-  data_dict = NULL
+  data_dict = NULL,
+  period7_open_month = 3L
 )
 }
 \arguments{
@@ -19,6 +20,11 @@ calculate_pgy_and_period(
 \item{current_date}{Date. Current date for calculation (default: Sys.Date())}
 
 \item{data_dict}{Optional. Data dictionary data frame to pull labels from REDCap}
+
+\item{period7_open_month}{Integer (1-6). Month in the residency start year when the
+Entering Residency (Period 7) self-evaluation becomes accessible to incoming interns
+BEFORE their official July 1 start date. Default: 3 (March 1). Set to 7 to disable
+early access (original behavior).}
 }
 \value{
 List with elements:
@@ -28,6 +34,7 @@ List with elements:
 \item{academic_year}{Character. Current academic year (e.g., "2024-2025")}
 \item{months_into_year}{Numeric. Months into current academic year}
 \item{is_valid}{Logical. TRUE if resident is currently in training}
+\item{is_prestart}{Logical. TRUE if in the pre-start Period 7 window (March-June)}
 }
 \description{
 Determines resident's current PGY year and appropriate self-evaluation period
@@ -36,7 +43,7 @@ based on graduation year, residency type, and current date within academic year.
 \details{
 Self-evaluation periods (note: starts at 7, not 0):
 \itemize{
-\item 7 = Entering Residency (July 1 - Sept 30, PGY1)
+\item 7 = Entering Residency (opens March 1 pre-start; July 1 - Sept 30 of PGY1)
 \item 1 = Mid Intern (Oct 1 - Jan 31, PGY1)
 \item 2 = End Intern (Feb 1 - June 30, PGY1)
 \item 3 = Mid PGY2 (Oct 1 - Jan 31, PGY2)
@@ -48,6 +55,10 @@ Self-evaluation periods (note: starts at 7, not 0):
 Preliminary residents only experience periods 7, 1, 2.
 After graduation, period_number = NA and is_valid = FALSE.
 
+Incoming interns: the Period 7 eval is accessible starting on
+\code{period7_open_month}/1 of their start year (default: March 1), even before
+the official July 1 start date. These residents have \code{is_prestart = TRUE}.
+
 If data_dict is provided, period names and type labels will be pulled from
 REDCap data dictionary. Otherwise, falls back to hardcoded labels.
 }
@@ -55,6 +66,14 @@ REDCap data dictionary. Otherwise, falls back to hardcoded labels.
 # Categorical resident graduating 2026, checked in December 2024
 calculate_pgy_and_period(2026, 2, as.Date("2024-12-15"))
 # Returns: PGY2, period 3 (Mid PGY2)
+
+# Incoming intern graduating 2029, checking in April 2026 (pre-start)
+calculate_pgy_and_period(2029, 2, as.Date("2026-04-09"))
+# Returns: PGY1, period 7 (Entering Residency), is_prestart = TRUE
+
+# Same intern before March 1 — still blocked
+calculate_pgy_and_period(2029, 2, as.Date("2026-02-15"))
+# Returns: is_valid = FALSE, "Pre-residency"
 
 # With data dictionary for dynamic labels
 calculate_pgy_and_period(2026, 2, as.Date("2024-12-15"), data_dict = my_data_dict)

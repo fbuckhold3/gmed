@@ -97,13 +97,13 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
     returnFormat = "json"
   )
   
-  # Make API call
+  # Make API call — 180s timeout; REDCap full-export responses can be >1.5 MB
   httr::set_config(httr::config(ssl_verifypeer = FALSE, ssl_verifyhost = FALSE))
   response <- httr::POST(
     url = url,
     body = form_data,
     encode = "form",
-    httr::timeout(60)
+    httr::timeout(180)
   )
   
   # Check response status
