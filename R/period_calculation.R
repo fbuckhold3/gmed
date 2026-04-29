@@ -87,7 +87,24 @@ calculate_pgy_and_period <- function(grad_yr,
       error            = "Missing graduation year"
     ))
   }
-  
+
+  # grad_yr may arrive as a raw REDCap dropdown code (e.g. 7) rather than an
+  # actual year (e.g. 2029). Any value < 2000 is treated as a code and resolved
+  # via the data dictionary label when available.
+  gy_numeric <- suppressWarnings(as.numeric(grad_yr))
+  if (!is.na(gy_numeric) && gy_numeric < 2000 && !is.null(data_dict)) {
+    choices <- tryCatch(
+      get_field_choices(data_dict, "grad_yr", return_type = "named_vector"),
+      error = function(e) NULL
+    )
+    if (!is.null(choices) && length(choices) > 0) {
+      # get_field_choices returns labels-as-names, codes-as-values; flip it.
+      label_for_code <- setNames(names(choices), unname(choices))
+      resolved <- suppressWarnings(as.numeric(label_for_code[as.character(grad_yr)]))
+      if (!is.na(resolved)) grad_yr <- resolved
+    }
+  }
+
   # Standardize type - convert to numeric if needed
   type_numeric <- as.numeric(type)
   if (is.na(type_numeric)) {

@@ -4,15 +4,18 @@
 \alias{get_milestone_label}
 \title{Get Milestone Label from Column Name (Simple Pattern Matching)}
 \usage{
-get_milestone_label(milestone_col, milestone_format = "rep")
+get_milestone_label(milestone_col, milestone_format = "rep", short = FALSE)
 }
 \arguments{
 \item{milestone_col}{Column name (e.g., "rep_pc1", "rep_pc1_self", "acgme_mk2")}
 
 \item{milestone_format}{Format to use ("rep", "acgme") - not used in this implementation}
+
+\item{short}{Logical. If TRUE, return only the competency code (e.g., "PC1")
+rather than the full label ("PC1: History"). Default FALSE.}
 }
 \value{
-Character string with proper label (e.g., "PC1: History")
+Character string with proper label (e.g., "PC1: History" or "PC1" if short=TRUE)
 }
 \description{
 Converts milestone column names to proper labels using pattern matching

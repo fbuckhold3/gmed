@@ -4,12 +4,34 @@
 \alias{mod_miles_rating_server}
 \title{Module Server for Milestone Rating}
 \usage{
-mod_miles_rating_server(id, period)
+mod_miles_rating_server(
+  id,
+  period,
+  prev_scores = shiny::reactive(NULL),
+  initial_scores = shiny::reactive(NULL),
+  initial_descs = shiny::reactive(NULL)
+)
 }
 \arguments{
 \item{id}{module id}
 
 \item{period}{reactive returning the selected period label (e.g. "Mid PGY2")}
+
+\item{prev_scores}{optional reactive returning a named list mapping item keys
+(e.g. \code{PC_1}, \code{MK_2}) to the resident's rating
+from their most recent prior self-evaluation. Displayed as
+a "Last period: N" hint above the score buttons so the
+resident can see what they rated last time. Defaults to
+\code{reactive(NULL)}.}
+
+\item{initial_scores}{optional reactive returning a named list of item key →
+integer score to prefill into the module when the
+period changes (e.g. ratings already saved for the
+current period). Lets a resident return to a partially
+completed self-eval and see their prior selections.}
+
+\item{initial_descs}{optional reactive returning a named list of item key →
+description text to prefill alongside \code{initial_scores}.}
 }
 \description{
 Presents all 22 ACGME milestones one at a time with a clickable dot-map

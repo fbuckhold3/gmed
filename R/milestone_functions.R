@@ -1084,10 +1084,22 @@ check_milestone_completeness <- function(milestone_data, milestone_format = "aut
 #' Works for any milestone column regardless of prefix or suffix
 #' @param milestone_col Column name (e.g., "rep_pc1", "rep_pc1_self", "acgme_mk2")
 #' @param milestone_format Format to use ("rep", "acgme") - not used in this implementation
-#' @return Character string with proper label (e.g., "PC1: History")
+#' @param short Logical. If TRUE, return only the competency code (e.g., "PC1")
+#'   rather than the full label ("PC1: History"). Default FALSE.
+#' @return Character string with proper label (e.g., "PC1: History" or "PC1" if short=TRUE)
 #' @export
-get_milestone_label <- function(milestone_col, milestone_format = "rep") {
-  
+get_milestone_label <- function(milestone_col, milestone_format = "rep", short = FALSE) {
+
+  full <- .get_milestone_label_full(milestone_col)
+  if (isTRUE(short)) {
+    # Strip trailing ": Description" if present
+    return(sub(":.*$", "", full))
+  }
+  full
+}
+
+.get_milestone_label_full <- function(milestone_col) {
+
   # Simple pattern matching - if it contains pc1, it's History, etc.
   # Patient Care
   if (grepl("pc1", milestone_col, ignore.case = TRUE)) return("PC1: History")
