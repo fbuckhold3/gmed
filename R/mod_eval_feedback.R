@@ -141,13 +141,59 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
     })
 
     # ── Decode ass_obs_type → label ───────────────────────────────────────────
-    .decode_type <- function(raw_type, cc_quart, obs_map) {
+    # Priority chain:
+    #   1. ass_obs_type → data-dict lookup  (direct-observation sub-types)
+    #   2. ass_rotator  if non-empty        (explicit rotator label)
+    #   3. source_form  pattern matching    (inpatient, bridge, clinic, etc.)
+    #   4. ass_cc_quart presence            (Continuity Clinic)
+    #   5. "General Assessment"             (catch-all)
+    .decode_type <- function(raw_type, cc_quart, obs_map,
+                             source_form = NULL, rotator = NULL) {
       out     <- rep(NA_character_, length(raw_type))
       raw_chr <- as.character(raw_type)
       if (length(obs_map) > 0) {
         decoded <- obs_map[raw_chr]
         out     <- ifelse(!is.na(decoded), decoded, out)
       }
+      # Fallback 1: explicit rotator label
+      if (!is.null(rotator)) {
+        rot_chr <- trimws(as.character(rotator))
+        mask    <- is.na(out) & !is.na(rotator) & nzchar(rot_chr)
+        out[mask] <- rot_chr[mask]
+      }
+      # Fallback 2: decode source_form into a human-readable assessment type
+      if (!is.null(source_form)) {
+        sf_chr <- as.character(source_form)
+        sf_l   <- tolower(trimws(ifelse(is.na(sf_chr), "", sf_chr)))
+        sf_dec <- dplyr::case_when(
+          grepl("obs_acp",     sf_l) ~ "ACP Discussion",
+          grepl("obs_educat",  sf_l) ~ "Teaching Session",
+          grepl("obs_pres",    sf_l) ~ "Presentation",
+          grepl("obs_cdm",     sf_l) ~ "Clinical Decision Making",
+          grepl("obs_pe",      sf_l) ~ "Physical Exam",
+          grepl("obs_writehp", sf_l) ~ "Written H&P",
+          grepl("obs_daily",   sf_l) ~ "Progress Note",
+          grepl("obs_dc",      sf_l) ~ "Discharge Summary",
+          grepl("obs_meet",    sf_l) ~ "Family Meeting",
+          grepl("obs_senior",  sf_l) ~ "Team Supervision",
+          grepl("obs_proc",    sf_l) ~ "Procedure",
+          grepl("obs_mdr",     sf_l) ~ "Multi-Disciplinary Rounds",
+          grepl("obs_emer",    sf_l) ~ "Emergent Situation",
+          grepl("obs_pocus",   sf_l) ~ "Point of Care Ultrasound",
+          grepl("obs",         sf_l) ~ "Direct Observation",
+          grepl("int_ip",      sf_l) ~ "Intern Inpatient",
+          grepl("res_ip",      sf_l) ~ "Resident Inpatient",
+          grepl("bridge",      sf_l) ~ "Bridge Clinic",
+          sf_l == "cc" | grepl("_cc",  sf_l) ~ "Continuity Clinic",
+          sf_l == "day" | grepl("_day", sf_l) ~ "Single Clinic Day",
+          grepl("cons",        sf_l) ~ "Consult",
+          nzchar(sf_l) ~ sf_chr,
+          TRUE ~ NA_character_
+        )
+        mask <- is.na(out) & !is.na(sf_dec)
+        out[mask] <- sf_dec[mask]
+      }
+      # Fallback 3: cc_quart present → Continuity Clinic
       is_cc       <- is.na(out) & !is.na(cc_quart) &
                      nzchar(trimws(as.character(cc_quart)))
       out[is_cc]  <- "Continuity Clinic"
@@ -165,9 +211,11 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         if (length(obs_map) > 0) unname(obs_map) else character(0),
         "Continuity Clinic"
       )
-      cc_quart <- if ("ass_cc_quart" %in% names(df)) df$ass_cc_quart
-                  else rep(NA_character_, nrow(df))
-      type_vec <- .decode_type(df$ass_obs_type, cc_quart, obs_map)
+      cc_quart <- if ("ass_cc_quart"  %in% names(df)) df$ass_cc_quart  else rep(NA_character_, nrow(df))
+      sf_vec   <- if ("source_form"  %in% names(df)) df$source_form   else NULL
+      rot_vec  <- if ("ass_rotator"  %in% names(df)) df$ass_rotator   else NULL
+      type_vec <- .decode_type(df$ass_obs_type, cc_quart, obs_map,
+                               source_form = sf_vec, rotator = rot_vec)
       actual   <- data.frame(Type = type_vec, stringsAsFactors = FALSE) %>%
         dplyr::count(Type)
       if ("General Assessment" %in% actual$Type)
@@ -219,10 +267,12 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       req(my_evals())
       df      <- my_evals()
       obs_map <- obs_type_map_r()
-      cc_quart <- if ("ass_cc_quart" %in% names(df)) df$ass_cc_quart
-                  else rep(NA_character_, nrow(df))
+      cc_quart <- if ("ass_cc_quart"  %in% names(df)) df$ass_cc_quart  else rep(NA_character_, nrow(df))
+      sf_vec   <- if ("source_form"  %in% names(df)) df$source_form   else NULL
+      rot_vec  <- if ("ass_rotator"  %in% names(df)) df$ass_rotator   else NULL
       df %>%
-        dplyr::mutate(.Type = .decode_type(ass_obs_type, cc_quart, obs_map)) %>%
+        dplyr::mutate(.Type = .decode_type(ass_obs_type, cc_quart, obs_map,
+                                           source_form = sf_vec, rotator = rot_vec)) %>%
         dplyr::filter(
           (!is.na(ass_plus)  & nzchar(trimws(ass_plus)))  |
           (!is.na(ass_delta) & nzchar(trimws(ass_delta)))
