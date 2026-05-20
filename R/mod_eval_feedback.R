@@ -140,65 +140,79 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         )
     })
 
-    # ── Decode ass_obs_type → label ───────────────────────────────────────────
-    # Priority chain:
-    #   1. ass_obs_type → data-dict lookup  (direct-observation sub-types)
-    #   2. ass_rotator  if non-empty        (explicit rotator label)
-    #   3. source_form  pattern matching    (inpatient, bridge, clinic, etc.)
-    #   4. ass_cc_quart presence            (Continuity Clinic)
-    #   5. "General Assessment"             (catch-all)
-    .decode_type <- function(raw_type, cc_quart, obs_map,
-                             source_form = NULL, rotator = NULL) {
-      out     <- rep(NA_character_, length(raw_type))
-      raw_chr <- as.character(raw_type)
-      if (length(obs_map) > 0) {
-        decoded <- obs_map[raw_chr]
-        out     <- ifelse(!is.na(decoded), decoded, out)
+    # ── Detect assessment type from scored field-name prefixes ────────────────
+    #
+    # REDCap stores assessment sub-type in the PREFIX of scored-item columns:
+    #   ass_obs_type set          → Direct Observation (sub-type from obs_map)
+    #   ass_int_ip_*  scored      → Intern Inpatient
+    #   ass_res_ip_*  scored      → Resident Inpatient
+    #   ass_bridge_*  scored      → Bridge Clinic
+    #   ass_cons_*    scored      → Consult
+    #   ass_day_*     scored      → Single Clinic Day
+    #   ass_cc_*      scored / ass_cc_quart set → Continuity Clinic
+    #
+    # Returns a character vector of generic type labels (no specialty prefix).
+    .detect_assessment_type <- function(df, obs_map) {
+      n  <- nrow(df)
+      if (n == 0) return(character(0))
+      out <- rep(NA_character_, n)
+      cn  <- names(df)
+
+      # Which rows have >= 1 non-NA, non-empty, non-"0" value in columns
+      # whose names start with `prefix`.
+      scored_in <- function(prefix) {
+        cols <- cn[startsWith(cn, prefix)]
+        if (length(cols) == 0) return(rep(FALSE, n))
+        apply(df[, cols, drop = FALSE], 1, function(r) {
+          vals <- trimws(as.character(r))
+          any(!is.na(r) & nzchar(vals) & vals != "0")
+        })
       }
-      # Fallback 1: explicit rotator label
-      if (!is.null(rotator)) {
-        rot_chr <- trimws(as.character(rotator))
-        mask    <- is.na(out) & !is.na(rotator) & nzchar(rot_chr)
-        out[mask] <- rot_chr[mask]
-      }
-      # Fallback 2: decode source_form into a human-readable assessment type
-      if (!is.null(source_form)) {
-        sf_chr <- as.character(source_form)
-        sf_l   <- tolower(trimws(ifelse(is.na(sf_chr), "", sf_chr)))
-        sf_dec <- dplyr::case_when(
-          grepl("obs_acp",     sf_l) ~ "ACP Discussion",
-          grepl("obs_educat",  sf_l) ~ "Teaching Session",
-          grepl("obs_pres",    sf_l) ~ "Presentation",
-          grepl("obs_cdm",     sf_l) ~ "Clinical Decision Making",
-          grepl("obs_pe",      sf_l) ~ "Physical Exam",
-          grepl("obs_writehp", sf_l) ~ "Written H&P",
-          grepl("obs_daily",   sf_l) ~ "Progress Note",
-          grepl("obs_dc",      sf_l) ~ "Discharge Summary",
-          grepl("obs_meet",    sf_l) ~ "Family Meeting",
-          grepl("obs_senior",  sf_l) ~ "Team Supervision",
-          grepl("obs_proc",    sf_l) ~ "Procedure",
-          grepl("obs_mdr",     sf_l) ~ "Multi-Disciplinary Rounds",
-          grepl("obs_emer",    sf_l) ~ "Emergent Situation",
-          grepl("obs_pocus",   sf_l) ~ "Point of Care Ultrasound",
-          grepl("obs",         sf_l) ~ "Direct Observation",
-          grepl("int_ip",      sf_l) ~ "Intern Inpatient",
-          grepl("res_ip",      sf_l) ~ "Resident Inpatient",
-          grepl("bridge",      sf_l) ~ "Bridge Clinic",
-          sf_l == "cc" | grepl("_cc",  sf_l) ~ "Continuity Clinic",
-          sf_l == "day" | grepl("_day", sf_l) ~ "Single Clinic Day",
-          grepl("cons",        sf_l) ~ "Consult",
-          nzchar(sf_l) ~ sf_chr,
-          TRUE ~ NA_character_
+
+      # 1. Direct observation: ass_obs_type set → decode via data-dict map
+      if ("ass_obs_type" %in% cn) {
+        ot      <- trimws(as.character(df$ass_obs_type))
+        has_ot  <- !is.na(df$ass_obs_type) & nzchar(ot)
+        dec_ot  <- dplyr::if_else(
+          has_ot & ot %in% names(obs_map),
+          obs_map[ot],
+          dplyr::if_else(has_ot, "Direct Observation", NA_character_)
         )
-        mask <- is.na(out) & !is.na(sf_dec)
-        out[mask] <- sf_dec[mask]
+        out[is.na(out) & has_ot] <- dec_ot[is.na(out) & has_ot]
       }
-      # Fallback 3: cc_quart present → Continuity Clinic
-      is_cc       <- is.na(out) & !is.na(cc_quart) &
-                     nzchar(trimws(as.character(cc_quart)))
-      out[is_cc]  <- "Continuity Clinic"
+
+      # 2. Inpatient forms
+      out[is.na(out) & scored_in("ass_int_ip_")] <- "Intern Inpatient"
+      out[is.na(out) & scored_in("ass_res_ip_")] <- "Resident Inpatient"
+
+      # 3. Other rotation types
+      out[is.na(out) & scored_in("ass_bridge_")]  <- "Bridge Clinic"
+      out[is.na(out) & scored_in("ass_cons_")]    <- "Consult"
+      out[is.na(out) & scored_in("ass_day_")]     <- "Single Clinic Day"
+
+      # 4. Continuity Clinic (scored CC items or cc_quart set)
+      has_cc <- scored_in("ass_cc_")
+      if ("ass_cc_quart" %in% cn) {
+        has_cc <- has_cc | (!is.na(df$ass_cc_quart) &
+                              nzchar(trimws(as.character(df$ass_cc_quart))))
+      }
+      out[is.na(out) & has_cc] <- "Continuity Clinic"
+
       out[is.na(out)] <- "General Assessment"
       out
+    }
+
+    # ── Prepend ass_specialty to assessment type label ─────────────────────────
+    # Produces labels like "GI Inpatient", "Nephrology Consult", "Hospitalist Inpatient".
+    # Continuity Clinic, Direct Observation sub-types, and General Assessment
+    # are left without a specialty prefix (they already contain enough context).
+    NO_SPEC_PREFIX <- c("Continuity Clinic", "General Assessment")
+    .apply_specialty <- function(type_vec, specialty_vec) {
+      if (is.null(specialty_vec)) return(type_vec)
+      spec <- trimws(as.character(ifelse(is.na(specialty_vec), "", specialty_vec)))
+      spec <- tools::toTitleCase(tolower(spec))   # "internal medicine" → "Internal Medicine"
+      skip <- type_vec %in% NO_SPEC_PREFIX
+      dplyr::if_else(!skip & nzchar(spec), paste(spec, type_vec), type_vec)
     }
 
     # ── 1. Assessment type count buttons ─────────────────────────────────────
@@ -207,19 +221,26 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       df      <- my_evals()
       obs_map <- obs_type_map_r()
 
-      all_types <- c(
-        if (length(obs_map) > 0) unname(obs_map) else character(0),
-        "Continuity Clinic"
+      # Generic types detected from field prefixes (no specialty prefix on tiles —
+      # keeps the grid compact and comparable across residents)
+      type_vec <- .detect_assessment_type(df, obs_map)
+
+      # Seed the grid with all known obs-type labels + structural rotation types
+      # so tiles with 0 count appear in grey (programme expectation view).
+      STRUCTURAL_TYPES <- c(
+        "Intern Inpatient", "Resident Inpatient",
+        "Bridge Clinic", "Consult", "Single Clinic Day", "Continuity Clinic"
       )
-      cc_quart <- if ("ass_cc_quart"  %in% names(df)) df$ass_cc_quart  else rep(NA_character_, nrow(df))
-      sf_vec   <- if ("source_form"  %in% names(df)) df$source_form   else NULL
-      rot_vec  <- if ("ass_rotator"  %in% names(df)) df$ass_rotator   else NULL
-      type_vec <- .decode_type(df$ass_obs_type, cc_quart, obs_map,
-                               source_form = sf_vec, rotator = rot_vec)
-      actual   <- data.frame(Type = type_vec, stringsAsFactors = FALSE) %>%
+      all_types <- unique(c(
+        if (length(obs_map) > 0) unname(obs_map) else character(0),
+        STRUCTURAL_TYPES
+      ))
+
+      actual <- data.frame(Type = type_vec, stringsAsFactors = FALSE) %>%
         dplyr::count(Type)
-      if ("General Assessment" %in% actual$Type)
-        all_types <- c(all_types, "General Assessment")
+      # Add any types from data not already in all_types (e.g. "General Assessment")
+      extra <- setdiff(actual$Type, all_types)
+      if (length(extra) > 0) all_types <- c(all_types, extra)
 
       counts <- data.frame(Type = all_types, stringsAsFactors = FALSE) %>%
         dplyr::left_join(actual, by = "Type") %>%
@@ -267,12 +288,11 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       req(my_evals())
       df      <- my_evals()
       obs_map <- obs_type_map_r()
-      cc_quart <- if ("ass_cc_quart"  %in% names(df)) df$ass_cc_quart  else rep(NA_character_, nrow(df))
-      sf_vec   <- if ("source_form"  %in% names(df)) df$source_form   else NULL
-      rot_vec  <- if ("ass_rotator"  %in% names(df)) df$ass_rotator   else NULL
+      # Detect type from field prefixes, then prepend specialty for context
+      spec_vec  <- if ("ass_specialty" %in% names(df)) df$ass_specialty else NULL
+      type_vec  <- .apply_specialty(.detect_assessment_type(df, obs_map), spec_vec)
       df %>%
-        dplyr::mutate(.Type = .decode_type(ass_obs_type, cc_quart, obs_map,
-                                           source_form = sf_vec, rotator = rot_vec)) %>%
+        dplyr::mutate(.Type = type_vec) %>%
         dplyr::filter(
           (!is.na(ass_plus)  & nzchar(trimws(ass_plus)))  |
           (!is.na(ass_delta) & nzchar(trimws(ass_delta)))
