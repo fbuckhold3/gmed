@@ -96,8 +96,11 @@ mod_eval_feedback_ui <- function(id) {
         # Table
         DT::dataTableOutput(ns("pd_table")),
 
-        # Score detail
-        uiOutput(ns("score_detail"))
+        # Score detail header / prompt
+        uiOutput(ns("score_detail")),
+
+        # Score chart — plotly bar chart rendered on row click
+        plotly::plotlyOutput(ns("score_chart"), height = "auto")
       )
     )
   )
@@ -554,25 +557,16 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           fontWeight = "600", color = "#6c3483")
     })
 
-    # ── 2d. Score detail on row click ─────────────────────────────────────────
-    output$score_detail <- renderUI({
-      row_idx <- input$pd_table_rows_selected
-      if (is.null(row_idx) || length(row_idx) == 0) {
-        return(tags$p(
-          style = "font-size:0.78rem; color:#0066a1; margin-top:10px; font-style:italic;",
-          tags$i(class = "bi bi-hand-index me-1"),
-          "Select a row above to see the full assessment scores for that evaluation."
-        ))
-      }
+    # ── Helper: build scored-items data frame for the selected row ────────────
+    .build_scored_df <- function(row_idx) {
+      if (is.null(row_idx) || length(row_idx) == 0) return(NULL)
       sel_row <- pd_data() %>% dplyr::slice(row_idx)
       if (nrow(sel_row) == 0) return(NULL)
-
       inst_id  <- sel_row$redcap_repeat_instance[1]
       eval_row <- assessment_data() %>%
         dplyr::filter(redcap_repeat_instance == inst_id,
                       record_id == !!record_id())
       if (nrow(eval_row) == 0) return(NULL)
-
       dd <- data_dict()
       if (is.null(dd) || nrow(dd) == 0) return(NULL)
 
@@ -586,92 +580,175 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           grepl("^ass_", field_name),
           !field_name %in% meta_skip,
           field_type %in% c("radio", "dropdown")
-        )
+        ) %>%
+        dplyr::filter(field_name %in% names(eval_row))
 
-      scored <- item_fields %>%
-        dplyr::filter(field_name %in% names(eval_row)) %>%
-        dplyr::rowwise() %>%
-        dplyr::filter({
-          v <- eval_row[[field_name]][1]
-          !is.na(v) && as.character(v) != "" && as.character(v) != "0"
-        }) %>%
-        dplyr::ungroup()
-
-      if (nrow(scored) == 0) {
-        return(div(
-          style = "margin-top:10px; padding:10px; background:#f8f9fa;
-                   border-radius:6px; font-size:0.83rem; color:#6c757d;",
-          tags$i(class = "bi bi-dash-circle me-1"),
-          "No scored items recorded for this evaluation."
-        ))
-      }
-
-      badges <- lapply(seq_len(nrow(scored)), function(i) {
-        fn    <- scored$field_name[i]
-        label <- scored$field_label[i]
-        val   <- as.character(eval_row[[fn]][1])
-        cm    <- parse_redcap_choices(scored$select_choices_or_calculations[i])
-        val_label <- if (length(cm) > 0 && val %in% names(cm)) cm[[val]] else val
-        n_choices <- length(cm)
-        pos       <- if (length(cm) > 0) which(names(cm) == val) else NA_integer_
-        bg_col <- if (!is.na(pos) && n_choices > 0) {
-          pal <- grDevices::colorRampPalette(
-            c("#c0392b","#e67e22","#f9e79f","#27ae60","#1a6b3a")
-          )(n_choices)
-          pal[pos]
-        } else "#aaa"
-        fg_col <- if (!is.na(pos) && pos == ceiling(n_choices / 2) && n_choices >= 3)
-          "#555" else "#fff"
-        div(
-          style = "display:inline-block; margin:4px;",
-          div(
-            style = paste0(
-              "background:", bg_col, "; color:", fg_col, ";",
-              "border-radius:6px; padding:6px 12px;",
-              "font-size:0.78rem; font-weight:600;",
-              "max-width:220px; text-align:center;"
-            ),
-            tags$div(
-              style = "opacity:0.8; font-size:0.68rem; font-weight:400;
-                       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;",
-              label
-            ),
-            tags$div(val_label)
-          )
+      rows <- lapply(seq_len(nrow(item_fields)), function(i) {
+        fn  <- item_fields$field_name[i]
+        lbl <- item_fields$field_label[i]
+        val <- as.character(eval_row[[fn]][1])
+        if (is.na(val) || !nzchar(val) || val == "0") return(NULL)
+        cm  <- parse_redcap_choices(item_fields$select_choices_or_calculations[i])
+        n   <- length(cm)
+        pos <- if (n > 0 && val %in% names(cm)) which(names(cm) == val) else NA_integer_
+        val_lbl <- if (n > 0 && val %in% names(cm)) unname(cm[val]) else val
+        # Mark "unable to evaluate" type responses for separate colouring
+        is_na_resp <- grepl("unable|cannot|n/a|not observed|not applicable",
+                            val_lbl, ignore.case = TRUE)
+        # Shorten label: strip trailing parenthetical qualifiers
+        short_lbl <- gsub("\\s*\\(.*?\\)", "", lbl)
+        short_lbl <- trimws(gsub("\\s+", " ", short_lbl))
+        data.frame(
+          field_name = fn,
+          label      = short_lbl,
+          full_label = lbl,
+          val_label  = val_lbl,
+          pos        = pos,
+          n_choices  = n,
+          norm_pos   = if (!is.na(pos) && n > 1) (pos - 1) / (n - 1) else 0,
+          is_na_resp = is_na_resp,
+          stringsAsFactors = FALSE
         )
       })
+      rows <- rows[!sapply(rows, is.null)]
+      if (length(rows) == 0) return(NULL)
+      df <- do.call(rbind, rows)
+      df[!is.na(df$pos), ]
+    }
+
+    # ── 2d. Score detail header (prompt / metadata above chart) ───────────────
+    output$score_detail <- renderUI({
+      row_idx <- input$pd_table_rows_selected
+      if (is.null(row_idx) || length(row_idx) == 0) {
+        return(tags$p(
+          style = "font-size:0.78rem; color:#0066a1; margin-top:10px; font-style:italic;",
+          tags$i(class = "bi bi-hand-index me-1"),
+          "Select a row above to see the scored items for that evaluation."
+        ))
+      }
+      sel_row <- pd_data() %>% dplyr::slice(row_idx)
+      if (nrow(sel_row) == 0) return(NULL)
+
+      scored_df <- .build_scored_df(row_idx)
+      n_scored  <- if (!is.null(scored_df)) nrow(scored_df) else 0
 
       div(
-        style = paste0("margin-top:14px; padding:14px 16px;",
-                       "background:#f8fbff; border-radius:6px;",
-                       "border:1px solid #dde5ed;"),
+        style = paste0("margin-top:14px; padding:12px 16px;",
+                       "background:#f8fbff; border-radius:6px 6px 0 0;",
+                       "border:1px solid #dde5ed; border-bottom:none;"),
         div(
-          style = "font-size:0.72rem; font-weight:700; text-transform:uppercase;
-                   letter-spacing:.08em; color:#6c757d; margin-bottom:6px;",
-          tags$i(class = "bi bi-award me-1"),
-          paste0("Scores \u2014 ", sel_row$Date[1],
-                 " \u00b7 ", sel_row$Type[1],
-                 " \u00b7 ", sel_row$Faculty[1])
-        ),
-        tags$p(
-          style = "font-size:0.75rem; color:#6c757d; margin-bottom:8px;",
-          "Each badge shows one assessed item. Colour runs ",
-          tags$span(style = "color:#c0392b; font-weight:600;", "red"),
-          " (below expectations) \u2192 ",
-          tags$span(style = "color:#27ae60; font-weight:600;", "green"),
-          " (attending level)."
-        ),
-        div(style = "display:flex; flex-wrap:wrap;", badges),
-        tags$button(
-          style   = "margin-top:8px; font-size:0.72rem;",
-          class   = "btn btn-sm btn-outline-secondary py-0",
-          onclick = sprintf(
-            "Shiny.setInputValue('%s', Math.random(), {priority:'event'})",
-            ns("close_scores")
+          class = "d-flex justify-content-between align-items-start",
+          div(
+            div(
+              style = "font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                       letter-spacing:.08em; color:#6c757d; margin-bottom:3px;",
+              tags$i(class = "bi bi-bar-chart-fill me-1"),
+              paste0(sel_row$Date[1], " \u00b7 ", sel_row$Type[1],
+                     " \u00b7 ", sel_row$Faculty[1])
+            ),
+            if (n_scored == 0) {
+              tags$span(
+                style = "font-size:0.78rem; color:#6c757d; font-style:italic;",
+                tags$i(class = "bi bi-dash-circle me-1"),
+                "No rubric items recorded \u2014 narrative feedback only."
+              )
+            } else {
+              tags$span(
+                style = "font-size:0.78rem; color:#1a6b3a;",
+                tags$i(class = "bi bi-check-circle me-1"),
+                paste0(n_scored, " rated item", if (n_scored != 1) "s" else "",
+                       ". Bars run red \u2192 green (low \u2192 high)."),
+                " Hover for exact choice."
+              )
+            }
           ),
-          "\u00d7 Close"
+          tags$button(
+            style   = "font-size:0.72rem; margin-left:12px; flex-shrink:0;",
+            class   = "btn btn-sm btn-outline-secondary py-0",
+            onclick = sprintf(
+              "Shiny.setInputValue('%s', Math.random(), {priority:'event'})",
+              ns("close_scores")
+            ),
+            "\u00d7 Close"
+          )
         )
       )
+    })
+
+    # ── 2e. Score chart — plotly horizontal bar chart ─────────────────────────
+    output$score_chart <- plotly::renderPlotly({
+      row_idx <- input$pd_table_rows_selected
+      scored_df <- .build_scored_df(row_idx)
+      if (is.null(scored_df) || nrow(scored_df) == 0) {
+        return(plotly::plotly_empty() %>%
+                 plotly::config(displayModeBar = FALSE))
+      }
+
+      # Colour: "unable to evaluate" → grey; others → red→green gradient
+      pal_fn <- grDevices::colorRampPalette(
+        c("#c0392b","#e67e22","#f1c40f","#27ae60","#1a6b3a")
+      )
+      scored_df$bar_color <- ifelse(
+        scored_df$is_na_resp,
+        "#b0bec5",
+        pal_fn(100)[pmin(100, pmax(1, round(scored_df$norm_pos * 99) + 1))]
+      )
+
+      # Hover text
+      scored_df$hover <- paste0(
+        "<b>", scored_df$label, "</b><br>",
+        scored_df$val_label, "<br>",
+        "<span style=\'color:#999\'>", scored_df$pos, " of ",
+        scored_df$n_choices, "</span>"
+      )
+
+      # Reverse row order so first item sits at top of chart
+      scored_df <- scored_df[rev(seq_len(nrow(scored_df))), ]
+      scored_df$label <- factor(scored_df$label, levels = scored_df$label)
+
+      n_items <- nrow(scored_df)
+      height  <- max(180, n_items * 38 + 60)
+
+      plotly::plot_ly(
+        data        = scored_df,
+        x           = ~norm_pos,
+        y           = ~label,
+        type        = "bar",
+        orientation = "h",
+        marker      = list(
+          color = ~bar_color,
+          line  = list(color = "rgba(255,255,255,0.6)", width = 1)
+        ),
+        hovertemplate = ~paste0(hover, "<extra></extra>"),
+        showlegend    = FALSE
+      ) %>%
+        plotly::layout(
+          xaxis = list(
+            title      = "",
+            range      = c(0, 1.05),
+            tickvals   = c(0, 0.5, 1),
+            ticktext   = c("Low", "Mid", "High"),
+            showgrid   = TRUE,
+            gridcolor  = "#eee",
+            zeroline   = FALSE,
+            fixedrange = TRUE
+          ),
+          yaxis = list(
+            title      = "",
+            automargin = TRUE,
+            fixedrange = TRUE
+          ),
+          margin       = list(l = 8, r = 20, t = 8, b = 36),
+          paper_bgcolor = "rgba(248,251,255,1)",
+          plot_bgcolor  = "rgba(248,251,255,1)",
+          height        = height,
+          shapes = list(
+            list(type = "line", x0 = 0.5, x1 = 0.5,
+                 y0 = -0.5, y1 = n_items - 0.5,
+                 line = list(color = "#ccc", dash = "dot", width = 1))
+          )
+        ) %>%
+        plotly::config(displayModeBar = FALSE, responsive = TRUE)
     })
 
     observeEvent(input$close_scores, {
