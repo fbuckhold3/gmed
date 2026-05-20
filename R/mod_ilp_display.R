@@ -56,7 +56,7 @@ mod_ilp_display_ui <- function(id,
         style = "color:#34495e; margin-top:10px;"
       ),
       if (nzchar(m$subhead))
-        shiny::tags$p(m$subhead, style = "color:#7f8c8d; font-size:0.9rem;") else NULL,
+        shiny::tags$p(m$subhead, style = "color:#7f8c8d; font-size:1.05rem;") else NULL,
       shiny::wellPanel(
         style = m$panel_style,
         shiny::uiOutput(ns(s))
@@ -277,6 +277,7 @@ mod_ilp_display_server <- function(id,
     pcmk = list(
       goal       = "goal_pcmk",
       level      = "goal_level_pcmk",
+      row        = "goal_level_r_pcmk",
       how        = "how_pcmk",
       prior      = "prior_goal_pcmk",
       review_no  = "review_q_pcmk",
@@ -286,6 +287,7 @@ mod_ilp_display_server <- function(id,
     sbppbl = list(
       goal       = "goal_sbppbl",
       level      = "goal_level_sbppbl",
+      row        = "goal_r_sbppbl",
       how        = "how_sbppbl",
       prior      = "prior_goal_sbppbl",
       review_no  = "review_q_sbppbl",
@@ -295,6 +297,7 @@ mod_ilp_display_server <- function(id,
     profics = list(
       goal       = "goal_subcomp_profics",
       level      = "goal_level_profics",
+      row        = "goal_r_profics",
       how        = "how_profics",
       prior      = "prior_goal_profics",
       review_no  = "review_q_profics",
@@ -322,9 +325,9 @@ mod_ilp_display_server <- function(id,
   if (is.na(v)) paste("Code", code) else unname(v)
 }
 
-# Optional: resolve full milestone-level descriptor from data dict if available.
-# Falls back to "Level N" text. Mirrors mod_goals.R::get_milestone_level_text.
-.ilp_level_text <- function(domain, code, level, dd) {
+# Resolve milestone anchor text from the data dictionary for a specific row+level.
+# Falls back to "Level N" when the dd lookup fails.
+.ilp_level_text <- function(domain, code, level, dd, row = NULL) {
   if (!nzchar(code) || !nzchar(level)) return("Level not specified")
   bare <- paste("Level", level)
   if (is.null(dd) || !is.data.frame(dd)) return(bare)
@@ -332,7 +335,11 @@ mod_ilp_display_server <- function(id,
   subcomp <- .ilp_subcomp_code(domain, code)
   if (is.null(subcomp)) return(bare)
 
-  fld <- paste0(subcomp, "_r1")
+  # Use the resident's selected row; fall back to row 1 only when no row saved.
+  row_n <- suppressWarnings(as.integer(row))
+  if (is.na(row_n) || row_n < 1) row_n <- 1L
+  fld <- paste0(subcomp, "_r", row_n)
+
   fn_col <- intersect(c("field_name", "Variable / Field Name", "Variable...Field.Name"),
                       names(dd))
   ch_col <- intersect(c("select_choices_or_calculations",
@@ -340,9 +347,9 @@ mod_ilp_display_server <- function(id,
                         "Choices..Calculations..OR.Slider.Labels"),
                       names(dd))
   if (!length(fn_col) || !length(ch_col)) return(bare)
-  row <- dd[dd[[fn_col[1]]] == fld, , drop = FALSE]
-  if (!nrow(row)) return(bare)
-  choices <- as.character(row[[ch_col[1]]][1])
+  dd_row <- dd[dd[[fn_col[1]]] == fld, , drop = FALSE]
+  if (!nrow(dd_row)) return(bare)
+  choices <- as.character(dd_row[[ch_col[1]]][1])
   if (!nzchar(choices)) return(bare)
   parts <- trimws(unlist(strsplit(choices, "\\|")))
   parts <- gsub("^[0-9]+,\\s*", "", parts)
@@ -386,6 +393,7 @@ mod_ilp_display_server <- function(id,
   fm   <- .ilp_domain_fields(domain); if (is.null(fm)) return(NULL)
   code <- if (fm$goal  %in% names(cur_data)) as.character(cur_data[[fm$goal]][1])  else ""
   lvl  <- if (fm$level %in% names(cur_data)) as.character(cur_data[[fm$level]][1]) else ""
+  row  <- if (fm$row   %in% names(cur_data)) as.character(cur_data[[fm$row]][1])   else ""
   how  <- if (fm$how   %in% names(cur_data)) as.character(cur_data[[fm$how]][1])   else ""
   if (!nzchar(code) || code == "NA") return(NULL)
 
@@ -395,7 +403,7 @@ mod_ilp_display_server <- function(id,
     shiny::tags$h5(domain_name, style = "color:#e67e22; margin-top:0;"),
     shiny::tags$p(shiny::tags$strong("Selected Goal: "), .ilp_subcomp_label(domain, code)),
     shiny::tags$p(shiny::tags$strong("Target Milestone Level: "),
-                  .ilp_level_text(domain, code, lvl, data_dict)),
+                  .ilp_level_text(domain, code, lvl, data_dict, row)),
     if (nzchar(how) && !is.na(how))
       shiny::tagList(
         shiny::tags$p(shiny::tags$strong("How to achieve:")),
@@ -414,6 +422,7 @@ mod_ilp_display_server <- function(id,
 
   prev_code <- fld(prev_data, fm$goal)
   prev_lvl  <- fld(prev_data, fm$level)
+  prev_row  <- fld(prev_data, fm$row)
   prev_how  <- fld(prev_data, fm$how)
   achv      <- fld(cur_data,  fm$prior)
   rno       <- fld(cur_data,  fm$review_no)
@@ -421,6 +430,7 @@ mod_ilp_display_server <- function(id,
 
   cur_code  <- fld(cur_data, fm$goal)
   cur_lvl   <- fld(cur_data, fm$level)
+  cur_row   <- fld(cur_data, fm$row)
   cur_how   <- fld(cur_data, fm$how)
 
   goal_met    <- nzchar(achv) && (achv == "1" || tolower(achv) == "yes")
@@ -433,8 +443,8 @@ mod_ilp_display_server <- function(id,
     shiny::div(
       class = "mt-3 p-3",
       style = "background:#f8f9fa; border:1px dashed #adb5bd; border-radius:8px;",
-      shiny::tags$div(class = "small fw-bold text-uppercase text-muted mb-1",
-                      style = "letter-spacing:.06em;",
+      shiny::tags$div(class = "fw-bold text-uppercase text-muted mb-1",
+                      style = "letter-spacing:.06em; font-size:0.9rem;",
                       "Did the resident meet this goal?"),
       shiny::tags$div(class = "fst-italic text-muted",
                       shiny::tags$i(class = "bi bi-hourglass-split me-1"),
@@ -453,14 +463,14 @@ mod_ilp_display_server <- function(id,
       class = "mt-3 p-3",
       style = sprintf("background:%s; border-left:5px solid %s; border-radius:8px;",
                       bg, border),
-      shiny::tags$div(class = "small fw-bold text-uppercase mb-1",
-                      style = sprintf("letter-spacing:.06em; color:%s;", color),
+      shiny::tags$div(class = "fw-bold text-uppercase mb-1",
+                      style = sprintf("letter-spacing:.06em; color:%s; font-size:0.9rem;", color),
                       "Did the resident meet this goal?"),
       shiny::tags$div(
         class = "d-flex align-items-center mb-2",
         shiny::tags$i(class = paste0("bi ", icon, " me-2"),
                       style = sprintf("font-size:1.4rem; color:%s;", border)),
-        shiny::tags$span(style = sprintf("font-size:1.1rem; font-weight:700; color:%s;", color),
+        shiny::tags$span(style = sprintf("font-size:1.4rem; font-weight:700; color:%s;", color),
                          txt)
       ),
       if (nzchar(trimws(reflection)))
@@ -481,25 +491,25 @@ mod_ilp_display_server <- function(id,
   }
 
   # ---- Goal info block (used in both panes) ----
-  .goal_info <- function(code, lvl, how) {
+  .goal_info <- function(code, lvl, row, how) {
     shiny::tagList(
       shiny::div(
         class = "p-2 mb-2",
         style = "background:#f8fafc; border-radius:6px;",
-        shiny::tags$div(class = "small text-uppercase fw-bold text-muted mb-1",
-                        style = "letter-spacing:.05em;",
+        shiny::tags$div(class = "text-uppercase fw-bold text-muted mb-1",
+                        style = "letter-spacing:.05em; font-size:0.9rem;",
                         "Subcompetency"),
-        shiny::tags$div(style = "font-size:1.05rem; font-weight:600; color:#2c3e50;",
+        shiny::tags$div(style = "font-size:1.3rem; font-weight:600; color:#2c3e50;",
                         .ilp_subcomp_label(domain, code))
       ),
       shiny::div(
         class = "p-2 mb-2",
         style = "background:#f8fafc; border-radius:6px;",
-        shiny::tags$div(class = "small text-uppercase fw-bold text-muted mb-1",
-                        style = "letter-spacing:.05em;",
+        shiny::tags$div(class = "text-uppercase fw-bold text-muted mb-1",
+                        style = "letter-spacing:.05em; font-size:0.9rem;",
                         "Target Milestone Level"),
-        shiny::tags$div(style = "color:#34495e;",
-                        .ilp_level_text(domain, code, lvl, data_dict))
+        shiny::tags$div(style = "color:#34495e; font-size:1.15rem;",
+                        .ilp_level_text(domain, code, lvl, data_dict, row))
       ),
       if (nzchar(how))
         shiny::div(
@@ -508,7 +518,7 @@ mod_ilp_display_server <- function(id,
           shiny::tags$div(class = "small text-uppercase fw-bold text-muted mb-1",
                           style = "letter-spacing:.05em;",
                           "How they'll get there"),
-          shiny::tags$div(style = "color:#34495e; white-space:pre-wrap;", how)
+          shiny::tags$div(style = "color:#34495e; white-space:pre-wrap; font-size:1.1rem;", how)
         )
     )
   }
@@ -517,14 +527,14 @@ mod_ilp_display_server <- function(id,
     shiny::div(class = "text-muted fst-italic small p-3",
                "No goal recorded for last period.")
   } else {
-    shiny::tagList(.goal_info(prev_code, prev_lvl, prev_how), achievement_box)
+    shiny::tagList(.goal_info(prev_code, prev_lvl, prev_row, prev_how), achievement_box)
   }
 
   cur_pane <- if (!nzchar(cur_code)) {
     shiny::div(class = "text-muted fst-italic small p-3",
                "Resident has not yet set a goal for this period.")
   } else {
-    .goal_info(cur_code, cur_lvl, cur_how)
+    .goal_info(cur_code, cur_lvl, cur_row, cur_how)
   }
 
   pane_header <- function(label, color, icon) {
@@ -573,6 +583,7 @@ mod_ilp_display_server <- function(id,
   # Goal text/level/plan = previous-period ilp row.
   code <- if (fm$goal       %in% names(prev_data)) as.character(prev_data[[fm$goal]][1])       else ""
   lvl  <- if (fm$level      %in% names(prev_data)) as.character(prev_data[[fm$level]][1])      else ""
+  row  <- if (fm$row        %in% names(prev_data)) as.character(prev_data[[fm$row]][1])        else ""
   how  <- if (fm$how        %in% names(prev_data)) as.character(prev_data[[fm$how]][1])        else ""
   # Achievement + reflection = CURRENT-period ilp row (resident enters these
   # at the start of period N while reviewing period N-1).
@@ -602,7 +613,7 @@ mod_ilp_display_server <- function(id,
     shiny::div(style = "margin-bottom:10px;", badge),
     shiny::tags$p(shiny::tags$strong("Selected Goal: "), .ilp_subcomp_label(domain, code)),
     shiny::tags$p(shiny::tags$strong("Target Milestone Level: "),
-                  .ilp_level_text(domain, code, lvl, data_dict)),
+                  .ilp_level_text(domain, code, lvl, data_dict, row)),
     if (nzchar(how) && !is.na(how))
       shiny::tagList(
         shiny::tags$p(shiny::tags$strong("How to achieve:")),

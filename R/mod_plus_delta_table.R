@@ -326,21 +326,44 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
             TRUE ~ "Not provided"
           ),
 
-          # Rotation: prefer ass_rotator, then source_form, then specialty
+          # Rotation: what was evaluated \u2014 prefer ass_rotator, then decode
+          # source_form to a human-readable assessment type, then specialty
+          # as a last resort.
           Rotation = {
             rot_val <- if ("ass_rotator" %in% names(dplyr::cur_data()))
               dplyr::cur_data()[["ass_rotator"]] else rep(NA_character_, dplyr::n())
             sf_val  <- if ("source_form"  %in% names(dplyr::cur_data()))
               dplyr::cur_data()[["source_form"]]  else rep(NA_character_, dplyr::n())
+            sf_l <- tolower(trimws(ifelse(is.na(sf_val), "", sf_val)))
             dplyr::case_when(
               !is.na(rot_val) & nzchar(trimws(rot_val)) ~ trimws(rot_val),
-              !is.na(sf_val)  & grepl("cc",        tolower(sf_val)) ~ "Continuity Clinic",
-              !is.na(sf_val)  & grepl("inpatient", tolower(sf_val)) ~ "Inpatient",
-              !is.na(sf_val)  & grepl("consult",   tolower(sf_val)) ~ "Consult",
-              !is.na(sf_val)  & grepl("day",       tolower(sf_val)) ~ "Day Assessment",
-              !is.na(sf_val)  & grepl("bridge",    tolower(sf_val)) ~ "Bridge Clinic",
-              !is.na(sf_val)  & !is.na(sf_val)                      ~ sf_val,
-              !is.na(ass_specialty) & nzchar(trimws(ass_specialty))  ~ trimws(ass_specialty),
+              # Observation sub-types (specific before generic "obs" catch-all)
+              grepl("obs_acp",     sf_l) ~ "ACP Discussion",
+              grepl("obs_educat",  sf_l) ~ "Teaching Session",
+              grepl("obs_pres",    sf_l) ~ "Presentation",
+              grepl("obs_cdm",     sf_l) ~ "Clinical Decision Making",
+              grepl("obs_pe",      sf_l) ~ "Physical Exam",
+              grepl("obs_writehp", sf_l) ~ "Written H&P",
+              grepl("obs_daily",   sf_l) ~ "Progress Note",
+              grepl("obs_dc",      sf_l) ~ "Discharge Summary",
+              grepl("obs_meet",    sf_l) ~ "Family Meeting",
+              grepl("obs_senior",  sf_l) ~ "Team Supervision",
+              grepl("obs_proc",    sf_l) ~ "Procedure",
+              grepl("obs_mdr",     sf_l) ~ "Multi-Disciplinary Rounds",
+              grepl("obs_emer",    sf_l) ~ "Emergent Situation",
+              grepl("obs_pocus",   sf_l) ~ "Point of Care Ultrasound",
+              grepl("obs",         sf_l) ~ "Direct Observation",
+              # Assessment context types
+              grepl("int_ip",      sf_l) ~ "Intern Inpatient",
+              grepl("res_ip",      sf_l) ~ "Resident Inpatient",
+              grepl("bridge",      sf_l) ~ "Bridge Clinic",
+              sf_l == "cc" | grepl("_cc",  sf_l) ~ "Continuity Clinic",
+              sf_l == "day" | grepl("_day", sf_l) ~ "Single Clinic Day",
+              grepl("cons",        sf_l) ~ "Consult",
+              # Use raw source_form if non-empty but unrecognized
+              nzchar(sf_l) ~ trimws(sf_val),
+              # Last resort: faculty specialty
+              !is.na(ass_specialty) & nzchar(trimws(ass_specialty)) ~ trimws(ass_specialty),
               TRUE ~ "\u2014"
             )
           }

@@ -136,7 +136,7 @@ create_gmed_datatable_tested <- function(data,
       columns = names(data),
       backgroundColor = '#fafafa',
       borderColor = '#e1e5e9',
-      fontSize = '14px',
+      fontSize = '20px',
       fontFamily = '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif'
     )
   
@@ -316,7 +316,7 @@ create_gmed_datatable <- function(data,
       columns = names(data),
       backgroundColor = '#f8f9fa',
       borderColor = '#dfe2e5',
-      fontSize = '14px'
+      fontSize = '20px'
     )
   
   # Highlight specified columns if provided
@@ -568,7 +568,7 @@ create_cc_table <- function(data, name) {
       borderBottom = "2px solid #004d78"
     ),
     cellStyle = list(
-      fontSize = "14px"
+      fontSize = "20px"
     ),
     rowHighlightStyle = list(
       backgroundColor = "#f5f5f5"
