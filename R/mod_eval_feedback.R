@@ -696,13 +696,28 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           is_na_r  <- grepl("unable|cannot|n/a|not observed|not applicable",
                             val_lbl, ignore.case = TRUE)
           short_lbl <- trimws(gsub("\\s+", " ", gsub("\\s*\\(.*?\\)", "", lbl)))
+          # Detect reversed scale: first choice sounds "best" (e.g. Exceptional → Could use improvement)
+          first_lbl <- if (n > 0) unname(cm)[1] else ""
+          is_rev    <- grepl(
+            "exceptional|best among|above expectation|exceed|outstanding|excellent",
+            first_lbl, ignore.case = TRUE
+          )
+          # Flip direction so higher norm_pos always = better performance
+          np <- if (n > 1) {
+            if (is_rev) (n - pos) / (n - 1)
+            else         (pos - 1) / (n - 1)
+          } else 0
+          # Short text label for display on bar (≤18 chars)
+          val_short <- if (nchar(val_lbl) > 18) paste0(substr(val_lbl, 1, 17), "\u2026") else val_lbl
           data.frame(field_name  = fn,
                      label       = short_lbl,
                      val_label   = val_lbl,
+                     val_short   = val_short,
                      choices_str = item_fields$select_choices_or_calculations[j],
                      pos         = pos,
                      n_choices   = n,
-                     norm_pos    = if (n > 1) (pos - 1) / (n - 1) else 0,
+                     norm_pos    = np,
+                     is_reversed = is_rev,
                      is_na_resp  = is_na_r,
                      stringsAsFactors = FALSE)
         })
@@ -726,7 +741,8 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           "<b>", chart_df$label, "</b><br>",
           chart_df$val_label, "<br>",
           "<span style=\'color:#999\'>", chart_df$pos, " of ",
-          chart_df$n_choices, "</span>"
+          chart_df$n_choices, if (any(chart_df$is_reversed, na.rm=TRUE)) " (scale: high=best)" else "",
+          "</span>"
         )
         subtitle <- paste0(sel_row$Date[1], " \u00b7 ", sel_row$Faculty[1])
 
@@ -755,11 +771,13 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
             choices_str = dplyr::first(choices_str),
             n_obs       = dplyr::n(),
             is_na_resp  = all(is_na_resp),
+            is_reversed = dplyr::first(is_reversed),
             .groups     = "drop"
           ) %>%
           dplyr::mutate(
-            pos    = round(norm_pos * (n_choices - 1)) + 1,
-            hover  = paste0(
+            pos       = round(norm_pos * (n_choices - 1)) + 1,
+            val_short = paste0(round(norm_pos * 100), "%"),
+            hover     = paste0(
               "<b>", label, "</b><br>",
               round(norm_pos * 100), "% of scale<br>",
               "<span style=\'color:#999\'>", n_obs, " assessment",
@@ -782,16 +800,18 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       modal_n <- as.integer(
         names(sort(table(chart_df$n_choices), decreasing = TRUE))[1]
       )
-      rep_str <- chart_df$choices_str[
-        !is.na(chart_df$choices_str) & chart_df$n_choices == modal_n
-      ][1]
+      modal_rows <- chart_df[!is.na(chart_df$n_choices) & chart_df$n_choices == modal_n, ]
+      rep_str    <- modal_rows$choices_str[!is.na(modal_rows$choices_str)][1]
       cm_ticks   <- if (!is.na(rep_str)) parse_redcap_choices(rep_str) else list()
       n_ticks    <- length(cm_ticks)
-      tick_vals  <- if (n_ticks > 1) seq(0, 1, length.out = n_ticks) else c(0, 1)
       # Truncate long labels for the axis (full label still in hover)
       trunc_lbl  <- function(s, n = 20)
         ifelse(nchar(s) > n, paste0(substr(s, 1, n - 1), "…"), s)
-      tick_text  <- if (n_ticks > 0) trunc_lbl(unname(cm_ticks)) else c("", "")
+      raw_ticks    <- if (n_ticks > 0) trunc_lbl(unname(cm_ticks)) else c("Low", "High")
+      # If the dominant scale is reversed (first choice = best), flip label order
+      dom_reversed <- isTRUE(modal_rows$is_reversed[1])
+      tick_text    <- if (dom_reversed) rev(raw_ticks) else raw_ticks
+      tick_vals    <- if (n_ticks > 1) seq(0, 1, length.out = n_ticks) else c(0, 1)
 
       # ── Render the chart ──────────────────────────────────────────────────
       pal_fn <- grDevices::colorRampPalette(
@@ -813,6 +833,10 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         data          = chart_df,
         x             = ~norm_pos,
         y             = ~label,
+        text          = ~val_short,
+        textposition  = "inside",
+        insidetextanchor = "end",
+        textfont      = list(color = "white", size = 11),
         type          = "bar",
         orientation   = "h",
         marker        = list(
