@@ -62,11 +62,11 @@ mod_eval_feedback_ui <- function(id) {
         style = "background:#003d5c; color:white; padding:10px 18px;",
         div(
           class = "d-flex align-items-center",
-          tags$i(class = "bi bi-chat-left-text-fill me-2"),
-          tags$span(style = "font-weight:700;", "Written Feedback & Scores"),
+          tags$i(class = "bi bi-table me-2"),
+          tags$span(style = "font-weight:700;", "Assessment History & Scores"),
           tags$span(
             style = "font-size:0.75rem; opacity:0.7; margin-left:10px;",
-            "Click a row to expand the full assessment scores"
+            "Click a row to expand rubric scores for that evaluation"
           )
         )
       ),
@@ -80,11 +80,10 @@ mod_eval_feedback_ui <- function(id) {
           tags$i(class = "bi bi-lightbulb-fill mt-1 flex-shrink-0"),
           tags$div(
             tags$strong("How to use: "),
-            "Use the filters below to narrow evaluations by training level or assessment type. ",
-            "The table shows every evaluation that includes written feedback. ",
-            tags$strong("Plus "), "(\u2795) highlights what went well; ",
-            tags$strong("Delta "), "(\u25b3) notes areas to develop. ",
-            "Select any row to reveal the full scored items for that evaluation."
+            "Use the filters below to narrow by training level or assessment type. ",
+            "The table shows every assessment. ",
+            "The ", tags$strong("Scores"), " column shows how many rubric items were rated \u2014 click any row to expand them. ",
+            tags$strong("Plus "), "(\u2795) and ", tags$strong("Delta "), "(\u25b3) show written feedback when provided."
           )
         ),
 
@@ -298,20 +297,40 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       div(class = "row g-2 px-1", buttons)
     })
 
-    # ── pd_data_all (unfiltered) ──────────────────────────────────────────────
+    # ── pd_data_all (all assessments — not filtered to narrative-only) ────────
     pd_data_all <- reactive({
       req(my_evals())
       df      <- my_evals()
       obs_map <- obs_type_map_r()
+      dd      <- data_dict()
+
       # Detect type from field prefixes, then prepend specialty for context
-      spec_vec  <- if ("ass_specialty" %in% names(df)) df$ass_specialty else NULL
-      type_vec  <- .apply_specialty(.detect_assessment_type(df, obs_map), spec_vec)
+      spec_vec <- if ("ass_specialty" %in% names(df)) df$ass_specialty else NULL
+      type_vec <- .apply_specialty(.detect_assessment_type(df, obs_map), spec_vec)
+
+      # ── Per-row scored-item count (drives the "Scores" indicator column) ───
+      meta_skip <- c("record_id","redcap_repeat_instrument","redcap_repeat_instance",
+                     "ass_date","ass_level","ass_plus","ass_delta","ass_faculty",
+                     "ass_specialty","ass_rotator","ass_cc_quart","ass_obs_type",
+                     "fac_eval_level","q_level","source_form")
+      score_cols <- character(0)
+      if (!is.null(dd) && nrow(dd) > 0) {
+        score_cols <- dd$field_name[
+          grepl("^ass_", dd$field_name) &
+          dd$field_type %in% c("radio", "dropdown") &
+          !dd$field_name %in% meta_skip
+        ]
+        score_cols <- intersect(score_cols, names(df))
+      }
+      score_counts <- if (length(score_cols) > 0) {
+        apply(df[, score_cols, drop = FALSE], 1, function(r) {
+          vals <- trimws(as.character(r))
+          sum(!is.na(r) & nzchar(vals))
+        })
+      } else rep(0L, nrow(df))
+
       df %>%
-        dplyr::mutate(.Type = type_vec) %>%
-        dplyr::filter(
-          (!is.na(ass_plus)  & nzchar(trimws(ass_plus)))  |
-          (!is.na(ass_delta) & nzchar(trimws(ass_delta)))
-        ) %>%
+        dplyr::mutate(.Type = type_vec, .ScoreCount = as.integer(score_counts)) %>%
         dplyr::mutate(
           Date    = format(as.Date(ass_date), "%b %d, %Y"),
           Type    = .Type,
@@ -323,9 +342,12 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           ),
           Faculty = dplyr::coalesce(ass_faculty, "\u2014"),
           Plus    = dplyr::if_else(!is.na(ass_plus)  & nzchar(trimws(ass_plus)),
-                                   trimws(ass_plus),  "Not provided"),
+                                   trimws(ass_plus),  "\u2014"),
           Delta   = dplyr::if_else(!is.na(ass_delta) & nzchar(trimws(ass_delta)),
-                                   trimws(ass_delta), "Not provided")
+                                   trimws(ass_delta), "\u2014"),
+          Scores  = dplyr::if_else(.ScoreCount > 0L,
+                                   paste0(.ScoreCount, " items"),
+                                   "\u2014")
         ) %>%
         dplyr::arrange(dplyr::desc(ass_date))
     })
@@ -491,17 +513,18 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       )
     })
 
-    # ── 2c. Plus / delta table ────────────────────────────────────────────────
+    # ── 2c. Assessment table ──────────────────────────────────────────────────
     output$pd_table <- DT::renderDataTable({
       req(pd_data())
       df <- pd_data()
       if (nrow(df) == 0) {
         return(DT::datatable(
-          data.frame(Message = "No written feedback matches the current filters."),
+          data.frame(Message = "No assessments match the current filters."),
           options  = list(dom = "t"), rownames = FALSE
         ))
       }
-      display <- df %>% dplyr::select(Date, Type, Level, Faculty, Plus, Delta)
+      # Scores col first so users know which rows to click
+      display <- df %>% dplyr::select(Date, Type, Level, Faculty, Scores, Plus, Delta)
       DT::datatable(
         display,
         rownames  = FALSE,
@@ -510,12 +533,15 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           pageLength = 10, scrollX = TRUE,
           dom = "tp", ordering = FALSE,
           columnDefs = list(
-            list(className = "dt-center", targets = c(0, 1, 2, 3)),
-            list(width = "28%", targets = c(4, 5))
+            list(className = "dt-center", targets = c(0, 1, 2, 3, 4)),
+            list(width = "22%", targets = c(5, 6))
           )
         ),
         class = "table table-sm table-hover"
       ) %>%
+        DT::formatStyle("Scores",
+          fontWeight = "700", color = "#1a6b3a",
+          backgroundColor = "#f0f9f4") %>%
         DT::formatStyle("Plus",
           backgroundColor = "#e8f5e9", borderLeft = "3px solid #27ae60") %>%
         DT::formatStyle("Delta",
