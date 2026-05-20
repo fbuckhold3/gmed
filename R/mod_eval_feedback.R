@@ -696,10 +696,15 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           is_na_r  <- grepl("unable|cannot|n/a|not observed|not applicable",
                             val_lbl, ignore.case = TRUE)
           short_lbl <- trimws(gsub("\\s+", " ", gsub("\\s*\\(.*?\\)", "", lbl)))
-          data.frame(field_name = fn, label = short_lbl, val_label = val_lbl,
-                     pos = pos, n_choices = n,
-                     norm_pos = if (n > 1) (pos - 1) / (n - 1) else 0,
-                     is_na_resp = is_na_r, stringsAsFactors = FALSE)
+          data.frame(field_name  = fn,
+                     label       = short_lbl,
+                     val_label   = val_lbl,
+                     choices_str = item_fields$select_choices_or_calculations[j],
+                     pos         = pos,
+                     n_choices   = n,
+                     norm_pos    = if (n > 1) (pos - 1) / (n - 1) else 0,
+                     is_na_resp  = is_na_r,
+                     stringsAsFactors = FALSE)
         })
         rows <- rows[!sapply(rows, is.null)]
         if (length(rows) == 0) return(NULL)
@@ -745,11 +750,12 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         chart_df <- all_df %>%
           dplyr::group_by(field_name, label) %>%
           dplyr::summarise(
-            norm_pos   = mean(norm_pos,  na.rm = TRUE),
-            n_choices  = max(n_choices),
-            n_obs      = dplyr::n(),
-            is_na_resp = all(is_na_resp),
-            .groups    = "drop"
+            norm_pos    = mean(norm_pos,  na.rm = TRUE),
+            n_choices   = max(n_choices),
+            choices_str = dplyr::first(choices_str),
+            n_obs       = dplyr::n(),
+            is_na_resp  = all(is_na_resp),
+            .groups     = "drop"
           ) %>%
           dplyr::mutate(
             pos    = round(norm_pos * (n_choices - 1)) + 1,
@@ -771,6 +777,22 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         return(empty_plot)
       }
 
+      # ── Build axis ticks from the dominant scale in chart_df ─────────────
+      # Pick the most common n_choices; use its choice labels as tick text.
+      modal_n <- as.integer(
+        names(sort(table(chart_df$n_choices), decreasing = TRUE))[1]
+      )
+      rep_str <- chart_df$choices_str[
+        !is.na(chart_df$choices_str) & chart_df$n_choices == modal_n
+      ][1]
+      cm_ticks   <- if (!is.na(rep_str)) parse_redcap_choices(rep_str) else list()
+      n_ticks    <- length(cm_ticks)
+      tick_vals  <- if (n_ticks > 1) seq(0, 1, length.out = n_ticks) else c(0, 1)
+      # Truncate long labels for the axis (full label still in hover)
+      trunc_lbl  <- function(s, n = 20)
+        ifelse(nchar(s) > n, paste0(substr(s, 1, n - 1), "…"), s)
+      tick_text  <- if (n_ticks > 0) trunc_lbl(unname(cm_ticks)) else c("", "")
+
       # ── Render the chart ──────────────────────────────────────────────────
       pal_fn <- grDevices::colorRampPalette(
         c("#c0392b","#e67e22","#f1c40f","#27ae60","#1a6b3a")
@@ -780,12 +802,12 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         pal_fn(100)[pmin(100, pmax(1, round(chart_df$norm_pos * 99) + 1))]
       )
 
-      # Sort by avg score descending, then reverse for top-to-bottom display
+      # Sort ascending so lowest-scoring items appear at bottom
       chart_df <- chart_df[order(chart_df$norm_pos), ]
       chart_df$label <- factor(chart_df$label, levels = chart_df$label)
 
       n_items <- nrow(chart_df)
-      height  <- max(180, n_items * 38 + 70)
+      height  <- max(180, n_items * 38 + 90)
 
       plotly::plot_ly(
         data          = chart_df,
@@ -810,16 +832,17 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           ),
           xaxis  = list(
             title      = "",
-            range      = c(0, 1.05),
-            tickvals   = c(0, 0.5, 1),
-            ticktext   = c("Low", "Mid", "High"),
+            range      = c(-0.02, 1.05),
+            tickvals   = tick_vals,
+            ticktext   = tick_text,
+            tickangle  = -30,
             showgrid   = TRUE,
             gridcolor  = "#eee",
             zeroline   = FALSE,
             fixedrange = TRUE
           ),
           yaxis  = list(title = "", automargin = TRUE, fixedrange = TRUE),
-          margin = list(l = 8, r = 20, t = 30, b = 36),
+          margin = list(l = 8, r = 20, t = 30, b = 80),
           paper_bgcolor = "rgba(248,251,255,1)",
           plot_bgcolor  = "rgba(248,251,255,1)",
           height = height,
