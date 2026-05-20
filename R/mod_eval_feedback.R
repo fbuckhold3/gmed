@@ -265,21 +265,31 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         dplyr::arrange(dplyr::desc(n > 0), dplyr::desc(n), Type)
 
       done_rows <- which(counts$n > 0)
+      sel_type  <- selected_type()
       buttons <- lapply(seq_len(nrow(counts)), function(i) {
-        tp   <- counts$Type[i]
-        cnt  <- counts$n[i]
-        done <- cnt > 0
-        col  <- if (done)
+        tp      <- counts$Type[i]
+        cnt     <- counts$n[i]
+        done    <- cnt > 0
+        is_sel  <- nzchar(sel_type) && sel_type == tp
+        col     <- if (done)
           TYPE_PAL[((match(i, done_rows) - 1L) %% length(TYPE_PAL)) + 1L]
         else "#c8d3dd"
+        # Clickable only when there is data; selected tile gets ring highlight
+        onclick_js <- if (done)
+          sprintf("Shiny.setInputValue('%s', '%s', {priority:'event'})",
+                  ns("type_chip_click"), gsub("'", "\\'", tp))
+        else NULL
         div(
           class = "col-6 col-sm-4 col-md-3 col-lg-2 mb-2",
           div(
             style = paste0(
               "border:2px solid ", col, "; border-radius:8px;",
               "padding:10px 8px; text-align:center; height:100%;",
-              if (done) paste0("background:", col, "18;") else "background:#f7f9fb;"
+              if (done) paste0("background:", col, "18;") else "background:#f7f9fb;",
+              if (is_sel) paste0("box-shadow:0 0 0 3px ", col, ";") else "",
+              if (done) "cursor:pointer;" else ""
             ),
+            onclick = onclick_js,
             tags$div(
               style = paste0(
                 "font-size:1.6rem; font-weight:800; line-height:1; margin-bottom:4px;",
@@ -311,29 +321,8 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       spec_vec <- if ("ass_specialty" %in% names(df)) df$ass_specialty else NULL
       type_vec <- .apply_specialty(.detect_assessment_type(df, obs_map), spec_vec)
 
-      # ── Per-row scored-item count (drives the "Scores" indicator column) ───
-      meta_skip <- c("record_id","redcap_repeat_instrument","redcap_repeat_instance",
-                     "ass_date","ass_level","ass_plus","ass_delta","ass_faculty",
-                     "ass_specialty","ass_rotator","ass_cc_quart","ass_obs_type",
-                     "fac_eval_level","q_level","source_form")
-      score_cols <- character(0)
-      if (!is.null(dd) && nrow(dd) > 0) {
-        score_cols <- dd$field_name[
-          grepl("^ass_", dd$field_name) &
-          dd$field_type %in% c("radio", "dropdown") &
-          !dd$field_name %in% meta_skip
-        ]
-        score_cols <- intersect(score_cols, names(df))
-      }
-      score_counts <- if (length(score_cols) > 0) {
-        apply(df[, score_cols, drop = FALSE], 1, function(r) {
-          vals <- trimws(as.character(r))
-          sum(!is.na(r) & nzchar(vals))
-        })
-      } else rep(0L, nrow(df))
-
       df %>%
-        dplyr::mutate(.Type = type_vec, .ScoreCount = as.integer(score_counts)) %>%
+        dplyr::mutate(.Type = type_vec) %>%
         dplyr::mutate(
           Date    = format(as.Date(ass_date), "%b %d, %Y"),
           Type    = .Type,
@@ -347,10 +336,7 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           Plus    = dplyr::if_else(!is.na(ass_plus)  & nzchar(trimws(ass_plus)),
                                    trimws(ass_plus),  "\u2014"),
           Delta   = dplyr::if_else(!is.na(ass_delta) & nzchar(trimws(ass_delta)),
-                                   trimws(ass_delta), "\u2014"),
-          Scores  = dplyr::if_else(.ScoreCount > 0L,
-                                   paste0(.ScoreCount, " items"),
-                                   "\u2014")
+                                   trimws(ass_delta), "\u2014")
         ) %>%
         dplyr::arrange(dplyr::desc(ass_date))
     })
@@ -526,8 +512,7 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           options  = list(dom = "t"), rownames = FALSE
         ))
       }
-      # Scores col first so users know which rows to click
-      display <- df %>% dplyr::select(Date, Type, Level, Faculty, Scores, Plus, Delta)
+      display <- df %>% dplyr::select(Date, Type, Level, Faculty, Plus, Delta)
       DT::datatable(
         display,
         rownames  = FALSE,
@@ -536,15 +521,12 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
           pageLength = 10, scrollX = TRUE,
           dom = "tp", ordering = FALSE,
           columnDefs = list(
-            list(className = "dt-center", targets = c(0, 1, 2, 3, 4)),
-            list(width = "22%", targets = c(5, 6))
+            list(className = "dt-center", targets = c(0, 1, 2, 3)),
+            list(width = "25%", targets = c(4, 5))
           )
         ),
         class = "table table-sm table-hover"
       ) %>%
-        DT::formatStyle("Scores",
-          fontWeight = "700", color = "#1a6b3a",
-          backgroundColor = "#f0f9f4") %>%
         DT::formatStyle("Plus",
           backgroundColor = "#e8f5e9", borderLeft = "3px solid #27ae60") %>%
         DT::formatStyle("Delta",
@@ -675,55 +657,158 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       )
     })
 
-    # ── 2e. Score chart — plotly horizontal bar chart ─────────────────────────
+    # ── 2e. Score chart: type-aggregate or per-instance ──────────────────────
+    #
+    # Priority:
+    #   1. Row clicked       → per-instance bar chart
+    #   2. Type selected     → aggregate bar chart (avg across all instances)
+    #   3. Neither           → empty
     output$score_chart <- plotly::renderPlotly({
-      row_idx <- input$pd_table_rows_selected
-      scored_df <- .build_scored_df(row_idx)
-      if (is.null(scored_df) || nrow(scored_df) == 0) {
-        return(plotly::plotly_empty() %>%
-                 plotly::config(displayModeBar = FALSE))
+      row_idx  <- input$pd_table_rows_selected
+      type_sel <- selected_type()
+
+      dd <- data_dict()
+      empty_plot <- plotly::plotly_empty() %>% plotly::config(displayModeBar = FALSE)
+      if (is.null(dd) || nrow(dd) == 0) return(empty_plot)
+
+      meta_skip <- c("record_id","redcap_repeat_instrument","redcap_repeat_instance",
+                     "ass_date","ass_level","ass_plus","ass_delta","ass_faculty",
+                     "ass_specialty","ass_rotator","ass_cc_quart","ass_obs_type",
+                     "fac_eval_level","q_level","source_form")
+
+      # ── Inner helper: extract scored items from one eval_row ──────────────
+      .get_items <- function(eval_row) {
+        item_fields <- dd %>%
+          dplyr::filter(grepl("^ass_", field_name),
+                        !field_name %in% meta_skip,
+                        field_type %in% c("radio", "dropdown")) %>%
+          dplyr::filter(field_name %in% names(eval_row))
+        rows <- lapply(seq_len(nrow(item_fields)), function(j) {
+          fn  <- item_fields$field_name[j]
+          lbl <- item_fields$field_label[j]
+          val <- as.character(eval_row[[fn]][1])
+          if (is.na(val) || !nzchar(val) || val == "0") return(NULL)
+          cm  <- parse_redcap_choices(item_fields$select_choices_or_calculations[j])
+          n   <- length(cm)
+          pos <- if (n > 0 && val %in% names(cm)) which(names(cm) == val) else NA_integer_
+          if (is.na(pos)) return(NULL)
+          val_lbl  <- unname(cm[val])
+          is_na_r  <- grepl("unable|cannot|n/a|not observed|not applicable",
+                            val_lbl, ignore.case = TRUE)
+          short_lbl <- trimws(gsub("\\s+", " ", gsub("\\s*\\(.*?\\)", "", lbl)))
+          data.frame(field_name = fn, label = short_lbl, val_label = val_lbl,
+                     pos = pos, n_choices = n,
+                     norm_pos = if (n > 1) (pos - 1) / (n - 1) else 0,
+                     is_na_resp = is_na_r, stringsAsFactors = FALSE)
+        })
+        rows <- rows[!sapply(rows, is.null)]
+        if (length(rows) == 0) return(NULL)
+        do.call(rbind, rows)
       }
 
-      # Colour: "unable to evaluate" → grey; others → red→green gradient
+      # ── Build the chart data frame (per-instance OR aggregate) ────────────
+      if (!is.null(row_idx) && length(row_idx) > 0) {
+        # ── PER-INSTANCE ──────────────────────────────────────────────────
+        sel_row  <- pd_data() %>% dplyr::slice(row_idx)
+        inst_id  <- sel_row$redcap_repeat_instance[1]
+        eval_row <- assessment_data() %>%
+          dplyr::filter(redcap_repeat_instance == inst_id,
+                        record_id == !!record_id())
+        if (nrow(eval_row) == 0) return(empty_plot)
+        chart_df <- .get_items(eval_row)
+        if (is.null(chart_df) || nrow(chart_df) == 0) return(empty_plot)
+        chart_df$hover <- paste0(
+          "<b>", chart_df$label, "</b><br>",
+          chart_df$val_label, "<br>",
+          "<span style=\'color:#999\'>", chart_df$pos, " of ",
+          chart_df$n_choices, "</span>"
+        )
+        subtitle <- paste0(sel_row$Date[1], " \u00b7 ", sel_row$Faculty[1])
+
+      } else if (nzchar(type_sel)) {
+        # ── TYPE AGGREGATE ────────────────────────────────────────────────
+        df_type <- pd_data_all() %>% dplyr::filter(Type == type_sel)
+        if (nrow(df_type) == 0) return(empty_plot)
+
+        all_items <- lapply(seq_len(nrow(df_type)), function(i) {
+          inst_id  <- df_type$redcap_repeat_instance[i]
+          eval_row <- assessment_data() %>%
+            dplyr::filter(redcap_repeat_instance == inst_id,
+                          record_id == !!record_id())
+          if (nrow(eval_row) == 0) return(NULL)
+          .get_items(eval_row)
+        })
+        all_items <- all_items[!sapply(all_items, is.null)]
+        if (length(all_items) == 0) return(empty_plot)
+        all_df <- do.call(rbind, all_items)
+
+        chart_df <- all_df %>%
+          dplyr::group_by(field_name, label) %>%
+          dplyr::summarise(
+            norm_pos   = mean(norm_pos,  na.rm = TRUE),
+            n_choices  = max(n_choices),
+            n_obs      = dplyr::n(),
+            is_na_resp = all(is_na_resp),
+            .groups    = "drop"
+          ) %>%
+          dplyr::mutate(
+            pos    = round(norm_pos * (n_choices - 1)) + 1,
+            hover  = paste0(
+              "<b>", label, "</b><br>",
+              round(norm_pos * 100), "% of scale<br>",
+              "<span style=\'color:#999\'>", n_obs, " assessment",
+              dplyr::if_else(n_obs > 1, "s averaged", ""), "</span>"
+            )
+          ) %>%
+          as.data.frame()
+        n_assessed <- nrow(df_type)
+        subtitle <- paste0(
+          n_assessed, " assessment", if (n_assessed != 1) "s" else "",
+          " \u2014 bars show average score"
+        )
+
+      } else {
+        return(empty_plot)
+      }
+
+      # ── Render the chart ──────────────────────────────────────────────────
       pal_fn <- grDevices::colorRampPalette(
         c("#c0392b","#e67e22","#f1c40f","#27ae60","#1a6b3a")
       )
-      scored_df$bar_color <- ifelse(
-        scored_df$is_na_resp,
-        "#b0bec5",
-        pal_fn(100)[pmin(100, pmax(1, round(scored_df$norm_pos * 99) + 1))]
+      chart_df$bar_color <- ifelse(
+        chart_df$is_na_resp, "#b0bec5",
+        pal_fn(100)[pmin(100, pmax(1, round(chart_df$norm_pos * 99) + 1))]
       )
 
-      # Hover text
-      scored_df$hover <- paste0(
-        "<b>", scored_df$label, "</b><br>",
-        scored_df$val_label, "<br>",
-        "<span style=\'color:#999\'>", scored_df$pos, " of ",
-        scored_df$n_choices, "</span>"
-      )
+      # Sort by avg score descending, then reverse for top-to-bottom display
+      chart_df <- chart_df[order(chart_df$norm_pos), ]
+      chart_df$label <- factor(chart_df$label, levels = chart_df$label)
 
-      # Reverse row order so first item sits at top of chart
-      scored_df <- scored_df[rev(seq_len(nrow(scored_df))), ]
-      scored_df$label <- factor(scored_df$label, levels = scored_df$label)
-
-      n_items <- nrow(scored_df)
-      height  <- max(180, n_items * 38 + 60)
+      n_items <- nrow(chart_df)
+      height  <- max(180, n_items * 38 + 70)
 
       plotly::plot_ly(
-        data        = scored_df,
-        x           = ~norm_pos,
-        y           = ~label,
-        type        = "bar",
-        orientation = "h",
-        marker      = list(
+        data          = chart_df,
+        x             = ~norm_pos,
+        y             = ~label,
+        type          = "bar",
+        orientation   = "h",
+        marker        = list(
           color = ~bar_color,
-          line  = list(color = "rgba(255,255,255,0.6)", width = 1)
+          line  = list(color = "rgba(255,255,255,0.5)", width = 1)
         ),
         hovertemplate = ~paste0(hover, "<extra></extra>"),
         showlegend    = FALSE
       ) %>%
         plotly::layout(
-          xaxis = list(
+          title  = list(
+            text     = subtitle,
+            font     = list(size = 11, color = "#6c757d"),
+            x        = 0,
+            xanchor  = "left",
+            pad      = list(l = 8)
+          ),
+          xaxis  = list(
             title      = "",
             range      = c(0, 1.05),
             tickvals   = c(0, 0.5, 1),
@@ -733,15 +818,11 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
             zeroline   = FALSE,
             fixedrange = TRUE
           ),
-          yaxis = list(
-            title      = "",
-            automargin = TRUE,
-            fixedrange = TRUE
-          ),
-          margin       = list(l = 8, r = 20, t = 8, b = 36),
+          yaxis  = list(title = "", automargin = TRUE, fixedrange = TRUE),
+          margin = list(l = 8, r = 20, t = 30, b = 36),
           paper_bgcolor = "rgba(248,251,255,1)",
           plot_bgcolor  = "rgba(248,251,255,1)",
-          height        = height,
+          height = height,
           shapes = list(
             list(type = "line", x0 = 0.5, x1 = 0.5,
                  y0 = -0.5, y1 = n_items - 0.5,
