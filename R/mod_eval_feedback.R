@@ -198,21 +198,36 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       }
       out[is.na(out) & has_cc] <- "Continuity Clinic"
 
+      # 5. Fallback: use ass_specialty as the type label.
+      #    Many assessments only have narrative plus/delta without rubric scores;
+      #    the specialty field (e.g. "Hospitalist", "GI", "Nephrology") gives
+      #    meaningful context where rubric-based detection cannot fire.
+      if ("ass_specialty" %in% cn) {
+        spec_raw <- trimws(as.character(ifelse(is.na(df$ass_specialty), "", df$ass_specialty)))
+        spec_tc  <- tools::toTitleCase(tolower(spec_raw))
+        still_na <- is.na(out)
+        out[still_na & nzchar(spec_tc)] <- spec_tc[still_na & nzchar(spec_tc)]
+      }
+
       out[is.na(out)] <- "General Assessment"
       out
     }
 
-    # ── Prepend ass_specialty to assessment type label ─────────────────────────
-    # Produces labels like "GI Inpatient", "Nephrology Consult", "Hospitalist Inpatient".
-    # Continuity Clinic, Direct Observation sub-types, and General Assessment
-    # are left without a specialty prefix (they already contain enough context).
-    NO_SPEC_PREFIX <- c("Continuity Clinic", "General Assessment")
+    # ── Combine type with specialty for the plus/delta table ──────────────────
+    # For structural rotation types (those detected via rubric scores), prepend
+    # the specialty: "Intern Inpatient" + "GI" → "GI Intern Inpatient".
+    # For types that are ALREADY the specialty (fallback path above), or for
+    # Continuity Clinic / obs sub-types, leave the label unchanged.
+    STRUCTURAL_ROTATION_TYPES <- c(
+      "Intern Inpatient", "Resident Inpatient",
+      "Bridge Clinic", "Consult", "Single Clinic Day"
+    )
     .apply_specialty <- function(type_vec, specialty_vec) {
       if (is.null(specialty_vec)) return(type_vec)
       spec <- trimws(as.character(ifelse(is.na(specialty_vec), "", specialty_vec)))
-      spec <- tools::toTitleCase(tolower(spec))   # "internal medicine" → "Internal Medicine"
-      skip <- type_vec %in% NO_SPEC_PREFIX
-      dplyr::if_else(!skip & nzchar(spec), paste(spec, type_vec), type_vec)
+      spec <- tools::toTitleCase(tolower(spec))
+      is_structural <- type_vec %in% STRUCTURAL_ROTATION_TYPES
+      dplyr::if_else(is_structural & nzchar(spec), paste(spec, type_vec), type_vec)
     }
 
     # ── 1. Assessment type count buttons ─────────────────────────────────────
