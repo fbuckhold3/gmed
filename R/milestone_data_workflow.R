@@ -93,6 +93,16 @@ calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
           message("Processed rows: ", nrow(processed_data))
         }
 
+        # ACGME milestones use acgme_mile_period as their period column;
+        # alias it to prog_mile_period so the grouping below works for all
+        # three forms (program/self/acgme). Without this, the ACGME median
+        # calc errors on a missing column and is silently dropped.
+        if (grepl("acgme", form_name) &&
+            !"prog_mile_period" %in% names(processed_data) &&
+            "acgme_mile_period" %in% names(processed_data)) {
+          processed_data$prog_mile_period <- processed_data$acgme_mile_period
+        }
+
         # Calculate medians manually (works for all column patterns)
         medians <- processed_data %>%
           dplyr::group_by(prog_mile_period, period_name) %>%
