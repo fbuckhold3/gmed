@@ -1,0 +1,117 @@
+/* gmed-themes.css — "Calm Data-First"
+ *
+ * Loaded last (see load_gmed_styles()), after gmed-core.css and
+ * gmed-components.css, so these rules override the defaults there by
+ * cascade order rather than !important.
+ *
+ * Rationale (see the gmed theme-directions proposal): bump the base type
+ * scale up from a cramped 16px, and flatten the heavy blue gradient/shadow
+ * card chrome to a hairline border + accent rail. That frees the semantic
+ * status colors (success/warning/danger — already used for milestone
+ * status, plus/delta) to be the thing that visually stands out, instead of
+ * competing with a saturated blue gradient on every card header.
+ */
+
+/* ============================================================================
+   BASE TYPE SCALE
+   ============================================================================ */
+body {
+  font-size: 19px;
+  line-height: 1.6;
+}
+
+/* ============================================================================
+   CARD CHROME — flattened
+   ============================================================================ */
+.gmed-card {
+  box-shadow: none;
+  border: 1px solid var(--ssm-border);
+  border-radius: 12px;
+}
+
+/* Drop the full-width gradient top bar that came with the heavier chrome */
+.gmed-card::before {
+  content: none;
+}
+
+/* Accent rail instead of a full gradient-fill header band */
+.gmed-card-header {
+  background: none;
+  color: var(--ssm-text-primary);
+  border-left: 5px solid var(--ssm-secondary-blue);
+  border-radius: 0;
+  padding: 1.5rem 1.75rem 0.9rem;
+  margin: -1px -1px 1.25rem -1px;
+}
+
+.gmed-card-title {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ssm-primary-blue);
+}
+
+/* ============================================================================
+   BUTTONS — flat fill instead of gradient
+   ============================================================================ */
+.btn-gmed-primary {
+  background: var(--ssm-secondary-blue);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.btn-gmed-primary:hover {
+  background: var(--ssm-primary-blue);
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 61, 92, 0.15);
+}
+
+.btn-gmed-secondary {
+  background: var(--ssm-light-gray);
+  color: var(--ssm-secondary-blue);
+  border-radius: 8px;
+}
+
+.btn-gmed-secondary:hover {
+  background: var(--ssm-border);
+}
+
+/* ============================================================================
+   NAV-GRID TILES — enlarged for use as a page's primary navigation
+   ============================================================================
+   gmed-components.css sizes .gmed-nav-block-* for small, dense inline use
+   (icon 1.5rem / label 0.95rem / desc 0.75rem). Both imslu.ccc.dashboard and
+   imslu.ind.dash independently copy-pasted the same larger !important
+   overrides here because they use this component as their home-page nav
+   grid, not a dense list — consolidated here as the shared default for that
+   larger use case so neither app needs its own copy.
+   ============================================================================ */
+.gmed-nav-block-icon {
+  font-size: 3.6rem;
+  padding-top: 0;
+  margin-bottom: 20px;
+}
+
+.gmed-nav-block-label {
+  font-size: 1.15rem;
+  margin-bottom: 8px;
+}
+
+.gmed-nav-block-desc {
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+/* ============================================================================
+   RESPONSIVE — keep the flattened treatment consistent at small widths
+   ============================================================================ */
+@media (max-width: 768px) {
+  .gmed-card-header {
+    padding: 1.1rem 1.4rem 0.7rem;
+    border-left-width: 4px;
+  }
+
+  .gmed-card-title {
+    font-size: 1.6rem;
+  }
+}
