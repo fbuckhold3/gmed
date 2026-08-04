@@ -536,35 +536,41 @@ milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600
   
   tagList(
     div(class = "milestone-dashboard-container",
-        style = paste0("height: ", height, "; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 5px;"),
-        
+        # display:flex/flex-direction:column so every child below gets a definite
+        # height from the flexbox algorithm, instead of a % height resolving
+        # against an auto-height parent (which plotly's resize observer then
+        # fights with — the "vibrating"/undersized chart bug this replaces).
+        style = paste0("height: ", height, "; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 5px; display: flex; flex-direction: column;"),
+
         # Module header
-        div(class = "dashboard-header", 
-            style = "text-align: center; margin-bottom: 15px; border-bottom: 2px solid #2c3e50; padding-bottom: 10px;",
+        div(class = "dashboard-header",
+            style = "flex: 0 0 auto; text-align: center; margin-bottom: 15px; border-bottom: 2px solid #2c3e50; padding-bottom: 10px;",
             h4(module_title, style = "color: #2c3e50; margin: 0; font-weight: bold;")
         ),
-        
+
         # Loading indicator
         conditionalPanel(
           condition = paste0("$('html').hasClass('shiny-busy') && $('#", ns("loading"), "').is(':visible')"),
-          div(id = ns("loading"), 
-              style = "text-align: center; padding: 20px;",
+          div(id = ns("loading"), style = "flex: 0 0 auto; text-align: center; padding: 20px;",
               icon("spinner", class = "fa-spin"), " Loading milestone data..."
           )
         ),
-        
-        # Main content
+
+        # Main content — itself a flex column so its three children split the
+        # REMAINING space by ratio (flex-grow) rather than by percentage of an
+        # undefined height.
         div(id = ns("main_content"),
-            
-            # Spider plot section (top half)
+            style = "flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;",
+
+            # Spider plot section (top, ~63% of remaining space)
             div(class = "spider-section",
-                style = "height: 60%; margin-bottom: 15px;",  # Increased from 45% to 60%
+                style = "flex: 60 1 0; min-height: 0; margin-bottom: 15px;",
                 plotlyOutput(ns("spider_plot"), height = "100%")
             ),
-            
-            # Controls section
+
+            # Controls section — sized to its content, not a ratio
             div(class = "controls-section",
-                style = "height: 8%; margin-bottom: 10px; padding: 5px;",
+                style = "flex: 0 0 auto; margin-bottom: 10px; padding: 5px;",
                 fluidRow(
                   column(12,
                          selectInput(
@@ -576,10 +582,10 @@ milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600
                   )
                 )
             ),
-            
-            # Progression chart section (bottom half)
+
+            # Progression chart section (bottom, ~37% of remaining space)
             div(class = "progression-section",
-                style = "height: 35%;",  # Reduced from 42% to 35%
+                style = "flex: 35 1 0; min-height: 0;",
                 plotlyOutput(ns("progression_plot"), height = "100%")
             )
         ),
