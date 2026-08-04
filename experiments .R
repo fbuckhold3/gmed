@@ -1,6 +1,6 @@
 url <- "https://redcapsurvey.slu.edu/api/"
 
-rdm_token <- '601B0B68946F06A3396E0C3FA591DB1E'
+rdm_token <- Sys.getenv("RDM_TOKEN")
 
 devtools::load_all()
 

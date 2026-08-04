@@ -1,5 +1,5 @@
 devtools::load_all()
-rdm_token <- '601B0B68946F06A3396E0C3FA591DB1E'
+rdm_token <- Sys.getenv("RDM_TOKEN")
 
 # ============================================================================
 # REAL DATA DEMO APP FOR ASSESSMENT MODULE
@@ -43,15 +43,12 @@ if (length(missing_functions) > 0) {
   cat("✅ All required functions found\n")
 }
 
-# Set your RDM token - REPLACE WITH YOUR ACTUAL TOKEN
-rdm_token <- '601B0B68946F06A3396E0C3FA591DB1E'  # <-- PUT YOUR TOKEN HERE
+# Set your RDM token — read from environment, never hardcode (see ~/.Renviron)
+rdm_token <- Sys.getenv("RDM_TOKEN")
 
-# Alternative: keep using environment variable if you prefer
-# rdm_token <- Sys.getenv("RDM_TOKEN")
-
-if (rdm_token == "" || rdm_token == "YOUR_ACTUAL_TOKEN_HERE") {
-  cat("❌ Please set your actual RDM token in the code\n")
-  cat("💡 Replace 'YOUR_ACTUAL_TOKEN_HERE' with your token, or use:\n")
+if (rdm_token == "") {
+  cat("❌ RDM_TOKEN not set\n")
+  cat("💡 Set it in ~/.Renviron as RDM_TOKEN=your_token, or for this session:\n")
   cat("   Sys.setenv(RDM_TOKEN = 'your_token')\n")
   stop("RDM_TOKEN not set. Please set it and restart the demo.")
 } else {

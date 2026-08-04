@@ -3,7 +3,7 @@ library(plotly)
 library(dplyr)
 library(shinyjs)
 
-rdm_token <- '76AA0C37298CDA3B6D8B97F26D36A752'
+rdm_token <- Sys.getenv("RDM_TOKEN")
 devtools::load_all()
 
 complete_data$residents$access_code
