@@ -63,13 +63,26 @@
   --ssm-border-input: var(--gmed-border-input);
 }
 
-/* Base Typography */
+/* Base Typography
+ *
+ * Sets the ROOT (html) font-size, not just body's, because Bootstrap/bslib
+ * size almost every actual control (buttons, form-control, labels, badges,
+ * nav-tabs, ...) in rem — which is relative to the root element, not body.
+ * A body-only font-size bump only affects raw un-sized text; it leaves every
+ * rem-sized control at its old size. 118.75% = 19px against the 16px browser
+ * default, expressed as a percentage (not a fixed px) so it still respects a
+ * user's own browser zoom/accessibility font-size setting.
+ */
+html {
+  font-size: 118.75%;
+}
+
 body {
   font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   background: var(--gmed-bg);
   color: var(--gmed-text-primary);
   line-height: 1.6;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 /* ============================================================================
