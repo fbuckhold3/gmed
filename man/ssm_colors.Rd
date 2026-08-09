@@ -2,20 +2,16 @@
 % Please edit documentation in R/theme_manager.R
 \name{ssm_colors}
 \alias{ssm_colors}
-\title{SSM SLUCare Color Palette}
+\title{SSM SLUCare Color Palette (deprecated)}
 \usage{
 ssm_colors()
 }
 \value{
-Named list of SSM brand colors
+Named list of gmed brand colors (see \code{\link{gmed_colors}})
 }
 \description{
-Provides the official SSM Health/SLUCare color palette for consistent branding
-across all GMED applications.
-}
-\examples{
-\dontrun{
-colors <- ssm_colors()
-colors$primary  # "#003d5c"
-}
+Deprecated alias for \code{\link{gmed_colors}}. gmed moved to an
+institution-neutral palette so it can be reused across programs, not
+just SSM/SLUCare; this wrapper exists only so any caller still reading
+\code{ssm_colors()} directly doesn't break.
 }

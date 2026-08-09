@@ -1,43 +1,73 @@
-/* gmed-core.css - Core SSM Health Brand System */
+/* gmed-core.css - Core gmed Brand System ("Clinical Instrument", Restrained)
+ *
+ * Institution-neutral by design: components below only ever reference the
+ * --gmed-* semantic tokens, never a raw hex or an institution name, so a
+ * future program can restyle by overriding just this block. See
+ * gmed::gmed_colors() in R (theme_manager.R) — this is the CSS-side mirror
+ * of that same palette; keep the two in sync by hand until a {sass}
+ * pipeline generates both from one source.
+ */
 
 /* ============================================================================
    BRAND COLORS & TYPOGRAPHY
    ============================================================================ */
 :root {
-  /* SSM Health Primary Colors */
-  --ssm-primary-blue: #003d5c;
-  --ssm-secondary-blue: #0066a1;
-  --ssm-light-blue: #4a90a4;
-  --ssm-accent-blue: #2196f3;
+  /* gmed Primary Colors */
+  --gmed-primary: #0c5860;
+  --gmed-secondary: #0f8a94;
+  --gmed-light: #4fb3bc;
+  --gmed-accent: #e2543f;
 
-  /* Legacy Coaching Colors (mapped to SSM) */
-  --coach-primary: var(--ssm-secondary-blue);    /* Was #0072B2 */
-  --coach-secondary: var(--ssm-light-blue);      /* Was #56B4E9 */
+  /* Legacy Coaching Colors (kept for backward compatibility; unreferenced elsewhere) */
+  --coach-primary: var(--gmed-secondary);
+  --coach-secondary: var(--gmed-light);
 
   /* Status Colors */
-  --ssm-success-green: #00a651;
-  --ssm-warning-orange: #ff8c00;
-  --ssm-error-red: #dc3545;
-  --ssm-neutral-gray: #6c757d;
-  --ssm-light-gray: #f8f9fa;
-  --ssm-white: #ffffff;
+  --gmed-success-green: #1a9e5c;
+  --gmed-warning-orange: #d97706;
+  --gmed-error-red: #dc2626;
+  --gmed-neutral-gray: #5b6b70;
+  --gmed-light-gray: #f4f7f8;
+  --gmed-white: #ffffff;
 
   /* Text Colors */
-  --ssm-text-primary: #2c3e50;
-  --ssm-text-secondary: #546e7a;
-  --ssm-text-muted: #6c757d;
+  --gmed-text-primary: #1b2528;
+  --gmed-text-secondary: #4d5f64;
+  --gmed-text-muted: #6b7d82;
 
   /* Layout */
-  --ssm-bg: #f3f6fa;
-  --ssm-border: #dde5ed;
-  --ssm-border-input: #cdd5df;
+  --gmed-bg: #f5f7f8;
+  --gmed-border: #dde5e7;
+  --gmed-border-input: #cdd0d6;
+
+  /* ---- Deprecated --ssm-* aliases ----
+     Several apps (imslu.ind.dash, imslu.at.noon, resident.assessment,
+     imslu.facultyeval, imslu.ccc.dashboard, imslu.coach.dash) reference
+     these names directly in their own CSS/inline styles. Keep them
+     resolving to the new palette rather than editing every app. */
+  --ssm-primary-blue: var(--gmed-primary);
+  --ssm-secondary-blue: var(--gmed-secondary);
+  --ssm-light-blue: var(--gmed-light);
+  --ssm-accent-blue: var(--gmed-accent);
+  --ssm-success-green: var(--gmed-success-green);
+  --ssm-warning-orange: var(--gmed-warning-orange);
+  --ssm-error-red: var(--gmed-error-red);
+  --ssm-neutral-gray: var(--gmed-neutral-gray);
+  --ssm-light-gray: var(--gmed-light-gray);
+  --ssm-white: var(--gmed-white);
+  --ssm-text-primary: var(--gmed-text-primary);
+  --ssm-text-secondary: var(--gmed-text-secondary);
+  --ssm-text-muted: var(--gmed-text-muted);
+  --ssm-bg: var(--gmed-bg);
+  --ssm-border: var(--gmed-border);
+  --ssm-border-input: var(--gmed-border-input);
 }
 
 /* Base Typography */
 body {
   font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-  background: var(--ssm-bg);
-  color: var(--ssm-text-primary);
+  background: var(--gmed-bg);
+  color: var(--gmed-text-primary);
   line-height: 1.6;
   font-size: 16px;
 }
@@ -46,10 +76,10 @@ body {
    CARD SYSTEM
    ============================================================================ */
 .gmed-card {
-  background: var(--ssm-white);
+  background: var(--gmed-white);
   border: none;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 61, 92, 0.08);
+  box-shadow: 0 8px 32px rgba(12, 88, 96, 0.08);
   padding: 2rem;
   margin-bottom: 1.5rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -64,12 +94,12 @@ body {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, var(--ssm-primary-blue), var(--ssm-secondary-blue));
+  background: linear-gradient(90deg, var(--gmed-primary), var(--gmed-secondary));
 }
 
 .gmed-card-header {
-  background: linear-gradient(135deg, var(--ssm-primary-blue) 0%, var(--ssm-secondary-blue) 100%);
-  color: var(--ssm-white);
+  background: linear-gradient(135deg, var(--gmed-primary) 0%, var(--gmed-secondary) 100%);
+  color: var(--gmed-white);
   padding: 2rem;
   border-radius: 16px 16px 0 0;
   margin: -2rem -2rem 2rem -2rem;
@@ -90,52 +120,52 @@ body {
 .gmed-navbar-brand {
   font-weight: 700;
   font-size: 1.5rem;
-  color: var(--ssm-primary-blue) !important;
+  color: var(--gmed-primary) !important;
   letter-spacing: -0.5px;
 }
 
 .gmed-nav-tabs .nav-link.active {
-  background: linear-gradient(135deg, var(--ssm-secondary-blue), var(--ssm-light-blue));
-  color: var(--ssm-white);
+  background: linear-gradient(135deg, var(--gmed-secondary), var(--gmed-light));
+  color: var(--gmed-white);
   border: none;
   border-radius: 8px 8px 0 0;
 }
 
 .gmed-nav-tabs .nav-link {
-  color: var(--ssm-secondary-blue);
+  color: var(--gmed-secondary);
   border: 2px solid transparent;
   transition: all 0.3s ease;
 }
 
 .gmed-nav-tabs .nav-link:hover {
-  color: var(--ssm-primary-blue);
-  border-color: var(--ssm-light-blue);
+  color: var(--gmed-primary);
+  border-color: var(--gmed-light);
 }
 
 /* ============================================================================
    BUTTONS
    ============================================================================ */
 .btn-gmed-primary {
-  background: linear-gradient(135deg, var(--ssm-primary-blue), var(--ssm-secondary-blue));
+  background: linear-gradient(135deg, var(--gmed-primary), var(--gmed-secondary));
   border: none;
-  color: var(--ssm-white);
+  color: var(--gmed-white);
   padding: 0.75rem 2rem;
   border-radius: 12px;
   font-weight: 600;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(0, 61, 92, 0.2);
+  box-shadow: 0 4px 16px rgba(12, 88, 96, 0.2);
 }
 
 .btn-gmed-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 61, 92, 0.3);
-  color: var(--ssm-white);
+  box-shadow: 0 8px 24px rgba(12, 88, 96, 0.3);
+  color: var(--gmed-white);
 }
 
 .btn-gmed-secondary {
-  background: linear-gradient(135deg, var(--ssm-light-blue), var(--ssm-accent-blue));
+  background: linear-gradient(135deg, var(--gmed-light), var(--gmed-accent));
   border: none;
-  color: var(--ssm-white);
+  color: var(--gmed-white);
   padding: 0.75rem 2rem;
   border-radius: 12px;
   font-weight: 600;
@@ -148,14 +178,14 @@ body {
 .gmed-form-label {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--ssm-text-primary);
+  color: var(--gmed-text-primary);
   margin-bottom: 0.5rem;
   display: block;
 }
 
 .gmed-form-label.required::after {
   content: ' *';
-  color: var(--ssm-error-red);
+  color: var(--gmed-error-red);
   font-weight: 600;
 }
 
@@ -168,8 +198,8 @@ body {
 }
 
 .gmed-form-control:focus {
-  border-color: var(--ssm-secondary-blue);
-  box-shadow: 0 0 0 0.2rem rgba(0, 102, 161, 0.25);
+  border-color: var(--gmed-secondary);
+  box-shadow: 0 0 0 0.2rem rgba(15, 138, 148, 0.25);
 }
 
 /* ============================================================================

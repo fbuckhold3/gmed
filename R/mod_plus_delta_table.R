@@ -420,7 +420,7 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
           'Rotation',
           fontWeight = 'bold',
           backgroundColor = '#e3f0fb',
-          color = '#0066a1'
+          color = '#0f8a94'
         ) %>%
         DT::formatStyle(
           'Level',
@@ -511,7 +511,7 @@ create_questions_summary_display <- function(data, record_id, resident_name = NU
         x = 0.5, y = 0.7,
         text = "<b>0</b>",
         showarrow = FALSE,
-        font = list(size = 80, color = ssm_colors()$accent_blue),
+        font = list(size = 80, color = gmed_colors()$accent_blue),
         xref = "paper", yref = "paper"
       ) %>%
       add_annotations(
@@ -547,7 +547,7 @@ create_questions_summary_display <- function(data, record_id, resident_name = NU
       x = 0.5, y = 0.7,
       text = paste0("<b>", big_number, "</b>"),
       showarrow = FALSE,
-      font = list(size = 80, color = ssm_colors()$accent_blue),
+      font = list(size = 80, color = gmed_colors()$accent_blue),
       xref = "paper", yref = "paper"
     ) %>%
     add_annotations(

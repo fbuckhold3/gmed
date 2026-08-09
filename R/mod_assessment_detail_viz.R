@@ -5,7 +5,7 @@
 #' @export
 mod_assessment_detail_viz_ui <- function(id) {
   ns <- NS(id)
-  colors <- ssm_colors()
+  colors <- gmed_colors()
   
   tagList(
     tags$head(
@@ -220,7 +220,7 @@ mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict)
         orientation = "h",
         text = ~paste0("Mean: ", mean_score, "<br>Median: ", median_score, "<br>N: ", n_assessments),
         hoverinfo = "text",
-        marker = list(color = ssm_colors()$primary)
+        marker = list(color = gmed_colors()$primary)
       ) %>%
         plotly::layout(
           title = "Average Scores by Assessment Item",
@@ -304,7 +304,7 @@ mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict)
         y = ~reorder(ass_obs_type, n),
         type = "bar",
         orientation = "h",
-        marker = list(color = ssm_colors()$secondary)
+        marker = list(color = gmed_colors()$secondary)
       ) %>%
         plotly::layout(
           title = "Observations by Type",

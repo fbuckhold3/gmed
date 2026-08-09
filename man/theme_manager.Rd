@@ -4,5 +4,7 @@
 \alias{theme_manager}
 \title{Theme and Color Management for GMED}
 \description{
-Color schemes, theme functions, and resource loading for consistent SSM SLUCare branding
+Color schemes, theme functions, and resource loading for a
+consistent, institution-neutral gmed brand (built to scale across
+programs, not tied to one health system's colors)
 }

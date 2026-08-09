@@ -12,11 +12,11 @@ mod_seval_boards_display_ui(
 \arguments{
 \item{id}{Character. Module namespace id.}
 
-\item{mksap_url}{Character. URL the "Review MKSAP Tracking" button opens.
+\item{mksap_url}{Character. URL the "Review MKSAP Tracking" link opens.
 Defaults to the IM MKSAP tracker.}
 }
 \value{
-A \code{shiny::tagList} with three \code{uiOutput()} slots: \code{step3}, \code{prediction}, \code{mksap}.
+A \code{shiny::tagList}.
 }
 \description{
 Read-only summary of a resident's board-preparation status for coach review.
@@ -24,8 +24,9 @@ Renders three cards stacked vertically:
 \enumerate{
 \item Step 3 status (passed / scheduled / not yet)
 \item ABIM pass-probability prediction from in-training-exam (ITE) percent
-correct, using the McDonald 2020 nomogram (\code{gmed::pass_prob}).
-\item A "Review MKSAP Tracking" link button.
+correct, including a nomogram plot of the McDonald 2020 curves.
+\item A "Review MKSAP Tracking" external link plus the resident's
+self-reported MKSAP completion category.
 }
 }
 \details{
@@ -36,9 +37,11 @@ surfaced inline beneath the relevant cards when present.
 \seealso{
 \code{\link[=mod_seval_boards_display_server]{mod_seval_boards_display_server()}}
 
-Other seval_display: 
-\code{\link{mod_seval_boards_display_server}()},
-\code{\link{mod_seval_reflection_display_server}()},
-\code{\link{mod_seval_reflection_display_ui}()}
+Other seval_display:
+\code{\link[=mod_grad_plan_display_server]{mod_grad_plan_display_server()}},
+\code{\link[=mod_grad_plan_display_ui]{mod_grad_plan_display_ui()}},
+\code{\link[=mod_seval_boards_display_server]{mod_seval_boards_display_server()}},
+\code{\link[=mod_seval_reflection_display_server]{mod_seval_reflection_display_server()}},
+\code{\link[=mod_seval_reflection_display_ui]{mod_seval_reflection_display_ui()}}
 }
 \concept{seval_display}

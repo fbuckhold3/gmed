@@ -562,7 +562,7 @@ create_cc_table <- function(data, name) {
   # Create custom theme for SSM SLUCare styling
   custom_theme <- reactable::reactableTheme(
     headerStyle = list(
-      backgroundColor = "#0066a1",
+      backgroundColor = "#0f8a94",
       color = "#ffffff",
       fontWeight = 600,
       borderBottom = "2px solid #004d78"
@@ -582,7 +582,7 @@ create_cc_table <- function(data, name) {
       minWidth = 120,
       cell = function(value) {
         htmltools::div(
-          style = "font-weight: 600; color: #0066a1;",
+          style = "font-weight: 600; color: #0f8a94;",
           value
         )
       }

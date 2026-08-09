@@ -22,7 +22,7 @@ mod_eval_table_ui <- function(id) {
     tags$style(HTML("
       .eval-feedback-panel {
         background: #fff;
-        border-left: 4px solid #0066a1;
+        border-left: 4px solid #0f8a94;
         border-radius: 0 6px 6px 0;
         padding: 16px 20px;
         margin-top: 12px;
@@ -40,7 +40,7 @@ mod_eval_table_ui <- function(id) {
       .fb-plus  { color: #1a6b3a; font-size: 0.88rem; line-height: 1.55; }
       .fb-delta { color: #c0392b; font-size: 0.88rem; line-height: 1.55; }
       .eval-select-hint {
-        font-size: 0.78rem; color: #0066a1; margin-top: 8px; font-style: italic;
+        font-size: 0.78rem; color: #0f8a94; margin-top: 8px; font-style: italic;
       }
       /* Keep selected row highlighted even after focus moves */
       table.dataTable tbody tr.selected td { background: #e8f0f7 !important; }
@@ -196,11 +196,11 @@ mod_eval_table_server <- function(id, rdm_data, record_id, data_dict) {
         class = "table table-sm table-hover"
       ) %>%
         DT::formatStyle("Date",
-          fontWeight = "bold", color = "#003d5c") %>%
+          fontWeight = "bold", color = "#0c5860") %>%
         DT::formatStyle("Level",
           fontWeight = "600", color = "#6c3483") %>%
         DT::formatStyle("Rotation",
-          fontWeight = "600", color = "#0066a1") %>%
+          fontWeight = "600", color = "#0f8a94") %>%
         DT::formatStyle("Faculty",
           color = "#555")
 
@@ -281,7 +281,7 @@ mod_eval_table_server <- function(id, rdm_data, record_id, data_dict) {
         div(
           class = "d-flex justify-content-between align-items-start mb-3",
           tags$span(
-            style = "font-weight:700; color:#003d5c; font-size:0.88rem;",
+            style = "font-weight:700; color:#0c5860; font-size:0.88rem;",
             if ("Date" %in% names(sel)) sel$Date[1] else "",
             if ("Rotation" %in% names(sel) && !is.na(sel$Rotation[1]))
               paste0(" \u00b7 ", sel$Rotation[1]),

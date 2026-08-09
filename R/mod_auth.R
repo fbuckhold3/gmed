@@ -21,7 +21,7 @@ NULL
 mod_auth_ui <- function(id,
                         app_title       = "IMSLU Resident Portal",
                         app_subtitle    = "Internal Medicine Residency",
-                        org_eyebrow     = "SSM HEALTH \u00b7 SLUCARE",
+                        org_eyebrow     = "GME TOOLS",
                         disclaimer_text = NULL) {
 
   ns <- shiny::NS(id)

@@ -42,7 +42,7 @@ renders the requested display sections.
 \seealso{
 \code{\link[=mod_ilp_display_ui]{mod_ilp_display_ui()}}
 
-Other ilp_display: 
-\code{\link{mod_ilp_display_ui}()}
+Other ilp_display:
+\code{\link[=mod_ilp_display_ui]{mod_ilp_display_ui()}}
 }
 \concept{ilp_display}

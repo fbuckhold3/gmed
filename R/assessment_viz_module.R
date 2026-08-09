@@ -26,7 +26,7 @@ library(plotly)
 #' }
 assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
   ns <- NS(id)
-  colors <- ssm_colors()
+  colors <- gmed_colors()
   
   tagList(
     tags$head(

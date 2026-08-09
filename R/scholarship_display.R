@@ -189,7 +189,7 @@ scholarship_badge_ui <- function(badges) {
     if (completed) {
       "display: inline-block; padding: 8px 12px; margin: 5px; background-color: #28a745; color: white; border-radius: 4px; font-weight: bold;"
     } else {
-      "display: inline-block; padding: 8px 12px; margin: 5px; background-color: #dc3545; color: white; border-radius: 4px; font-weight: bold;"
+      "display: inline-block; padding: 8px 12px; margin: 5px; background-color: #dc2626; color: white; border-radius: 4px; font-weight: bold;"
     }
   }
   

@@ -239,7 +239,7 @@ mod_seval_boards_display_server <- function(id,
                      shiny::tags$div(msg)))
       }
       if (identical(self_done, FALSE)) {
-        return(.card("#dc3545", "bi-exclamation-triangle-fill", "#842029",
+        return(.card("#dc2626", "bi-exclamation-triangle-fill", "#842029",
                      "Step 3 not yet taken",
                      shiny::tags$div(class = "text-muted",
                                      "Resident has not yet reported a scheduled date.")))
@@ -302,7 +302,7 @@ mod_seval_boards_display_server <- function(id,
         ),
         shiny::div(
           style = "flex:1;",
-          shiny::tags$div(class = "fw-bold mb-1", style = "color:#003d5c; font-size:1.05rem;",
+          shiny::tags$div(class = "fw-bold mb-1", style = "color:#0c5860; font-size:1.05rem;",
                           sprintf("PGY%d ACP ITE Score", pgy_int)),
           if (!is.na(prob))
             shiny::tags$div(

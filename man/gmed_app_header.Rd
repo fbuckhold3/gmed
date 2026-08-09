@@ -19,7 +19,7 @@ gmed_app_header(title, subtitle = NULL, logo_url = NULL, class = "")
 HTML div element with header styling
 }
 \description{
-Creates a consistent header for GMED applications with SSM branding.
+Creates a consistent header for GMED applications.
 }
 \examples{
 \dontrun{

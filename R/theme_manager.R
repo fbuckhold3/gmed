@@ -1,5 +1,7 @@
 #' @title Theme and Color Management for GMED
-#' @description Color schemes, theme functions, and resource loading for consistent SSM SLUCare branding
+#' @description Color schemes, theme functions, and resource loading for a
+#'   consistent, institution-neutral gmed brand (built to scale across
+#'   programs, not tied to one health system's colors)
 #' @name theme_manager
 NULL
 
@@ -37,57 +39,79 @@ apply_gmed_style <- function(element, style = "gmed-card") {
   element
 }
 
-#' SSM SLUCare Color Palette
+#' GMED Color Palette ("Clinical Instrument", Restrained)
 #'
-#' Provides the official SSM Health/SLUCare color palette for consistent branding
-#' across all GMED applications.
+#' Institution-neutral color palette for gmed applications — a cyan primary
+#' (a vitals-monitor trace, not generic SaaS blue) with a warm coral accent
+#' reserved for actions and emphasis, so semantic status colors
+#' (success/warning/danger) don't compete with the accent for attention.
 #'
-#' @return Named list of SSM brand colors
+#' Field names are unchanged from the previous SSM-branded palette (only
+#' `accent_blue` becomes `accent`, since it's no longer blue) so existing
+#' call sites keep working with just a new function name. See
+#' \code{\link{ssm_colors}} for the deprecated SSM-branded alias.
+#'
+#' @return Named list of gmed brand colors
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' colors <- ssm_colors()
-#' colors$primary  # "#003d5c"
+#' colors <- gmed_colors()
+#' colors$primary  # "#0c5860"
 #' }
-ssm_colors <- function() {
+gmed_colors <- function() {
   list(
     # Primary Brand Colors
-    primary = "#003d5c",           # SSM Primary Blue (dark)
-    secondary = "#0066a1",         # SSM Secondary Blue  
-    light_blue = "#4a90a4",        # SSM Light Blue
-    accent_blue = "#2196f3",       # SSM Accent Blue
-    
-    # Legacy Coaching Colors (mapped to SSM)
-    coach_primary = "#0066a1",     # Was #0072B2
-    coach_secondary = "#4a90a4",   # Was #56B4E9
-    
+    primary = "#0c5860",           # Deep teal — headings, high-contrast text/icons
+    secondary = "#0f8a94",         # Main interactive cyan — buttons, links, active states
+    light_blue = "#4fb3bc",        # Lighter cyan — hover states, secondary accents
+    accent = "#e2543f",            # Warm coral — CTAs, emphasis, "pop" moments
+    accent_blue = "#e2543f",       # Deprecated alias for `accent` (kept for callers reading this field directly)
+
+    # Legacy Coaching Colors (kept for backward compatibility; unreferenced elsewhere)
+    coach_primary = "#0f8a94",
+    coach_secondary = "#4fb3bc",
+
     # Status Colors
-    success = "#00a651",           # SSM Success Green
-    warning = "#ff8c00",           # SSM Warning Orange
-    danger = "#dc3545",            # SSM Error Red
-    info = "#2196f3",              # SSM Info Blue
-    
-    # Neutral Colors
-    neutral_gray = "#6c757d",      # SSM Neutral Gray
-    light_gray = "#f8f9fa",        # SSM Light Gray
-    white = "#ffffff",             # White
-    
+    success = "#1a9e5c",
+    warning = "#d97706",
+    danger = "#dc2626",
+    info = "#0f8a94",              # Reuses secondary cyan
+
+    # Neutral Colors (cool-tinted, not pure gray)
+    neutral_gray = "#5b6b70",
+    light_gray = "#f4f7f8",
+    white = "#ffffff",
+
     # Text Colors
-    text_primary = "#2c3e50",      # Primary text
-    text_secondary = "#546e7a",    # Secondary text
-    text_muted = "#6c757d",        # Muted text
-    
+    text_primary = "#1b2528",
+    text_secondary = "#4d5f64",
+    text_muted = "#6b7d82",
+
     # Background Colors
-    bg_primary = "#f8f9fa",        # Primary background
-    bg_secondary = "#e9ecef",      # Secondary background
-    bg_dark = "#343a40"            # Dark background
+    bg_primary = "#f5f7f8",
+    bg_secondary = "#e9eff0",
+    bg_dark = "#162325"
   )
+}
+
+#' SSM SLUCare Color Palette (deprecated)
+#'
+#' Deprecated alias for \code{\link{gmed_colors}}. gmed moved to an
+#' institution-neutral palette so it can be reused across programs, not
+#' just SSM/SLUCare; this wrapper exists only so any caller still reading
+#' \code{ssm_colors()} directly doesn't break.
+#'
+#' @return Named list of gmed brand colors (see \code{\link{gmed_colors}})
+#' @export
+ssm_colors <- function() {
+  .Deprecated("gmed_colors")
+  gmed_colors()
 }
 
 #' Create GMED Bootstrap Theme
 #'
-#' Creates a bslib theme with SSM SLUCare colors and GMED styling.
+#' Creates a bslib theme with the gmed color palette and styling.
 #'
 #' @param version Bootstrap version (default: 5)
 #' @param base_font Base font family
@@ -115,24 +139,24 @@ create_gmed_theme <- function(version = 5,
   if (!requireNamespace("bslib", quietly = TRUE)) {
     stop("Package 'bslib' is required for theme creation")
   }
-  
-  # Get SSM colors
-  colors <- ssm_colors()
-  
+
+  # Get gmed colors
+  colors <- gmed_colors()
+
   # Apply any custom color overrides
   if (!is.null(custom_colors)) {
     colors[names(custom_colors)] <- custom_colors
   }
-  
+
   # Create the theme
   bslib::bs_theme(
     version = version,
-    primary = colors$secondary,      # Use secondary blue as primary
-    secondary = colors$light_blue,   # Light blue as secondary
+    primary = colors$secondary,      # Main interactive cyan as bslib primary
+    secondary = colors$light_blue,   # Lighter cyan as secondary
     success = colors$success,
     warning = colors$warning,
     danger = colors$danger,
-    info = colors$accent_blue,
+    info = colors$accent,
     bg = colors$bg_primary,
     fg = colors$text_primary,
     base_font = base_font,
@@ -249,7 +273,7 @@ gmed_page <- function(...,
 
 #' Create Standard GMED App Header
 #'
-#' Creates a consistent header for GMED applications with SSM branding.
+#' Creates a consistent header for GMED applications.
 #'
 #' @param title Main application title
 #' @param subtitle Optional subtitle

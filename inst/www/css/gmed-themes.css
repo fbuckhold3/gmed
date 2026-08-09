@@ -25,7 +25,7 @@ body {
    ============================================================================ */
 .gmed-card {
   box-shadow: none;
-  border: 1px solid var(--ssm-border);
+  border: 1px solid var(--gmed-border);
   border-radius: 12px;
 }
 
@@ -37,8 +37,8 @@ body {
 /* Accent rail instead of a full gradient-fill header band */
 .gmed-card-header {
   background: none;
-  color: var(--ssm-text-primary);
-  border-left: 5px solid var(--ssm-secondary-blue);
+  color: var(--gmed-text-primary);
+  border-left: 5px solid var(--gmed-secondary);
   border-radius: 0;
   padding: 1.5rem 1.75rem 0.9rem;
   margin: -1px -1px 1.25rem -1px;
@@ -48,32 +48,32 @@ body {
   font-size: 1.85rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: var(--ssm-primary-blue);
+  color: var(--gmed-primary);
 }
 
 /* ============================================================================
    BUTTONS — flat fill instead of gradient
    ============================================================================ */
 .btn-gmed-primary {
-  background: var(--ssm-secondary-blue);
+  background: var(--gmed-secondary);
   border-radius: 8px;
   box-shadow: none;
 }
 
 .btn-gmed-primary:hover {
-  background: var(--ssm-primary-blue);
+  background: var(--gmed-primary);
   transform: none;
-  box-shadow: 0 2px 8px rgba(0, 61, 92, 0.15);
+  box-shadow: 0 2px 8px rgba(12, 88, 96, 0.15);
 }
 
 .btn-gmed-secondary {
-  background: var(--ssm-light-gray);
-  color: var(--ssm-secondary-blue);
+  background: var(--gmed-light-gray);
+  color: var(--gmed-secondary);
   border-radius: 8px;
 }
 
 .btn-gmed-secondary:hover {
-  background: var(--ssm-border);
+  background: var(--gmed-border);
 }
 
 /* ============================================================================

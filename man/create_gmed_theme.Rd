@@ -24,7 +24,7 @@ create_gmed_theme(
 bslib bs_theme object
 }
 \description{
-Creates a bslib theme with SSM SLUCare colors and GMED styling.
+Creates a bslib theme with the gmed color palette and styling.
 }
 \examples{
 \dontrun{

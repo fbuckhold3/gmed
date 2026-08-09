@@ -24,7 +24,7 @@ create_combined_assessment_chart <- function(data, record_id, resident_name = NU
   }
   
   # Get colors
-  colors <- ssm_colors()
+  colors <- gmed_colors()
   
   # Filter assessment data
   assessment_data <- data %>%
@@ -192,7 +192,7 @@ create_combined_faculty_chart <- function(data, record_id, resident_name = NULL)
   }
   
   # Get colors
-  colors <- ssm_colors()
+  colors <- gmed_colors()
   
   # Filter faculty data
   faculty_data <- data %>%

@@ -9,26 +9,29 @@ mod_seval_boards_display_server(
   current_s_eval,
   resident_info = NULL,
   test_data = NULL,
-  pgy = NULL
+  pgy = NULL,
+  data_dict = NULL
 )
 }
 \arguments{
 \item{id}{Character. Module namespace id (must match the UI call).}
 
 \item{current_s_eval}{Reactive returning a 1-row data frame from the
-resident's \code{s_eval} form for the period being reviewed (or NULL/empty).
-Provides \code{s_e_step3}, \code{s_e_step3_contact}, \code{s_e_step3_date_set},
-\code{s_e_step3_date}, \code{s_e_board_concern}, \code{s_e_board_help}, \code{s_e_board_discu},
-\code{s_e_mksap_comp}.}
+resident's \code{s_eval} form for the period being reviewed (or NULL/empty).}
 
 \item{resident_info}{Reactive returning a 1-row data frame from the
 \code{resident_data} form. Used for program-confirmed Step 3 (\code{step3},
 \code{usmle_step3_score}, \code{comlex_step3_score}).}
 
 \item{test_data}{Reactive returning a 0+ row data frame from the \code{test_data}
-form (most recent ITE row will be used for the prediction).}
+form (most recent ITE row is used for the prediction; all PGY rows are
+plotted on the nomogram if present).}
 
 \item{pgy}{Reactive returning the resident's current PGY level (1, 2, 3).}
+
+\item{data_dict}{Optional reactive returning the REDCap data dictionary
+data frame. When supplied, used to translate the \code{s_e_mksap_comp} raw
+code to its human-readable label.}
 }
 \value{
 Invisibly NULL.
@@ -39,9 +42,11 @@ Server side of \code{\link[=mod_seval_boards_display_ui]{mod_seval_boards_displa
 \seealso{
 \code{\link[=mod_seval_boards_display_ui]{mod_seval_boards_display_ui()}}
 
-Other seval_display: 
-\code{\link{mod_seval_boards_display_ui}()},
-\code{\link{mod_seval_reflection_display_server}()},
-\code{\link{mod_seval_reflection_display_ui}()}
+Other seval_display:
+\code{\link[=mod_grad_plan_display_server]{mod_grad_plan_display_server()}},
+\code{\link[=mod_grad_plan_display_ui]{mod_grad_plan_display_ui()}},
+\code{\link[=mod_seval_boards_display_ui]{mod_seval_boards_display_ui()}},
+\code{\link[=mod_seval_reflection_display_server]{mod_seval_reflection_display_server()}},
+\code{\link[=mod_seval_reflection_display_ui]{mod_seval_reflection_display_ui()}}
 }
 \concept{seval_display}

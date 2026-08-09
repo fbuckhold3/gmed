@@ -28,7 +28,7 @@ mod_eval_feedback_ui <- function(id) {
       style = "border-radius:8px; overflow:hidden;",
       div(
         class = "card-header d-flex align-items-center justify-content-between",
-        style = "background:#003d5c; color:white; padding:10px 18px;",
+        style = "background:#0c5860; color:white; padding:10px 18px;",
         div(
           class = "d-flex align-items-center",
           tags$i(class = "bi bi-grid-1x2-fill me-2"),
@@ -59,7 +59,7 @@ mod_eval_feedback_ui <- function(id) {
       style = "border-radius:8px; overflow:hidden;",
       div(
         class = "card-header",
-        style = "background:#003d5c; color:white; padding:10px 18px;",
+        style = "background:#0c5860; color:white; padding:10px 18px;",
         div(
           class = "d-flex align-items-center",
           tags$i(class = "bi bi-table me-2"),
@@ -119,9 +119,9 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
     ns <- session$ns
 
     # ── Palette constants ─────────────────────────────────────────────────────
-    TYPE_PAL  <- c("#003d5c","#0066a1","#1a6b3a","#6c3483",
+    TYPE_PAL  <- c("#0c5860","#0f8a94","#1a6b3a","#6c3483",
                    "#c0392b","#e67e22","#17a589","#2471a3")
-    LEVEL_COL <- c("Intern" = "#6c3483", "PGY2" = "#0066a1", "PGY3" = "#003d5c")
+    LEVEL_COL <- c("Intern" = "#6c3483", "PGY2" = "#0f8a94", "PGY3" = "#0c5860")
 
     # ── obs_type choice map ───────────────────────────────────────────────────
     obs_type_map_r <- reactive({
@@ -444,11 +444,11 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       all_chip <- tags$span(
         style = paste0(
           "display:inline-flex; align-items:center; gap:5px;",
-          "background:", if (all_active) "#003d5c" else "#e8edf2", ";",
-          "color:", if (all_active) "white" else "#003d5c", ";",
+          "background:", if (all_active) "#0c5860" else "#e8edf2", ";",
+          "color:", if (all_active) "white" else "#0c5860", ";",
           "border-radius:20px; padding:5px 14px; font-size:0.78rem;",
           "font-weight:600; margin:3px; cursor:pointer;",
-          "border:2px solid #003d5c;"
+          "border:2px solid #0c5860;"
         ),
         onclick = sprintf(
           "Shiny.setInputValue('%s', '', {priority:'event'})",
@@ -532,9 +532,9 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         DT::formatStyle("Delta",
           backgroundColor = "#fff3e0", borderLeft = "3px solid #e67e22") %>%
         DT::formatStyle("Date",
-          fontWeight = "bold", color = "#003d5c") %>%
+          fontWeight = "bold", color = "#0c5860") %>%
         DT::formatStyle("Type",
-          fontWeight = "600", color = "#0066a1") %>%
+          fontWeight = "600", color = "#0f8a94") %>%
         DT::formatStyle("Level",
           fontWeight = "600", color = "#6c3483")
     })
@@ -603,7 +603,7 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       row_idx <- input$pd_table_rows_selected
       if (is.null(row_idx) || length(row_idx) == 0) {
         return(tags$p(
-          style = "font-size:0.78rem; color:#0066a1; margin-top:10px; font-style:italic;",
+          style = "font-size:0.78rem; color:#0f8a94; margin-top:10px; font-style:italic;",
           tags$i(class = "bi bi-hand-index me-1"),
           "Select a row above to see the scored items for that evaluation."
         ))

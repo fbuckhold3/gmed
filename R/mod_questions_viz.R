@@ -6,7 +6,7 @@
 #' @export
 mod_questions_viz_ui <- function(id, title = "Conference Attendance by Rotation") {
   ns <- NS(id)
-  colors <- ssm_colors()
+  colors <- gmed_colors()
   
   tagList(
     tags$head(
@@ -232,7 +232,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
       rotation_summary <- questions_data() %>%
         dplyr::count(rotation_label, sort = TRUE)
       
-      colors <- ssm_colors()
+      colors <- gmed_colors()
       
       plot_ly(
         data = rotation_summary,
@@ -273,7 +273,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         ) %>%
         dplyr::arrange(week)
 
-      colors <- ssm_colors()
+      colors <- gmed_colors()
 
       plot_ly(
         data = weekly_data,
@@ -328,7 +328,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           month_label = format(month, "%b %Y")
         )
 
-      colors <- ssm_colors()
+      colors <- gmed_colors()
 
       plot_ly(
         data = monthly_data,

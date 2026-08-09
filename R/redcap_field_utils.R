@@ -63,7 +63,7 @@ completion_icon <- function(is_complete, size = "1.2em") {
     )
   } else {
     shiny::tags$span(
-      style = paste0("color: #dc3545; font-size: ", size, ";"),
+      style = paste0("color: #dc2626; font-size: ", size, ";"),
       title = "Not completed",
       "●"
     )

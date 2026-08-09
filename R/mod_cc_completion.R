@@ -226,7 +226,7 @@ mod_cc_completion_server <- function(id, rdm_data, record_id, resident_data = NU
                 div(class = "quarter-details",
                     paste0(quarter$faculty, " \u00b7 ",
                            format(as.Date(quarter$date), "%b %d, %Y"))),
-                tags$small(style = "color:#0066a1; font-size:0.72rem;",
+                tags$small(style = "color:#0f8a94; font-size:0.72rem;",
                            "View details \u203a")
               ),
               # ── Collapsible detail ───────────────────────────

@@ -8,7 +8,7 @@ gmed_login_page(
   id = "access_code",
   app_title = "IMSLU Resident Portal",
   app_subtitle = "Internal Medicine Residency",
-  org_eyebrow = "SSM HEALTH <U+00B7> SLUCARE",
+  org_eyebrow = "GME TOOLS",
   disclaimer_text = NULL,
   btn_label = "Sign In"
 )
@@ -21,7 +21,7 @@ The sign-in button fires \code{<id>_btn} as a Shiny input value.}
 
 \item{app_subtitle}{Subtitle / program line shown below the title}
 
-\item{org_eyebrow}{Small all-caps wordmark pill (default: "SSM HEALTH · SLUCARE")}
+\item{org_eyebrow}{Small all-caps wordmark pill (default: "GME TOOLS")}
 
 \item{disclaimer_text}{Full text of the terms/disclaimer paragraph. If NULL
 a standard IMSLU disclaimer is used.}
@@ -32,7 +32,10 @@ a standard IMSLU disclaimer is used.}
 Shiny tagList with the login screen UI
 }
 \description{
-Renders the standard Design A login screen with SSM branding, a disclaimer
+Renders the standard Design A login screen with a wordmark, a disclaimer
 block, and an access code input. Used as the entry point for all resident-
-and faculty-facing GMED applications.
+and faculty-facing GMED applications. \code{org_eyebrow} defaults to a
+generic gmed wordmark rather than any one institution's branding, since
+the same component is meant to be reusable across programs — pass your
+own program's name explicitly.
 }

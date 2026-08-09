@@ -38,7 +38,7 @@ of this module — the consumer adds them around \code{mod_ilp_display_ui()}.
 \seealso{
 \code{\link[=mod_ilp_display_server]{mod_ilp_display_server()}}
 
-Other ilp_display: 
-\code{\link{mod_ilp_display_server}()}
+Other ilp_display:
+\code{\link[=mod_ilp_display_server]{mod_ilp_display_server()}}
 }
 \concept{ilp_display}

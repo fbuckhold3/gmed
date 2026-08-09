@@ -53,7 +53,7 @@ mod_plus_delta_table_ui("minimal_table", title = NULL)
 \seealso{
 \code{\link{mod_plus_delta_table_server}} for the corresponding server function
 
-Other plus_delta_modules: 
-\code{\link{mod_plus_delta_table_server}()}
+Other plus_delta_modules:
+\code{\link[=mod_plus_delta_table_server]{mod_plus_delta_table_server()}}
 }
 \concept{plus_delta_modules}

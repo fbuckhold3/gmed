@@ -388,15 +388,18 @@ gmed_step_indicator <- function(current_step,
 
 #' GMED Login Page
 #'
-#' Renders the standard Design A login screen with SSM branding, a disclaimer
+#' Renders the standard Design A login screen with a wordmark, a disclaimer
 #' block, and an access code input. Used as the entry point for all resident-
-#' and faculty-facing GMED applications.
+#' and faculty-facing GMED applications. \code{org_eyebrow} defaults to a
+#' generic gmed wordmark rather than any one institution's branding, since
+#' the same component is meant to be reusable across programs — pass your
+#' own program's name explicitly.
 #'
 #' @param id Input ID for the access code field (default: "access_code").
 #'   The sign-in button fires \code{<id>_btn} as a Shiny input value.
 #' @param app_title Main application title shown below the wordmark
 #' @param app_subtitle Subtitle / program line shown below the title
-#' @param org_eyebrow Small all-caps wordmark pill (default: "SSM HEALTH · SLUCARE")
+#' @param org_eyebrow Small all-caps wordmark pill (default: "GME TOOLS")
 #' @param disclaimer_text Full text of the terms/disclaimer paragraph. If NULL
 #'   a standard IMSLU disclaimer is used.
 #' @param btn_label Label for the sign-in button (default: "Sign In")
@@ -406,7 +409,7 @@ gmed_step_indicator <- function(current_step,
 gmed_login_page <- function(id              = "access_code",
                             app_title       = "IMSLU Resident Portal",
                             app_subtitle    = "Internal Medicine Residency",
-                            org_eyebrow     = "SSM HEALTH \u00b7 SLUCARE",
+                            org_eyebrow     = "GME TOOLS",
                             disclaimer_text = NULL,
                             btn_label       = "Sign In") {
 

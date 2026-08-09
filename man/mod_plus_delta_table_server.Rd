@@ -108,7 +108,7 @@ server <- function(input, output, session) {
 
 \code{\link{create_gmed_datatable}} for the underlying table creation function
 
-Other plus_delta_modules: 
-\code{\link{mod_plus_delta_table_ui}()}
+Other plus_delta_modules:
+\code{\link[=mod_plus_delta_table_ui]{mod_plus_delta_table_ui()}}
 }
 \concept{plus_delta_modules}

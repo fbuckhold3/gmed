@@ -44,9 +44,11 @@ answered yet.
 \seealso{
 \code{\link[=mod_seval_reflection_display_ui]{mod_seval_reflection_display_ui()}}
 
-Other seval_display: 
-\code{\link{mod_seval_boards_display_server}()},
-\code{\link{mod_seval_boards_display_ui}()},
-\code{\link{mod_seval_reflection_display_ui}()}
+Other seval_display:
+\code{\link[=mod_grad_plan_display_server]{mod_grad_plan_display_server()}},
+\code{\link[=mod_grad_plan_display_ui]{mod_grad_plan_display_ui()}},
+\code{\link[=mod_seval_boards_display_server]{mod_seval_boards_display_server()}},
+\code{\link[=mod_seval_boards_display_ui]{mod_seval_boards_display_ui()}},
+\code{\link[=mod_seval_reflection_display_ui]{mod_seval_reflection_display_ui()}}
 }
 \concept{seval_display}

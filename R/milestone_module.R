@@ -223,7 +223,7 @@ mod_miles_rating_server <- function(id, period,
           k     <- keys_d[j]
           done  <- rated_d[j]
           is_this <- isTRUE(k == curKey())
-          bg    <- if (is_this) "#003d5c"
+          bg    <- if (is_this) "#0c5860"
                    else if (done) "#2e7d32"
                    else "#dee2e6"
           tags$span(
@@ -241,7 +241,7 @@ mod_miles_rating_server <- function(id, period,
         n_d <- sum(rated_d); tot_d <- length(keys_d); all_d <- n_d == tot_d
         div(class = "me-3 mb-1",
           tags$span(style = paste0("font-size:0.7rem; font-weight:", if(is_cur)"700" else "500",
-                                   "; color:", if(all_d)"#2e7d32" else if(is_cur)"#003d5c" else "#6c757d",
+                                   "; color:", if(all_d)"#2e7d32" else if(is_cur)"#0c5860" else "#6c757d",
                                    "; display:block; margin-bottom:2px;"),
                     paste0(imageSets[[d]]$title, " ", n_d, "/", tot_d)),
           dots
@@ -251,16 +251,16 @@ mod_miles_rating_server <- function(id, period,
       pct <- round(100 * n_rated / totalN)
       div(class = "mb-3",
         div(class = "d-flex justify-content-between align-items-center mb-1",
-          tags$span(style = "font-size:0.78rem; font-weight:600; color:#003d5c;",
+          tags$span(style = "font-size:0.78rem; font-weight:600; color:#0c5860;",
                     paste0("Milestone Self-Assessment \u2014 ", n_rated, " of ", totalN, " rated")),
           tags$span(style = paste0("font-size:0.78rem; font-weight:700; color:",
-                                   if(pct == 100) "#2e7d32" else "#0066a1"),
+                                   if(pct == 100) "#2e7d32" else "#0f8a94"),
                     paste0(pct, "%"))
         ),
         div(class = "progress mb-3", style = "height:5px;",
           div(class = "progress-bar",
               style = paste0("width:", pct, "%; background:",
-                             if(pct == 100) "#2e7d32" else "#0066a1", ";"))),
+                             if(pct == 100) "#2e7d32" else "#0f8a94", ";"))),
         div(class = "d-flex flex-wrap", domain_blocks)
       )
     })
@@ -282,7 +282,7 @@ mod_miles_rating_server <- function(id, period,
       score_btns <- lapply(1:9, function(v) {
         is_sel   <- isTRUE(sel == v)
         high     <- !is.null(thr) && v >= thr
-        bg  <- if (is_sel && high) "#e65100" else if (is_sel) "#003d5c" else "#f5f5f5"
+        bg  <- if (is_sel && high) "#e65100" else if (is_sel) "#0c5860" else "#f5f5f5"
         col <- if (is_sel) "white" else "#546e7a"
         brd <- if (is_sel) bg else "#dee2e6"
         tags$button(
@@ -316,7 +316,7 @@ mod_miles_rating_server <- function(id, period,
         # Header: domain + item title
         div(class = "d-flex align-items-baseline justify-content-between mb-2",
           div(
-            tags$span(style = "font-weight:700; color:#003d5c; font-size:0.95rem;",
+            tags$span(style = "font-weight:700; color:#0c5860; font-size:0.95rem;",
                       paste0(curDomain(), state$imgIdx, " \u2014 ", curSet()$imageTitles[state$imgIdx])),
             prev_badge),
           tags$span(style = "font-size:0.75rem; color:#9e9e9e;",
