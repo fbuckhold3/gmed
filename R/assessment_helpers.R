@@ -295,54 +295,6 @@ get_observation_subtypes <- function() {
   )
 }
 
-#' Extract Plus/Delta Feedback
-#'
-#' Extracts and formats plus/delta feedback from assessment data
-#'
-#' @param assessment_data Assessment data frame
-#' @param resident_name Optional: filter to specific resident
-#' @param date_range Optional: vector of c(start_date, end_date)
-#'
-#' @return Data frame with plus/delta feedback
-#' @export
-extract_plusdelta <- function(assessment_data, 
-                              resident_name = NULL,
-                              date_range = NULL) {
-  
-  result <- assessment_data %>%
-    dplyr::filter(!is.na(ass_plus) | !is.na(ass_delta))
-  
-  # Filter by resident if specified
-  if (!is.null(resident_name)) {
-    result <- result %>%
-      dplyr::filter(name == resident_name)
-  }
-  
-  # Filter by date range if specified
-  if (!is.null(date_range) && length(date_range) == 2) {
-    result <- result %>%
-      dplyr::filter(
-        ass_date >= date_range[1],
-        ass_date <= date_range[2]
-      )
-  }
-  
-  # Select relevant columns and clean up
-  result <- result %>%
-    dplyr::select(
-      date = ass_date,
-      resident = name,
-      level = ass_level,
-      faculty = ass_faculty,
-      specialty = ass_specialty,
-      plus = ass_plus,
-      delta = ass_delta
-    ) %>%
-    dplyr::arrange(dplyr::desc(date))
-  
-  return(result)
-}
-
 #' Get Assessment Field Choices
 #'
 #' Extracts the choices/options for a specific assessment field

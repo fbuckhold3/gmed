@@ -49,6 +49,13 @@ mod_plus_delta_table_ui <- function(id, title = "Plus/Delta Feedback") {
   ns <- NS(id)
 
   tagList(
+    # Loaded here (not just relying on the host app's page shell) because
+    # ccc.dashboard/coach.dash still call gmed::gmed_page(), not
+    # roundsui::roundsui_page() — this module is the first thing in either
+    # app to render via roundsui, so it can't assume the host has migrated
+    # yet. Documented as safe to load repeatedly / alongside
+    # gmed::load_gmed_styles() (--roundsui-*/--gmed-* tokens don't collide).
+    roundsui::load_roundsui_styles(),
     tags$style(HTML("
       .plus-delta-toggle {
         cursor: pointer;
@@ -83,31 +90,32 @@ mod_plus_delta_table_ui <- function(id, title = "Plus/Delta Feedback") {
         });
       });
     ", ns("toggle_header"), ns("toggle_icon"), ns("collapsible_content")))),
-    div(class = "gmed-card",
+    # roundsui-card/-card__header/-card__title classes render via roundsui's
+    # own CSS (roundsui-shell.css) once the host app loads
+    # roundsui::load_roundsui_styles() — this module doesn't call
+    # roundsui_card() directly because the collapsible header needs the
+    # toggle affordance above, which roundsui_card() doesn't support.
+    div(class = "roundsui-card",
         if (!is.null(title)) {
-          div(class = "gmed-card-header plus-delta-toggle",
+          div(class = "roundsui-card__header plus-delta-toggle",
               id = ns("toggle_header"),
               h4(
                 span(id = ns("toggle_icon"), class = "toggle-icon", icon("chevron-down")),
                 icon("comments"),
                 title,
-                class = "gmed-card-title",
+                class = "roundsui-card__title",
                 style = "display: inline; margin-left: 0.5rem;"
               )
           )
         },
 
         # Collapsible content
-        div(id = ns("collapsible_content"), class = "collapsible-content",
+        div(id = ns("collapsible_content"), class = "collapsible-content roundsui-card__body",
             # Main table output
-            div(class = "gmed-datatable-container",
-                DT::dataTableOutput(ns("plus_delta_table"))
-            ),
+            DT::dataTableOutput(ns("plus_delta_table")),
 
             # Summary statistics
-            div(class = "gmed-table-footer",
-                uiOutput(ns("table_summary"))
-            )
+            uiOutput(ns("table_summary"))
         )
     )
   )
@@ -175,7 +183,7 @@ mod_plus_delta_table_ui <- function(id, title = "Plus/Delta Feedback") {
 #'
 #' @family plus_delta_modules
 #' @seealso \code{\link{mod_plus_delta_table_ui}} for the corresponding UI function
-#' @seealso \code{\link{create_gmed_datatable}} for the underlying table creation function
+#' @seealso \code{\link[roundsui]{roundsui_datatable}} for the underlying table creation function
 #'
 #' @examples
 #' \dontrun{
@@ -380,56 +388,18 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
     
     output$plus_delta_table <- DT::renderDataTable({
       data <- plus_delta_data()
-      
-      if (nrow(data) == 0) {
-        return(DT::datatable(
-          data.frame(Message = "No plus/delta feedback available for this resident"),
-          options = list(dom = 't', ordering = FALSE, searching = FALSE),
-          rownames = FALSE,
-          class = 'table table-striped'
-        ))
-      }
-      
-      # Create the datatable with gmed styling
-      dt <- create_gmed_datatable(
+
+      # roundsui_datatable() handles the zero-row case itself (renders its
+      # own styled empty-state row), and Plus/Delta get roundsui's single
+      # accent-tint highlight instead of gmed's per-column rainbow
+      # (green/orange/blue/teal/purple) — Ward Notes is deliberately
+      # restrained to neutrals + one accent, not per-column color coding.
+      roundsui::roundsui_datatable(
         data,
-        caption = paste("Plus/Delta Feedback (", nrow(data), "entries )"),
+        caption = "Plus/Delta Feedback",
         page_length = 10,
-        scrollX = TRUE,
         highlight_columns = c("Plus", "Delta")
       )
-      
-      # Additional custom styling for plus/delta
-      dt <- dt %>%
-        DT::formatStyle(
-          'Plus',
-          backgroundColor = '#e8f5e9',  # Light green
-          borderLeft = '3px solid #4caf50'  # Green border
-        ) %>%
-        DT::formatStyle(
-          'Delta',
-          backgroundColor = '#fff3e0',  # Light orange  
-          borderLeft = '3px solid #ff9800'  # Orange border
-        ) %>%
-        DT::formatStyle(
-          'Date',
-          fontWeight = 'bold',
-          color = '#1976d2'
-        ) %>%
-        DT::formatStyle(
-          'Rotation',
-          fontWeight = 'bold',
-          backgroundColor = '#e3f0fb',
-          color = '#0f8a94'
-        ) %>%
-        DT::formatStyle(
-          'Level',
-          fontWeight = 'bold',
-          backgroundColor = '#f3e5f5',  # Light purple
-          color = '#7b1fa2'
-        )
-
-      return(dt)
     })
     
     # ========================================================================
@@ -444,17 +414,28 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
       }
       
       plus_count <- sum(data$Plus != "Not provided")
-      delta_count <- sum(data$Delta != "Not provided") 
+      delta_count <- sum(data$Delta != "Not provided")
       faculty_count <- length(unique(data$Faculty[data$Faculty != "Not specified"]))
-      
-      div(class = "gmed-summary-stats",
-          p(
-            icon("chart-bar"), 
-            strong("Summary: "),
-            span(paste(plus_count, "plus items,"), style = "color: #4caf50;"),
-            span(paste(delta_count, "delta items"), style = "color: #ff9800;"),
-            paste0("from ", faculty_count, " faculty member", if(faculty_count != 1) "s" else "")
+
+      # Restrained/neutral text per Ward Notes (no green/orange color-coding
+      # on the counts) — the icon + label already carry the meaning.
+      colors <- roundsui::roundsui_colors()
+      div(
+        style = sprintf(
+          "padding: 10px 18px; margin: 0 -18px -18px; border-top: 1px solid %s; color: %s; font-size: 13px;",
+          colors$border, colors$ink_muted
+        ),
+        p(
+          style = "margin: 0;",
+          icon("chart-bar"),
+          strong(" Summary: "),
+          sprintf(
+            "%d plus item%s, %d delta item%s, from %d faculty member%s",
+            plus_count, if (plus_count != 1) "s" else "",
+            delta_count, if (delta_count != 1) "s" else "",
+            faculty_count, if (faculty_count != 1) "s" else ""
           )
+        )
       )
     })
     
