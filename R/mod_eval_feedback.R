@@ -21,29 +21,32 @@
 mod_eval_feedback_ui <- function(id) {
   ns <- NS(id)
   tagList(
+    # Loaded here (not just relying on the host app's page shell) - same
+    # reasoning as gmed::mod_plus_delta_table_ui: ccc.dashboard/coach.dash
+    # still call gmed::gmed_page(), not roundsui::roundsui_page(), so this
+    # module can't assume the host has migrated yet. Safe to load repeatedly.
+    roundsui::load_roundsui_styles(),
 
     # ── 1. Assessment Breakdown ──────────────────────────────────────────────
     div(
-      class = "card border-0 shadow-sm mb-4",
-      style = "border-radius:8px; overflow:hidden;",
+      class = "roundsui-card mb-4",
       div(
-        class = "card-header d-flex align-items-center justify-content-between",
-        style = "background:#0c5860; color:white; padding:10px 18px;",
+        class = "roundsui-card__header d-flex align-items-center justify-content-between",
         div(
           class = "d-flex align-items-center",
           tags$i(class = "bi bi-grid-1x2-fill me-2"),
-          tags$span(style = "font-weight:700;", "Assessment Breakdown")
+          tags$span(class = "roundsui-card__title", style = "display:inline;", "Assessment Breakdown")
         ),
         tags$span(
-          style = "font-size:0.72rem; opacity:0.75;",
+          style = "font-size:0.72rem; color:var(--roundsui-ink-faint);",
           "All types defined for this programme \u2014 grey = none completed yet"
         )
       ),
       div(
-        class = "card-body p-3",
+        class = "roundsui-card__body",
         tags$p(
-          class = "text-muted mb-3",
-          style = "font-size:0.82rem;",
+          class = "mb-3",
+          style = "font-size:0.82rem; color:var(--roundsui-ink-muted);",
           tags$i(class = "bi bi-info-circle me-1"),
           "Each tile shows one type of direct observation or assessment. ",
           "The number is how many you have received. ",
@@ -55,23 +58,21 @@ mod_eval_feedback_ui <- function(id) {
 
     # ── 2 & 3. Written Feedback + Score Detail ────────────────────────────────
     div(
-      class = "card border-0 shadow-sm",
-      style = "border-radius:8px; overflow:hidden;",
+      class = "roundsui-card",
       div(
-        class = "card-header",
-        style = "background:#0c5860; color:white; padding:10px 18px;",
+        class = "roundsui-card__header",
         div(
           class = "d-flex align-items-center",
           tags$i(class = "bi bi-table me-2"),
-          tags$span(style = "font-weight:700;", "Assessment History & Scores"),
+          tags$span(class = "roundsui-card__title", style = "display:inline;", "Assessment History & Scores"),
           tags$span(
-            style = "font-size:0.75rem; opacity:0.7; margin-left:10px;",
+            style = "font-size:0.75rem; color:var(--roundsui-ink-faint); margin-left:10px;",
             "Click a row to expand rubric scores for that evaluation"
           )
         )
       ),
       div(
-        class = "card-body p-3",
+        class = "roundsui-card__body",
 
         # How-to banner
         div(
@@ -266,6 +267,11 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
 
       done_rows <- which(counts$n > 0)
       sel_type  <- selected_type()
+      # Neutral/"not done" tokens come from roundsui; TYPE_PAL (the
+      # per-category colors below) stays untouched — it's data encoding
+      # (which assessment type), not brand styling, same reasoning as this
+      # codebase's ms_palette milestone colors.
+      rc <- roundsui::roundsui_colors()
       buttons <- lapply(seq_len(nrow(counts)), function(i) {
         tp      <- counts$Type[i]
         cnt     <- counts$n[i]
@@ -273,7 +279,7 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         is_sel  <- nzchar(sel_type) && sel_type == tp
         col     <- if (done)
           TYPE_PAL[((match(i, done_rows) - 1L) %% length(TYPE_PAL)) + 1L]
-        else "#c8d3dd"
+        else rc$border_strong
         # Clickable only when there is data; selected tile gets ring highlight
         onclick_js <- if (done)
           sprintf("Shiny.setInputValue('%s', '%s', {priority:'event'})",
@@ -285,7 +291,7 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
             style = paste0(
               "border:2px solid ", col, "; border-radius:8px;",
               "padding:10px 8px; text-align:center; height:100%;",
-              if (done) paste0("background:", col, "18;") else "background:#f7f9fb;",
+              if (done) paste0("background:", col, "18;") else paste0("background:", rc$surface_2, ";"),
               if (is_sel) paste0("box-shadow:0 0 0 3px ", col, ";") else "",
               if (done) "cursor:pointer;" else ""
             ),
@@ -293,14 +299,14 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
             tags$div(
               style = paste0(
                 "font-size:1.6rem; font-weight:800; line-height:1; margin-bottom:4px;",
-                "color:", if (done) col else "#b0bec5", ";"
+                "color:", if (done) col else rc$ink_faint, ";"
               ),
               cnt
             ),
             tags$div(
               style = paste0(
                 "font-size:0.70rem; font-weight:600; line-height:1.3;",
-                "color:", if (done) "#2c3e50" else "#9aa5b0", ";"
+                "color:", if (done) rc$ink else rc$ink_faint, ";"
               ),
               tp
             )
@@ -367,6 +373,10 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
     })
 
     # ── 2a. PGY filter chips ──────────────────────────────────────────────────
+    # PGY chips: a closed 3-item set with no color meaning tied to anything
+    # else on screen (unlike the Type chips below, which share TYPE_PAL with
+    # the assessment tiles above as a category legend) — a clean fit for
+    # roundsui_filter_chips()'s single-accent active/inactive style.
     output$pgy_chips <- renderUI({
       df  <- pd_data_all()
       sel <- selected_level()
@@ -380,51 +390,24 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         dplyr::arrange(Level)
       if (nrow(counts) == 0) return(NULL)
 
-      .chip <- function(label, onclick_val, col, active, count = NULL) {
-        tags$span(
-          style = paste0(
-            "display:inline-flex; align-items:center; gap:4px;",
-            "background:", if (active) col else "#eee", ";",
-            "color:", if (active) "white" else col, ";",
-            "border-radius:20px; padding:4px 14px; font-size:0.78rem;",
-            "font-weight:600; margin:2px 3px; cursor:pointer;",
-            "border:2px solid ", col, ";"
-          ),
-          onclick = sprintf(
-            "Shiny.setInputValue('%s', '%s', {priority:'event'})",
-            ns("pgy_chip_click"), onclick_val
-          ),
-          label,
-          if (!is.null(count)) tags$span(
-            style = paste0(
-              "display:inline-flex; align-items:center; justify-content:center;",
-              "background:", if (active) "rgba(255,255,255,.3)" else col, ";",
-              "color:", if (active) col else "white", ";",
-              "border-radius:50%; width:19px; height:19px; font-size:0.7rem;"
-            ),
-            count
-          )
-        )
-      }
-
-      all_active <- !nzchar(sel)
       div(
         style = "margin-bottom:10px;",
         div(
           style = "font-size:0.7rem; font-weight:700; text-transform:uppercase;
-                   letter-spacing:.08em; color:#6c757d; margin-bottom:5px;",
+                   letter-spacing:.08em; color:var(--roundsui-ink-faint); margin-bottom:5px;",
           tags$i(class = "bi bi-mortarboard me-1"),
           "Filter by Training Level"
         ),
-        div(
-          style = "display:flex; flex-wrap:wrap; align-items:center;",
-          .chip("All levels", "", "#555", all_active, count = nrow(df)),
-          lapply(seq_len(nrow(counts)), function(i) {
-            lvl <- as.character(counts$Level[i])
-            .chip(lvl, lvl, LEVEL_COL[[lvl]],
-                  nzchar(sel) && sel == lvl,
-                  count = counts$n[i])
-          })
+        roundsui::roundsui_filter_chips(
+          chips = lapply(seq_len(nrow(counts)), function(i) {
+            list(value = as.character(counts$Level[i]),
+                 label = as.character(counts$Level[i]),
+                 count = counts$n[i])
+          }),
+          input_id  = ns("pgy_chip_click"),
+          all_label = "All levels",
+          all_count = nrow(df),
+          selected  = sel
         )
       )
     })
@@ -503,13 +486,25 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
     })
 
     # ── 2c. Assessment table ──────────────────────────────────────────────────
+    # NOTE: intentionally NOT roundsui::roundsui_datatable() here — that
+    # function doesn't expose DT's `selection=` argument, and this table's
+    # row-click score chart below depends entirely on native DT row
+    # selection (`input$pd_table_rows_selected` as a row index). Swapping
+    # to roundsui_datatable() would silently drop click-to-see-scores with
+    # no error. Hand-applying roundsui's own recipe here instead (same
+    # class + single accent-tint highlight on Plus/Delta, dropping the
+    # decorative per-column teal/purple that isn't real data encoding) so
+    # it's visually consistent without losing selection. Flagged separately
+    # as a real gap worth a `selection=` passthrough in roundsui itself.
     output$pd_table <- DT::renderDataTable({
       req(pd_data())
       df <- pd_data()
       if (nrow(df) == 0) {
         return(DT::datatable(
-          data.frame(Message = "No assessments match the current filters."),
-          options  = list(dom = "t"), rownames = FALSE
+          roundsui::roundsui_empty_table("No assessments match the current filters."),
+          options  = list(dom = "t", ordering = FALSE, searching = FALSE),
+          rownames = FALSE,
+          class    = "roundsui-empty-table-row"
         ))
       }
       display <- df %>% dplyr::select(Date, Type, Level, Faculty, Plus, Delta)
@@ -525,18 +520,12 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
             list(width = "25%", targets = c(4, 5))
           )
         ),
-        class = "table table-sm table-hover"
+        class = "roundsui-datatable cell-border stripe hover"
       ) %>%
-        DT::formatStyle("Plus",
-          backgroundColor = "#e8f5e9", borderLeft = "3px solid #27ae60") %>%
-        DT::formatStyle("Delta",
-          backgroundColor = "#fff3e0", borderLeft = "3px solid #e67e22") %>%
-        DT::formatStyle("Date",
-          fontWeight = "bold", color = "#0c5860") %>%
-        DT::formatStyle("Type",
-          fontWeight = "600", color = "#0f8a94") %>%
-        DT::formatStyle("Level",
-          fontWeight = "600", color = "#6c3483")
+        DT::formatStyle(
+          c("Plus", "Delta"),
+          backgroundColor = roundsui::roundsui_colors()$accent_tint
+        )
     })
 
     # ── Helper: build scored-items data frame for the selected row ────────────
@@ -600,10 +589,11 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
 
     # ── 2d. Score detail header (prompt / metadata above chart) ───────────────
     output$score_detail <- renderUI({
+      rc <- roundsui::roundsui_colors()
       row_idx <- input$pd_table_rows_selected
       if (is.null(row_idx) || length(row_idx) == 0) {
         return(tags$p(
-          style = "font-size:0.78rem; color:#0f8a94; margin-top:10px; font-style:italic;",
+          style = paste0("font-size:0.78rem; color:", rc$ink_faint, "; margin-top:10px; font-style:italic;"),
           tags$i(class = "bi bi-hand-index me-1"),
           "Select a row above to see the scored items for that evaluation."
         ))
@@ -616,27 +606,27 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
 
       div(
         style = paste0("margin-top:14px; padding:12px 16px;",
-                       "background:#f8fbff; border-radius:6px 6px 0 0;",
-                       "border:1px solid #dde5ed; border-bottom:none;"),
+                       "background:", rc$surface_2, "; border-radius:6px 6px 0 0;",
+                       "border:1px solid ", rc$border, "; border-bottom:none;"),
         div(
           class = "d-flex justify-content-between align-items-start",
           div(
             div(
-              style = "font-size:0.72rem; font-weight:700; text-transform:uppercase;
-                       letter-spacing:.08em; color:#6c757d; margin-bottom:3px;",
+              style = paste0("font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                       letter-spacing:.08em; color:", rc$ink_faint, "; margin-bottom:3px;"),
               tags$i(class = "bi bi-bar-chart-fill me-1"),
               paste0(sel_row$Date[1], " \u00b7 ", sel_row$Type[1],
                      " \u00b7 ", sel_row$Faculty[1])
             ),
             if (n_scored == 0) {
               tags$span(
-                style = "font-size:0.78rem; color:#6c757d; font-style:italic;",
+                style = paste0("font-size:0.78rem; color:", rc$ink_faint, "; font-style:italic;"),
                 tags$i(class = "bi bi-dash-circle me-1"),
                 "No rubric items recorded \u2014 narrative feedback only."
               )
             } else {
               tags$span(
-                style = "font-size:0.78rem; color:#1a6b3a;",
+                style = paste0("font-size:0.78rem; color:", rc$success, ";"),
                 tags$i(class = "bi bi-check-circle me-1"),
                 paste0(n_scored, " rated item", if (n_scored != 1) "s" else "",
                        ". Bars run red \u2192 green (low \u2192 high)."),
@@ -828,7 +818,14 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
 
       n_items <- nrow(chart_df)
       height  <- max(180, n_items * 38 + 90)
+      rc      <- roundsui::roundsui_colors()
 
+      # roundsui_plotly_layout() supplies chart chrome (font, axis grid/tick
+      # color, hoverlabel, transparent background) — the red→green bar
+      # gradient and the dotted midline stay hand-set below since they're
+      # semantic data encoding (score quality), not brand styling.
+      # gridcolor deliberately omitted from xaxis so roundsui's own
+      # border-token default applies instead of being overridden.
       plotly::plot_ly(
         data          = chart_df,
         x             = ~norm_pos,
@@ -846,10 +843,10 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
         hovertemplate = ~paste0(hover, "<extra></extra>"),
         showlegend    = FALSE
       ) %>%
-        plotly::layout(
+        roundsui::roundsui_plotly_layout(
           title  = list(
             text     = subtitle,
-            font     = list(size = 11, color = "#6c757d"),
+            font     = list(size = 11, color = rc$ink_faint),
             x        = 0,
             xanchor  = "left",
             pad      = list(l = 8)
@@ -861,19 +858,16 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
             ticktext   = tick_text,
             tickangle  = -30,
             showgrid   = TRUE,
-            gridcolor  = "#eee",
             zeroline   = FALSE,
             fixedrange = TRUE
           ),
           yaxis  = list(title = "", automargin = TRUE, fixedrange = TRUE),
           margin = list(l = 8, r = 20, t = 30, b = 80),
-          paper_bgcolor = "rgba(248,251,255,1)",
-          plot_bgcolor  = "rgba(248,251,255,1)",
           height = height,
           shapes = list(
             list(type = "line", x0 = 0.5, x1 = 0.5,
                  y0 = -0.5, y1 = n_items - 0.5,
-                 line = list(color = "#ccc", dash = "dot", width = 1))
+                 line = list(color = rc$border_strong, dash = "dot", width = 1))
           )
         ) %>%
         plotly::config(displayModeBar = FALSE, responsive = TRUE)

@@ -284,64 +284,6 @@ gmed_card <- function(title = NULL, ...,
   )
 }
 
-#' Create GMED Plus/Delta Display
-#' 
-#' Creates a styled container for displaying Plus/Delta feedback with GMED theming.
-#'
-#' @param plus_text Character string for plus (strengths) feedback
-#' @param delta_text Character string for delta (improvements) feedback
-#' @param plus_title Character string for plus section title (default: "Strengths (Plus)")
-#' @param delta_title Character string for delta section title (default: "Areas for Improvement (Delta)")
-#' @param class Additional CSS classes to apply
-#' @param style Additional CSS styles to apply
-#'
-#' @return HTML div element with plus/delta styling
-#' @export
-#'
-#' @examples
-#' \dontrun{
-#' gmed_plus_delta_display(
-#'   plus_text = "Great communication skills",
-#'   delta_text = "Could improve time management"
-#' )
-#' }
-gmed_plus_delta_display <- function(plus_text = "", 
-                                    delta_text = "", 
-                                    plus_title = "Strengths (Plus)", 
-                                    delta_title = "Areas for Improvement (Delta)",
-                                    class = "", 
-                                    style = NULL) {
-  
-  if (!requireNamespace("shiny", quietly = TRUE)) {
-    stop("Package 'shiny' is required for UI components")
-  }
-  
-  shiny::div(
-    class = paste("gmed-plus-delta-container", class),
-    style = style,
-    
-    # Plus section
-    shiny::div(
-      class = "gmed-plus-section",
-      shiny::h5(plus_title),
-      shiny::div(
-        class = "feedback-text",
-        if (nchar(plus_text) > 0) plus_text else "No strengths feedback provided"
-      )
-    ),
-    
-    # Delta section
-    shiny::div(
-      class = "gmed-delta-section", 
-      shiny::h5(delta_title),
-      shiny::div(
-        class = "feedback-text",
-        if (nchar(delta_text) > 0) delta_text else "No improvement feedback provided"
-      )
-    )
-  )
-}
-
 #' Create GMED Step Indicator
 #' 
 #' Creates a styled step indicator for multi-step processes.

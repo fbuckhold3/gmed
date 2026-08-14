@@ -42,50 +42,52 @@ mod_seval_boards_display_ui <- function(id,
                                         mksap_url = "https://mksap.acponline.org/login?forward=%2Ftracker#/") {
   ns <- shiny::NS(id)
 
-  section_h <- function(icon, label) {
-    shiny::tags$h6(
-      class = "fw-bold mb-2",
-      style = "color:#2c3e50; font-size:1rem; text-transform:none; letter-spacing:0;",
-      shiny::tags$i(class = paste0("bi ", icon, " me-2")),
-      label
+  # Loaded here (not just relying on the host app's page shell) - same
+  # reasoning as gmed's other roundsui-migrated modules: ccc.dashboard/
+  # coach.dash still call gmed::gmed_page(), not roundsui::roundsui_page().
+  # Safe to load repeatedly.
+  styles <- roundsui::load_roundsui_styles()
+
+  section_card <- function(icon, label, ...) {
+    shiny::div(
+      class = "roundsui-card mb-4",
+      shiny::div(
+        class = "roundsui-card__header",
+        shiny::tags$i(class = paste0("bi ", icon, " me-2")),
+        shiny::tags$span(class = "roundsui-card__title", style = "display:inline;", label)
+      ),
+      shiny::div(class = "roundsui-card__body", ...)
     )
   }
 
   shiny::tagList(
-    shiny::div(class = "mb-4",
-      section_h("bi-patch-check-fill", "Step 3"),
+    styles,
+    section_card("bi-patch-check-fill", "Step 3",
       shiny::uiOutput(ns("step3"))
     ),
-    shiny::div(class = "mb-4",
-      section_h("bi-graph-up-arrow", "ABIM Board Prediction (from ITE)"),
+    section_card("bi-graph-up-arrow", "ABIM Board Prediction (from ITE)",
       shiny::uiOutput(ns("prediction_summary")),
       shiny::div(class = "mt-2",
         plotly::plotlyOutput(ns("nomogram_plot"), height = "340px")
       ),
       shiny::uiOutput(ns("board_concerns"))
     ),
-    shiny::div(class = "mb-2",
-      section_h("bi-journal-bookmark-fill", "MKSAP"),
-      shiny::div(
-        class = "p-3",
-        style = "background:#f8fafc; border:1px solid #e9ecef; border-radius:8px;",
-        shiny::tags$p(
-          class = "mb-2",
-          style = "font-size:0.95rem;",
-          shiny::tags$a(
-            href = mksap_url,
-            target = "_blank",
-            rel = "noopener",
-            class = "fw-semibold",
-            shiny::tags$i(class = "bi bi-box-arrow-up-right me-1"),
-            "Review MKSAP Tracking"
-          ),
-          shiny::tags$span(class = "text-muted ms-2",
-                           style = "font-size:0.85rem;",
-                           "(opens in new tab)")
+    section_card("bi-journal-bookmark-fill", "MKSAP",
+      shiny::tags$p(
+        class = "mb-2",
+        style = "font-size:0.95rem;",
+        shiny::tags$a(
+          href = mksap_url,
+          target = "_blank",
+          rel = "noopener",
+          class = "fw-semibold",
+          shiny::tags$i(class = "bi bi-box-arrow-up-right me-1"),
+          "Review MKSAP Tracking"
         ),
-        shiny::uiOutput(ns("mksap"))
-      )
+        shiny::tags$span(style = "color:var(--roundsui-ink-faint); margin-left:8px; font-size:0.85rem;",
+                         "(opens in new tab)")
+      ),
+      shiny::uiOutput(ns("mksap"))
     )
   )
 }
@@ -187,10 +189,13 @@ mod_seval_boards_display_server <- function(id,
       self_date_set   <- .yesno(.field(sr, "s_e_step3_date_set"))
       self_date       <- .field(sr, "s_e_step3_date")
 
+      rc <- roundsui::roundsui_colors()
+
       .card <- function(border, icon, color, title, body) {
         shiny::div(
           class = "p-3",
-          style = sprintf("background:#fff; border:1px solid #e9ecef; border-left:5px solid %s; border-radius:8px; font-size:0.95rem;", border),
+          style = sprintf("background:%s; border:1px solid %s; border-left:5px solid %s; border-radius:8px; font-size:0.95rem;",
+                          rc$surface, rc$border, border),
           shiny::div(class = "d-flex align-items-center mb-2",
             shiny::tags$i(class = paste0("bi ", icon, " me-2"),
                           style = sprintf("font-size:1.5rem; color:%s;", color)),
@@ -200,6 +205,11 @@ mod_seval_boards_display_server <- function(id,
         )
       }
 
+      # Status -> roundsui token mapping: passed = success, scheduled =
+      # warning, not-done = danger, not-reported = neutral. "Reportedly
+      # complete (program record pending)" doesn't fit success/warning/
+      # danger - it's informational, not alarming - so it uses roundsui's
+      # accent rather than the original's Bootstrap blue.
       if (isTRUE(program_step3)) {
         score_bits <- c(
           if (nzchar(usmle_score))  paste("USMLE:", usmle_score) else NULL,
@@ -211,7 +221,7 @@ mod_seval_boards_display_server <- function(id,
         else
           shiny::tags$div(class = "fst-italic text-muted",
                           "Score not yet on file in resident_data.")
-        return(.card("#198754", "bi-check-circle-fill", "#0f5132",
+        return(.card(rc$success, "bi-check-circle-fill", rc$success,
                      "Step 3 passed (program-confirmed)", score_line))
       }
 
@@ -222,10 +232,10 @@ mod_seval_boards_display_server <- function(id,
             shiny::tags$i(class = "bi bi-envelope-check me-1"),
             "Reports score was emailed to the program.")
         else if (identical(self_contact, FALSE))
-          bits[[length(bits)+1]] <- shiny::tags$div(class = "text-warning",
+          bits[[length(bits)+1]] <- shiny::tags$div(style = sprintf("color:%s;", rc$warning),
             shiny::tags$i(class = "bi bi-envelope-exclamation me-1"),
             "Score has not yet been emailed to the program.")
-        return(.card("#0d6efd", "bi-info-circle-fill", "#055160",
+        return(.card(rc$accent, "bi-info-circle-fill", rc$accent,
                      "Step 3 reportedly complete (program record pending)",
                      do.call(shiny::tagList, bits)))
       }
@@ -234,17 +244,17 @@ mod_seval_boards_display_server <- function(id,
       if (isTRUE(self_date_set)) {
         msg <- if (nzchar(self_date)) paste("Scheduled date:", self_date)
                else "Resident reports a date is set (not provided)."
-        return(.card("#fd7e14", "bi-calendar-event", "#7a4500",
+        return(.card(rc$warning, "bi-calendar-event", rc$warning,
                      "Step 3 not yet taken \u2014 date scheduled",
                      shiny::tags$div(msg)))
       }
       if (identical(self_done, FALSE)) {
-        return(.card("#dc2626", "bi-exclamation-triangle-fill", "#842029",
+        return(.card(rc$danger, "bi-exclamation-triangle-fill", rc$danger,
                      "Step 3 not yet taken",
                      shiny::tags$div(class = "text-muted",
                                      "Resident has not yet reported a scheduled date.")))
       }
-      .card("#adb5bd", "bi-question-circle", "#495057",
+      .card(rc$border_strong, "bi-question-circle", rc$ink_faint,
             "Step 3 status not reported",
             shiny::tags$div(class = "fst-italic text-muted",
                             "Neither program record nor resident self-report on file for this period."))
@@ -275,44 +285,51 @@ mod_seval_boards_display_server <- function(id,
         }
       }
 
+      rc <- roundsui::roundsui_colors()
+
       if (is.na(ite_pct)) {
         return(shiny::div(
           class = "p-3",
-          style = "background:#fff; border:1px solid #e9ecef; border-left:5px solid #adb5bd; border-radius:8px; font-size:0.95rem;",
-          shiny::tags$div(class = "fw-semibold", style = "color:#495057;",
+          style = sprintf("background:%s; border:1px solid %s; border-left:5px solid %s; border-radius:8px; font-size:0.95rem;",
+                          rc$surface, rc$border, rc$border_strong),
+          shiny::tags$div(style = sprintf("font-weight:600; color:%s;", rc$ink_muted),
             shiny::tags$i(class = "bi bi-info-circle me-2"),
             sprintf("No PGY%d ITE percent-correct on file yet.", pgy_int)),
-          shiny::tags$div(class = "text-muted mt-1",
+          shiny::tags$div(class = "mt-1", style = sprintf("color:%s;", rc$ink_faint),
             "Once an ITE result is recorded, the ABIM pass-probability prediction will appear here.")
         ))
       }
 
+      # risk$color/risk$level come from gmed::risk_from_prob() unchanged - a
+      # separately-exported shared function, not just this module's file, so
+      # its own color contract isn't touched here even though the hex it
+      # returns is already close to roundsui's danger/warning/success.
       prob <- gmed::pass_prob(ite_pct, pgy_int)
       risk <- gmed::risk_from_prob(prob)
 
       shiny::div(
         class = "p-3 d-flex align-items-center gap-3",
-        style = sprintf("background:#fff; border:1px solid #e9ecef; border-left:5px solid %s; border-radius:8px; font-size:0.95rem;",
-                        risk$color),
+        style = sprintf("background:%s; border:1px solid %s; border-left:5px solid %s; border-radius:8px; font-size:0.95rem;",
+                        rc$surface, rc$border, risk$color),
         shiny::div(
           style = "min-width:96px; text-align:center;",
           shiny::tags$div(style = sprintf("font-size:2rem; font-weight:700; color:%s; line-height:1;", risk$color),
                           paste0(round(ite_pct, 1), "%")),
-          shiny::tags$div(class = "text-muted", style = "font-size:0.85rem;", "ITE % correct")
+          shiny::tags$div(style = sprintf("color:%s; font-size:0.85rem;", rc$ink_faint), "ITE % correct")
         ),
         shiny::div(
           style = "flex:1;",
-          shiny::tags$div(class = "fw-bold mb-1", style = "color:#0c5860; font-size:1.05rem;",
+          shiny::tags$div(class = "fw-bold mb-1", style = sprintf("color:%s; font-size:1.05rem;", rc$ink),
                           sprintf("PGY%d ACP ITE Score", pgy_int)),
           if (!is.na(prob))
             shiny::tags$div(
-              shiny::tags$span(style = "color:#212529;",
+              shiny::tags$span(style = sprintf("color:%s;", rc$ink),
                                paste0(round(prob * 100, 0), "% predicted ABIM pass probability")),
               shiny::tags$span(style = sprintf("margin-left:8px; font-weight:700; color:%s;", risk$color),
                                paste0("\u2014 ", risk$level))
             )
           else
-            shiny::tags$div(class = "text-muted", risk$level)
+            shiny::tags$div(style = sprintf("color:%s;", rc$ink_faint), risk$level)
         )
       )
     })
@@ -381,14 +398,19 @@ mod_seval_boards_display_server <- function(id,
                                                    risk$level, "<extra></extra>"))
       }
 
-      fig %>% plotly::layout(
+      # Chrome (font/axis grid/tick color, transparent background) comes from
+      # roundsui_plotly_layout(); the risk-zone ribbon fills, PGY curve
+      # colors, and resident-score marker colors above stay untouched -
+      # they're semantic data encoding (risk tier), not brand styling.
+      # gridcolor deliberately omitted from both axes so roundsui's own
+      # border-token default applies instead of being overridden.
+      fig %>% roundsui::roundsui_plotly_layout(
         xaxis = list(title = "ITE % Correct", range = c(20, 100),
-                     showgrid = TRUE, gridcolor = "#f0f0f0", dtick = 10),
+                     showgrid = TRUE, dtick = 10),
         yaxis = list(title = "Probability of Passing ABIM",
                      range = c(0, 1), tickformat = ".0%",
-                     showgrid = TRUE, gridcolor = "#f0f0f0"),
+                     showgrid = TRUE),
         legend = list(orientation = "h", x = 0, y = -0.25),
-        plot_bgcolor = "rgba(0,0,0,0)", paper_bgcolor = "rgba(0,0,0,0)",
         margin = list(t = 10, b = 60)
       ) %>% plotly::config(displayModeBar = FALSE)
     })
@@ -401,14 +423,16 @@ mod_seval_boards_display_server <- function(id,
 
       if (!isTRUE(board_concern) && !nzchar(trimws(board_discu))) return(NULL)
 
+      rc <- roundsui::roundsui_colors()
       shiny::div(
         class = "mt-3 p-3",
-        style = "background:#fff8e1; border-left:4px solid #ffb300; border-radius:6px; font-size:0.95rem;",
-        shiny::tags$div(class = "fw-bold mb-1", style = "color:#7a4500;",
+        style = sprintf("background:%s; border-left:4px solid %s; border-radius:6px; font-size:0.95rem;",
+                        rc$warning_tint, rc$warning),
+        shiny::tags$div(class = "fw-bold mb-1", style = sprintf("color:%s;", rc$warning),
           shiny::tags$i(class = "bi bi-exclamation-circle-fill me-1"),
           "Resident flagged board-prep concerns"),
         if (nzchar(trimws(board_discu)))
-          shiny::tags$div(style = "white-space:pre-wrap; color:#212529;",
+          shiny::tags$div(style = sprintf("white-space:pre-wrap; color:%s;", rc$ink),
                           board_discu)
       )
     })
@@ -447,13 +471,14 @@ mod_seval_boards_display_server <- function(id,
         }
       }
 
+      rc <- roundsui::roundsui_colors()
       shiny::div(
         class = "d-flex align-items-baseline flex-wrap gap-2",
         style = "font-size:0.95rem;",
         shiny::tags$span(class = "fw-semibold",
-                         style = "color:#495057;",
+                         style = sprintf("color:%s;", rc$ink_muted),
                          "MKSAP completion (self-reported):"),
-        shiny::tags$span(style = "font-weight:700; color:#2c3e50;", label)
+        shiny::tags$span(style = sprintf("font-weight:700; color:%s;", rc$ink), label)
       )
     })
 
