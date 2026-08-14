@@ -106,12 +106,17 @@ load_rdm_residents_only <- function(rdm_token = NULL,
     # grad_yr may similarly arrive as a raw code when raw_or_label="raw".
     # Decode values < 2000 via the "grad_yr" dropdown choices cached by Phase 1
     # callers. If no dict is available here, fall back to the raw numeric and
-    # hope it's already a year. Treating anything in [14, 36] as 1986+code
-    # matches the convention used in period_mapping.R.
+    # hope it's already a year. Two live code ranges (confirmed against the
+    # RDM data dictionary 2026-08-14, matches calculate_resident_level()'s
+    # decode in period_mapping.R): 1-13 = 2023-2035 (current dropdown range,
+    # code+2022), 14-36 = 2000-2022 (older alumni range, code+1986). This
+    # function previously only knew about the 14-36 range, so current
+    # residents (codes 1-13) silently decoded to NA -> Level "Unknown".
     decode_grad_yr <- function(gy) {
       g <- suppressWarnings(as.numeric(gy))
       if (is.na(g)) return(NA_real_)
       if (g >= 2000) g
+      else if (g >= 1  && g <= 13) g + 2022
       else if (g >= 14 && g <= 36) g + 1986
       else NA_real_
     }
