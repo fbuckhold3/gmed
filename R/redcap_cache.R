@@ -203,11 +203,26 @@ load_cached_medians <- function(
 #'
 #' Serialises a named list of amiontools' aggregate summary data frames
 #' (rotation/team/time-allocation class/program averages and per-resident
-#' wide tables) to JSON and writes it to the same cache record used by
-#' \code{write_medians_cache()}. Deliberately aggregate-only — full
-#' per-resident-day detail (\code{build_daily_detail()}) is far too large
-#' for a REDCap Notes Box field (measured ~12 MB vs. ~80 KB for the
-#' aggregates) and must never be passed here.
+#' wide tables) to JSON, gzip-compresses and base64-encodes it, and writes
+#' it to the same cache record used by \code{write_medians_cache()}.
+#' Deliberately aggregate-only — full per-resident-day detail
+#' (\code{build_daily_detail()}) is far too large for a REDCap Notes Box
+#' field (measured ~12 MB vs. ~80 KB for the aggregates) and must never be
+#' passed here.
+#'
+#' \strong{Why gzip+base64 (found the hard way, 2026-09-03):} REDCap's
+#' "Notes Box" field type is backed by a MySQL \code{TEXT} column — a hard
+#' \strong{65,535-byte} ceiling, not the ~500 KB figure
+#' \code{write_medians_cache()} warns at (that figure was never verified
+#' against REDCap's actual storage limit). A raw-JSON write of this
+#' function's ~79 KB payload was silently truncated to exactly 65,535
+#' bytes by REDCap on write — no error from the API, \code{redcap_write()}
+#' reported success, and the corruption only surfaced later as a JSON parse
+#' failure on read. Compression reduces the same payload to ~20 KB,
+#' comfortably under the ceiling with headroom as the program grows.
+#' \code{write_medians_cache()}'s existing raw-JSON path carries the same
+#' latent risk if its payload ever exceeds 64 KB (currently ~8.5 KB, so not
+#' an active problem, but the same silent-truncation failure mode).
 #'
 #' @param summaries Named list of data frames — the aggregate outputs of
 #'   \code{amiontools::build_rotation_summary()},
@@ -243,15 +258,29 @@ write_amion_cache <- function(
     error = function(e) stop("write_amion_cache: JSON serialisation failed: ", e$message)
   )
 
-  size_kb <- nchar(json_str, type = "bytes") / 1024
-  message(sprintf("write_amion_cache: JSON size = %.1f KB (%d tables)", size_kb, length(summaries)))
-  if (size_kb > 500)
-    warning("write_amion_cache: JSON is ", round(size_kb),
-            " KB — unexpectedly large, check no per-day detail slipped in")
+  raw_kb <- nchar(json_str, type = "bytes") / 1024
+
+  encoded <- jsonlite::base64_enc(memCompress(charToRaw(as.character(json_str)), type = "gzip"))
+  encoded_bytes <- nchar(encoded, type = "bytes")
+
+  message(sprintf("write_amion_cache: JSON %.1f KB -> gzip+base64 %.1f KB (%d tables)",
+                  raw_kb, encoded_bytes / 1024, length(summaries)))
+
+  # REDCap "Notes Box" = MySQL TEXT column, hard 65,535-byte ceiling —
+  # REDCap silently truncates over this (no API error), which corrupts the
+  # payload rather than failing loudly. Refuse to write past a safety
+  # margin below that rather than risk a silent truncation.
+  if (encoded_bytes > 65000) {
+    warning("write_amion_cache: encoded payload is ", round(encoded_bytes / 1024),
+            " KB — over REDCap's ~64 KB Notes Box ceiling. Refusing to write ",
+            "(would be silently truncated/corrupted by REDCap). Trim summaries or ",
+            "split across multiple cache fields.")
+    return(invisible(FALSE))
+  }
 
   cache_row <- data.frame(
     record_id               = cache_record_id,
-    cache_amion_json        = as.character(json_str),
+    cache_amion_json        = encoded,
     cache_amion_updated_at  = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
     stringsAsFactors        = FALSE
   )
@@ -340,8 +369,21 @@ load_cached_amion <- function(
     }
   }
 
+  # Decode+decompress the gzip+base64 payload written by write_amion_cache()
+  # (see its docs for why: REDCap's Notes Box field has a hard 65,535-byte
+  # ceiling that silently truncates raw JSON over that size).
+  json_str <- tryCatch(
+    rawToChar(memDecompress(jsonlite::base64_dec(row$cache_amion_json[1]), type = "gzip")),
+    error = function(e) {
+      message("load_cached_amion: base64/gzip decode failed — ", e$message)
+      NA_character_
+    }
+  )
+
+  if (is.na(json_str)) return(NULL)
+
   summaries <- tryCatch(
-    jsonlite::fromJSON(row$cache_amion_json[1], simplifyDataFrame = TRUE),
+    jsonlite::fromJSON(json_str, simplifyDataFrame = TRUE),
     error = function(e) {
       message("load_cached_amion: JSON parse failed — ", e$message)
       NULL

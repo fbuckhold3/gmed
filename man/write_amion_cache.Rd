@@ -31,9 +31,25 @@ Invisible \code{TRUE} on success, \code{FALSE} on failure.
 \description{
 Serialises a named list of amiontools' aggregate summary data frames
 (rotation/team/time-allocation class/program averages and per-resident
-wide tables) to JSON and writes it to the same cache record used by
-\code{write_medians_cache()}. Deliberately aggregate-only — full
-per-resident-day detail (\code{build_daily_detail()}) is far too large
-for a REDCap Notes Box field (measured ~12 MB vs. ~80 KB for the
-aggregates) and must never be passed here.
+wide tables) to JSON, gzip-compresses and base64-encodes it, and writes
+it to the same cache record used by \code{write_medians_cache()}.
+Deliberately aggregate-only — full per-resident-day detail
+(\code{build_daily_detail()}) is far too large for a REDCap Notes Box
+field (measured ~12 MB vs. ~80 KB for the aggregates) and must never be
+passed here.
+}
+\details{
+\strong{Why gzip+base64 (found the hard way, 2026-09-03):} REDCap's
+"Notes Box" field type is backed by a MySQL \code{TEXT} column — a hard
+\strong{65,535-byte} ceiling, not the ~500 KB figure
+\code{write_medians_cache()} warns at (that figure was never verified
+against REDCap's actual storage limit). A raw-JSON write of this
+function's ~79 KB payload was silently truncated to exactly 65,535
+bytes by REDCap on write — no error from the API, \code{redcap_write()}
+reported success, and the corruption only surfaced later as a JSON parse
+failure on read. Compression reduces the same payload to ~20 KB,
+comfortably under the ceiling with headroom as the program grows.
+\code{write_medians_cache()}'s existing raw-JSON path carries the same
+latent risk if its payload ever exceeds 64 KB (currently ~8.5 KB, so not
+an active problem, but the same silent-truncation failure mode).
 }
