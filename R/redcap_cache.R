@@ -1,16 +1,22 @@
 # redcap_cache.R
 # Read and write pre-computed milestone medians to/from a designated
 # REDCap cache record (instrument: app_cache, field: cache_medians_json).
+# Also holds the equivalent pair for amiontools' aggregate Amion summaries
+# (cache_amion_json / cache_amion_updated_at) — same record, same pattern,
+# added 2026-09-03 for the Amion rotation/team/time-allocation caching work.
 #
 # Workflow:
-#   rdm-data-refresh  →  write_medians_cache()  →  REDCap app_cache record
-#   Each app startup  →  load_cached_medians()  →  medians ready in ~1 sec
+#   rdm-data-refresh        →  write_medians_cache()  →  REDCap app_cache record
+#   rdm-data-refresh (Amion)→  write_amion_cache()    →  REDCap app_cache record
+#   Each app startup        →  load_cached_medians() / load_cached_amion()
 #
 # Setup:
-#   - Create an app_cache instrument in REDCap with fields:
-#       cache_medians_json  (Notes Box)
-#       cache_updated_at    (Text)
-#   - Create one record for the cache; set res_archive = "1" on it
+#   - app_cache instrument in REDCap has fields:
+#       cache_medians_json      (Notes Box)
+#       cache_updated_at        (Text)
+#       cache_amion_json        (Notes Box)
+#       cache_amion_updated_at  (Text)
+#   - One record for the cache; set res_archive = "1" on it
 #   - Set CACHE_RECORD_ID env var on all apps and rdm-data-refresh
 
 # ── Write ─────────────────────────────────────────────────────────────────────
@@ -189,4 +195,166 @@ load_cached_medians <- function(
 
   message(sprintf("load_cached_medians: loaded %d form(s) from cache", length(medians)))
   medians
+}
+
+# ── Amion summaries: Write ──────────────────────────────────────────────────
+
+#' Write amiontools aggregate summaries to REDCap cache
+#'
+#' Serialises a named list of amiontools' aggregate summary data frames
+#' (rotation/team/time-allocation class/program averages and per-resident
+#' wide tables) to JSON and writes it to the same cache record used by
+#' \code{write_medians_cache()}. Deliberately aggregate-only — full
+#' per-resident-day detail (\code{build_daily_detail()}) is far too large
+#' for a REDCap Notes Box field (measured ~12 MB vs. ~80 KB for the
+#' aggregates) and must never be passed here.
+#'
+#' @param summaries Named list of data frames — the aggregate outputs of
+#'   \code{amiontools::build_rotation_summary()},
+#'   \code{build_team_summary()}, and \code{build_time_allocation_summary()}.
+#'   Caller assembles the list (this function doesn't call amiontools
+#'   directly, keeping gmed free of an amiontools dependency).
+#' @param rdm_token REDCap API token (default: \code{RDM_TOKEN} env var).
+#' @param redcap_url REDCap API URL.
+#' @param cache_record_id Record ID of the cache record
+#'   (default: \code{CACHE_RECORD_ID} env var).
+#'
+#' @return Invisible \code{TRUE} on success, \code{FALSE} on failure.
+#' @export
+write_amion_cache <- function(
+    summaries,
+    rdm_token       = Sys.getenv("RDM_TOKEN"),
+    redcap_url      = "https://redcapsurvey.slu.edu/api/",
+    cache_record_id = Sys.getenv("CACHE_RECORD_ID")
+) {
+
+  if (!nzchar(cache_record_id)) {
+    stop("write_amion_cache: CACHE_RECORD_ID env var not set. ",
+         "Set it to the record_id of your app_cache record in REDCap.")
+  }
+
+  if (!is.list(summaries) || length(summaries) == 0) {
+    warning("write_amion_cache: summaries list is empty — nothing to cache")
+    return(invisible(FALSE))
+  }
+
+  json_str <- tryCatch(
+    jsonlite::toJSON(summaries, auto_unbox = TRUE, na = "null"),
+    error = function(e) stop("write_amion_cache: JSON serialisation failed: ", e$message)
+  )
+
+  size_kb <- nchar(json_str, type = "bytes") / 1024
+  message(sprintf("write_amion_cache: JSON size = %.1f KB (%d tables)", size_kb, length(summaries)))
+  if (size_kb > 500)
+    warning("write_amion_cache: JSON is ", round(size_kb),
+            " KB — unexpectedly large, check no per-day detail slipped in")
+
+  cache_row <- data.frame(
+    record_id               = cache_record_id,
+    cache_amion_json        = as.character(json_str),
+    cache_amion_updated_at  = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+    stringsAsFactors        = FALSE
+  )
+
+  result <- REDCapR::redcap_write(
+    ds_to_write = cache_row,
+    redcap_uri  = redcap_url,
+    token       = rdm_token,
+    verbose     = FALSE
+  )
+
+  if (isTRUE(result$success)) {
+    message(sprintf("write_amion_cache: written to record %s at %s",
+                    cache_record_id, format(Sys.time(), "%H:%M:%S")))
+    return(invisible(TRUE))
+  } else {
+    warning("write_amion_cache: REDCap write failed — ", result$outcome_message)
+    return(invisible(FALSE))
+  }
+}
+
+# ── Amion summaries: Read ───────────────────────────────────────────────────
+
+#' Load amiontools aggregate summaries from REDCap cache
+#'
+#' Reads the aggregate Amion summaries written by \code{write_amion_cache()}.
+#' Returns \code{NULL} silently if the cache record is unavailable or empty
+#' so callers can fall back gracefully to a live Amion fetch.
+#'
+#' @param rdm_token REDCap API token (default: \code{RDM_TOKEN} env var).
+#' @param redcap_url REDCap API URL.
+#' @param cache_record_id Record ID of the cache record
+#'   (default: \code{CACHE_RECORD_ID} env var).
+#' @param max_age_hours Warn if the cache is older than this many hours.
+#'   Set to \code{Inf} to silence the warning. Default 192h (8 days) —
+#'   the Amion cache refreshes weekly, unlike the medians cache's 3h default.
+#'
+#' @return Named list of data frames (same shape passed to
+#'   \code{write_amion_cache()}), or \code{NULL}.
+#' @export
+load_cached_amion <- function(
+    rdm_token       = Sys.getenv("RDM_TOKEN"),
+    redcap_url      = "https://redcapsurvey.slu.edu/api/",
+    cache_record_id = Sys.getenv("CACHE_RECORD_ID"),
+    max_age_hours   = 192
+) {
+
+  if (!nzchar(cache_record_id)) {
+    message("load_cached_amion: CACHE_RECORD_ID not set — skipping cache")
+    return(NULL)
+  }
+
+  result <- tryCatch(
+    REDCapR::redcap_read_oneshot(
+      redcap_uri = redcap_url,
+      token      = rdm_token,
+      records    = cache_record_id,
+      forms      = "app_cache",
+      verbose    = FALSE
+    ),
+    error = function(e) {
+      message("load_cached_amion: REDCap read error — ", e$message)
+      NULL
+    }
+  )
+
+  if (is.null(result) || !isTRUE(result$success) || nrow(result$data) == 0) {
+    message("load_cached_amion: cache unavailable — will fetch Amion live")
+    return(NULL)
+  }
+
+  row <- result$data
+
+  if (!"cache_amion_json" %in% names(row) || !nzchar(row$cache_amion_json[1])) {
+    message("load_cached_amion: cache record exists but is empty")
+    return(NULL)
+  }
+
+  if ("cache_amion_updated_at" %in% names(row) && nzchar(row$cache_amion_updated_at[1])) {
+    updated <- tryCatch(as.POSIXct(row$cache_amion_updated_at[1]), error = function(e) NULL)
+    if (!is.null(updated)) {
+      age_hrs <- as.numeric(difftime(Sys.time(), updated, units = "hours"))
+      if (is.finite(max_age_hours) && age_hrs > max_age_hours)
+        message(sprintf("load_cached_amion: cache is %.1f h old (threshold: %g h)",
+                        age_hrs, max_age_hours))
+    }
+  }
+
+  summaries <- tryCatch(
+    jsonlite::fromJSON(row$cache_amion_json[1], simplifyDataFrame = TRUE),
+    error = function(e) {
+      message("load_cached_amion: JSON parse failed — ", e$message)
+      NULL
+    }
+  )
+
+  if (is.null(summaries)) return(NULL)
+
+  summaries <- lapply(summaries, function(x) {
+    if (!is.data.frame(x)) x <- as.data.frame(x)
+    x
+  })
+
+  message(sprintf("load_cached_amion: loaded %d table(s) from cache", length(summaries)))
+  summaries
 }
