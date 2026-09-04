@@ -2,20 +2,26 @@
 # Read and write pre-computed milestone medians to/from a designated
 # REDCap cache record (instrument: app_cache, field: cache_medians_json).
 # Also holds the equivalent pair for amiontools' aggregate Amion summaries
-# (cache_amion_json / cache_amion_updated_at) — same record, same pattern,
-# added 2026-09-03 for the Amion rotation/team/time-allocation caching work.
+# (cache_amion_json / cache_amion_updated_at, added 2026-09-03) and the
+# RLE-encoded per-day expected-conference calendar
+# (cache_expected_calendar_json / cache_expected_calendar_updated_at,
+# added 2026-09-04) — same record, same pattern each time.
 #
 # Workflow:
-#   rdm-data-refresh        →  write_medians_cache()  →  REDCap app_cache record
-#   rdm-data-refresh (Amion)→  write_amion_cache()    →  REDCap app_cache record
-#   Each app startup        →  load_cached_medians() / load_cached_amion()
+#   rdm-data-refresh        →  write_medians_cache()          →  REDCap app_cache record
+#   rdm-data-refresh (Amion)→  write_amion_cache()            →  REDCap app_cache record
+#   rdm-data-refresh (Amion)→  write_expected_calendar_cache()→  REDCap app_cache record
+#   Each app startup        →  load_cached_medians() / load_cached_amion() /
+#                               load_cached_expected_calendar()
 #
 # Setup:
 #   - app_cache instrument in REDCap has fields:
-#       cache_medians_json      (Notes Box)
-#       cache_updated_at        (Text)
-#       cache_amion_json        (Notes Box)
-#       cache_amion_updated_at  (Text)
+#       cache_medians_json               (Notes Box)
+#       cache_updated_at                 (Text)
+#       cache_amion_json                 (Notes Box)
+#       cache_amion_updated_at           (Text)
+#       cache_expected_calendar_json     (Notes Box)
+#       cache_expected_calendar_updated_at (Text)
 #   - One record for the cache; set res_archive = "1" on it
 #   - Set CACHE_RECORD_ID env var on all apps and rdm-data-refresh
 
@@ -399,4 +405,177 @@ load_cached_amion <- function(
 
   message(sprintf("load_cached_amion: loaded %d table(s) from cache", length(summaries)))
   summaries
+}
+
+# ── Expected-conference calendar: Write ─────────────────────────────────────
+
+#' Write the RLE-encoded expected-conference calendar to REDCap cache
+#'
+#' Serialises a data frame of (record_id, start, end, expected) blocks —
+#' one row per consecutive run of the same expected-conference value for a
+#' resident — to JSON, gzip-compresses and base64-encodes it (same reason
+#' as \code{write_amion_cache()}: REDCap's Notes Box 65,535-byte ceiling),
+#' and writes it to the same cache record.
+#'
+#' RLE, not one row per resident-day, because a raw per-day table measured
+#' ~55 KB compressed (found 2026-09-04) — too close to the ceiling for
+#' comfort as the roster/season grows. Rotation blocks run for days/weeks
+#' at a time, so collapsing consecutive same-value runs per resident
+#' shrinks this ~3.5x (measured: 19,171 raw rows / 54.6 KB -> 5,448 RLE
+#' rows / 31.3 KB, same underlying data).
+#'
+#' @param calendar_rle Data frame with columns record_id, start, end
+#'   (Date or integer day-count — caller's choice, this function doesn't
+#'   care as long as \code{load_cached_expected_calendar()}'s caller knows
+#'   which), expected ("S"/"V"/"N" or similar short codes).
+#' @param rdm_token REDCap API token (default: \code{RDM_TOKEN} env var).
+#' @param redcap_url REDCap API URL.
+#' @param cache_record_id Record ID of the cache record
+#'   (default: \code{CACHE_RECORD_ID} env var).
+#'
+#' @return Invisible \code{TRUE} on success, \code{FALSE} on failure.
+#' @export
+write_expected_calendar_cache <- function(
+    calendar_rle,
+    rdm_token       = Sys.getenv("RDM_TOKEN"),
+    redcap_url      = "https://redcapsurvey.slu.edu/api/",
+    cache_record_id = Sys.getenv("CACHE_RECORD_ID")
+) {
+
+  if (!nzchar(cache_record_id)) {
+    stop("write_expected_calendar_cache: CACHE_RECORD_ID env var not set. ",
+         "Set it to the record_id of your app_cache record in REDCap.")
+  }
+
+  if (!is.data.frame(calendar_rle) || nrow(calendar_rle) == 0) {
+    warning("write_expected_calendar_cache: calendar_rle is empty — nothing to cache")
+    return(invisible(FALSE))
+  }
+
+  json_str <- tryCatch(
+    jsonlite::toJSON(calendar_rle, auto_unbox = TRUE, na = "null"),
+    error = function(e) stop("write_expected_calendar_cache: JSON serialisation failed: ", e$message)
+  )
+
+  raw_kb <- nchar(json_str, type = "bytes") / 1024
+  encoded <- jsonlite::base64_enc(memCompress(charToRaw(as.character(json_str)), type = "gzip"))
+  encoded_bytes <- nchar(encoded, type = "bytes")
+
+  message(sprintf("write_expected_calendar_cache: JSON %.1f KB -> gzip+base64 %.1f KB (%d rows)",
+                  raw_kb, encoded_bytes / 1024, nrow(calendar_rle)))
+
+  if (encoded_bytes > 65000) {
+    warning("write_expected_calendar_cache: encoded payload is ", round(encoded_bytes / 1024),
+            " KB — over REDCap's ~64 KB Notes Box ceiling. Refusing to write.")
+    return(invisible(FALSE))
+  }
+
+  cache_row <- data.frame(
+    record_id                          = cache_record_id,
+    cache_expected_calendar_json       = encoded,
+    cache_expected_calendar_updated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+    stringsAsFactors                   = FALSE
+  )
+
+  result <- REDCapR::redcap_write(
+    ds_to_write = cache_row,
+    redcap_uri  = redcap_url,
+    token       = rdm_token,
+    verbose     = FALSE
+  )
+
+  if (isTRUE(result$success)) {
+    message(sprintf("write_expected_calendar_cache: written to record %s at %s",
+                    cache_record_id, format(Sys.time(), "%H:%M:%S")))
+    return(invisible(TRUE))
+  } else {
+    warning("write_expected_calendar_cache: REDCap write failed — ", result$outcome_message)
+    return(invisible(FALSE))
+  }
+}
+
+# ── Expected-conference calendar: Read ──────────────────────────────────────
+
+#' Load the RLE-encoded expected-conference calendar from REDCap cache
+#'
+#' @param rdm_token REDCap API token (default: \code{RDM_TOKEN} env var).
+#' @param redcap_url REDCap API URL.
+#' @param cache_record_id Record ID of the cache record
+#'   (default: \code{CACHE_RECORD_ID} env var).
+#' @param max_age_hours Warn if the cache is older than this many hours.
+#'   Default 192h (8 days) — refreshes weekly, same as the Amion cache.
+#'
+#' @return Data frame (record_id, start, end, expected), or \code{NULL}.
+#' @export
+load_cached_expected_calendar <- function(
+    rdm_token       = Sys.getenv("RDM_TOKEN"),
+    redcap_url      = "https://redcapsurvey.slu.edu/api/",
+    cache_record_id = Sys.getenv("CACHE_RECORD_ID"),
+    max_age_hours   = 192
+) {
+
+  if (!nzchar(cache_record_id)) {
+    message("load_cached_expected_calendar: CACHE_RECORD_ID not set — skipping cache")
+    return(NULL)
+  }
+
+  result <- tryCatch(
+    REDCapR::redcap_read_oneshot(
+      redcap_uri = redcap_url,
+      token      = rdm_token,
+      records    = cache_record_id,
+      forms      = "app_cache",
+      verbose    = FALSE
+    ),
+    error = function(e) {
+      message("load_cached_expected_calendar: REDCap read error — ", e$message)
+      NULL
+    }
+  )
+
+  if (is.null(result) || !isTRUE(result$success) || nrow(result$data) == 0) {
+    message("load_cached_expected_calendar: cache unavailable — will build live")
+    return(NULL)
+  }
+
+  row <- result$data
+
+  if (!"cache_expected_calendar_json" %in% names(row) || !nzchar(row$cache_expected_calendar_json[1])) {
+    message("load_cached_expected_calendar: cache record exists but is empty")
+    return(NULL)
+  }
+
+  if ("cache_expected_calendar_updated_at" %in% names(row) && nzchar(row$cache_expected_calendar_updated_at[1])) {
+    updated <- tryCatch(as.POSIXct(row$cache_expected_calendar_updated_at[1]), error = function(e) NULL)
+    if (!is.null(updated)) {
+      age_hrs <- as.numeric(difftime(Sys.time(), updated, units = "hours"))
+      if (is.finite(max_age_hours) && age_hrs > max_age_hours)
+        message(sprintf("load_cached_expected_calendar: cache is %.1f h old (threshold: %g h)",
+                        age_hrs, max_age_hours))
+    }
+  }
+
+  json_str <- tryCatch(
+    rawToChar(memDecompress(jsonlite::base64_dec(row$cache_expected_calendar_json[1]), type = "gzip")),
+    error = function(e) {
+      message("load_cached_expected_calendar: base64/gzip decode failed — ", e$message)
+      NA_character_
+    }
+  )
+
+  if (is.na(json_str)) return(NULL)
+
+  calendar_rle <- tryCatch(
+    jsonlite::fromJSON(json_str, simplifyDataFrame = TRUE),
+    error = function(e) {
+      message("load_cached_expected_calendar: JSON parse failed — ", e$message)
+      NULL
+    }
+  )
+
+  if (is.null(calendar_rle)) return(NULL)
+  if (!is.data.frame(calendar_rle)) calendar_rle <- as.data.frame(calendar_rle)
+
+  message(sprintf("load_cached_expected_calendar: loaded %d RLE row(s) from cache", nrow(calendar_rle)))
+  calendar_rle
 }
