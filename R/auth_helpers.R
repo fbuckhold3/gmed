@@ -58,14 +58,30 @@ authenticate_resident <- function(access_code,
     message("Has access_code column: ", "access_code" %in% names(residents_df))
   }
   
-  # Check for demo/test codes
-  if (access_code_clean %in% c("demo", "test", "88")) {
+  # Check for demo/test codes.
+  #
+  # record_id was hardcoded "88" until 2026-09-16 — that collided with a
+  # real (archived) resident in RDM prod (Meghan Baumer), so every "demo"/
+  # "test" login was silently reading (and would have let someone write
+  # into) a real person's real evaluations/scholarship/assessment data.
+  # Confirmed live: record 999 is genuinely blank in prod. Still not a
+  # universal guarantee for every project this package might ever point
+  # at, so it's a GMED_DEMO_RECORD_ID env var (defaulting to "999"), not a
+  # second hardcoded literal — verify it's actually blank in whichever
+  # project/environment you're pointing at before relying on it.
+  #
+  # "88" was also removed from the trigger list itself: it used to shadow
+  # the record_id fallback lookup below, so typing "88" could never log in
+  # as whichever real resident actually has record_id 88 in a given
+  # project — it silently returned fake demo data instead.
+  if (access_code_clean %in% c("demo", "test")) {
     if (debug) message("Demo access granted")
-    
+    demo_record_id <- Sys.getenv("GMED_DEMO_RECORD_ID", unset = "999")
+
     return(list(
       success = TRUE,
       resident_info = list(
-        record_id = "88",
+        record_id = demo_record_id,
         name = "Demo Resident",
         type = "demo"
       ),
@@ -175,8 +191,9 @@ validate_access_code <- function(access_code,
   
   access_code_clean <- trimws(access_code)
   
-  # Check demo codes
-  if (access_code_clean %in% c("demo", "test", "88")) {
+  # Check demo codes — see authenticate_resident() above for why "88" was
+  # removed from this list (2026-09-16).
+  if (access_code_clean %in% c("demo", "test")) {
     return(TRUE)
   }
   
