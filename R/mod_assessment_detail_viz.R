@@ -2,7 +2,6 @@
 #' 
 #' Dynamic assessment viewer with category selector
 #' @param id Module namespace
-#' @export
 mod_assessment_detail_viz_ui <- function(id) {
   ns <- NS(id)
   colors <- gmed_colors()
@@ -71,7 +70,6 @@ mod_assessment_detail_viz_ui <- function(id) {
 #' @param rdm_data Reactive returning full RDM data
 #' @param record_id Reactive returning resident record_id
 #' @param data_dict Reactive or static data dictionary
-#' @export
 mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -349,7 +347,6 @@ mod_assessment_detail_viz_server <- function(id, rdm_data, record_id, data_dict)
 #' Extract Assessment Categories from Data Dictionary
 #' @param data_dict Data dictionary
 #' @return Named list of category configurations
-#' @export
 extract_assessment_categories <- function(data_dict) {
   
   # Get all assessment fields

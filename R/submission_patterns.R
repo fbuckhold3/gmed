@@ -18,8 +18,7 @@ NULL
 #' @param level Resident level
 #' @param review_type "scheduled" or "interim"
 #' @return List with success status and message
-#' @export
-submit_overwrite_data <- function(redcap_url, redcap_token, record_id, 
+submit_overwrite_data <- function(redcap_url, redcap_token, record_id,
                                   form_data, instrument_name, period, level, 
                                   review_type = "scheduled") {
   
@@ -90,8 +89,7 @@ submit_overwrite_data <- function(redcap_url, redcap_token, record_id,
 #' @param form_data List of form fields
 #' @param instrument_name REDCap instrument name (e.g., "faculty_evaluation", "scholarship")
 #' @return List with success status and message
-#' @export
-submit_additive_data <- function(redcap_url, redcap_token, record_id, 
+submit_additive_data <- function(redcap_url, redcap_token, record_id,
                                  form_data, instrument_name) {
   
   tryCatch({

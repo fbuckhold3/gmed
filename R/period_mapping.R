@@ -4,28 +4,28 @@
 #'
 #' Determines the current evaluation period based on the current date
 #' using the academic calendar (July 1 - June 30).
-#' 
+#'
 #' Period Calendar:
 #' - Intern Intro: July 1 - September 30 (only for Interns)
 #' - Mid Review: October 1 - January 31 (all levels)
 #' - End Review: February 1 - June 30 (all levels)
 #'
-#' @param reference_date Date object (defaults to current date)  
+#' @param reference_date Date object (defaults to current date)
 #' @return Character string indicating current period ("Intern Intro", "Mid Review", "End Review")
 #' @export
 get_current_period <- function(reference_date = Sys.Date()) {
-  
+
   if (is.null(reference_date)) {
     reference_date <- Sys.Date()
   }
-  
+
   # Convert to Date if needed
   if (!inherits(reference_date, "Date")) {
     reference_date <- as.Date(reference_date)
   }
-  
+
   month <- as.numeric(format(reference_date, "%m"))
-  
+
   if (month >= 7 && month <= 9) {
     # July-September: Intern Intro period
     return("Intern Intro")
@@ -50,15 +50,15 @@ get_current_period <- function(reference_date = Sys.Date()) {
 #' @return Character string of mapped period or NA if no mapping exists
 #' @export
 map_to_milestone_period <- function(level, period, form_context = NULL) {
-  
+
   if (is.null(level) || is.null(period) || level == "" || period == "") {
     return(NA_character_)
   }
-  
+
   # Normalize inputs
   level <- trimws(as.character(level))
   period <- trimws(as.character(period))
-  
+
   # INTERN MAPPINGS
   if (level == "Intern") {
     if (period == "Intern Intro") {
@@ -69,7 +69,7 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
       return("End Intern")
     }
   }
-  
+
   # PGY2 MAPPINGS
   else if (level == "PGY2") {
     # PGY2s don't do Intern Intro reviews
@@ -86,7 +86,7 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
       return("End PGY2")
     }
   }
-  
+
   # PGY3 MAPPINGS
   else if (level == "PGY3") {
     # PGY3s don't do Intern Intro reviews
@@ -103,7 +103,7 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
       return("Graduation")
     }
   }
-  
+
   # Unknown level
   message(sprintf("Unknown level '%s' for period '%s'", level, period))
   return(NA_character_)
@@ -124,13 +124,12 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
 #'
 #' @param milestone_period Character string of milestone period
 #' @return Character string of instance number or NA
-#' @export
 map_milestone_to_instance <- function(milestone_period) {
-  
+
   if (is.null(milestone_period) || is.na(milestone_period)) {
     return(NA_character_)
   }
-  
+
   instance_map <- c(
     "Intern Intro" = "7",
     "Mid Intern" = "1",
@@ -140,37 +139,15 @@ map_milestone_to_instance <- function(milestone_period) {
     "Mid PGY3" = "5",
     "Graduation" = "6"
   )
-  
+
   instance <- instance_map[milestone_period]
-  
+
   if (is.na(instance)) {
     message(sprintf("No instance mapping for milestone period: %s", milestone_period))
     return(NA_character_)
   }
-  
-  return(unname(instance))
-}
 
-#' Map Application Period to Coach Period Instance
-#'
-#' Convenience function that combines level/period mapping to get REDCap instance.
-#'
-#' @param app_period Current period from get_current_period()
-#' @param resident_level Resident level ("Intern", "PGY2", "PGY3")
-#' @return Character string of REDCap instance number
-#' @export
-map_app_period_to_coach_period <- function(app_period, resident_level) {
-  
-  # Get milestone period first
-  milestone_period <- map_to_milestone_period(resident_level, app_period)
-  
-  # If no milestone period (e.g., PGY2/3 during Intern Intro), return NA
-  if (is.na(milestone_period)) {
-    return(NA_character_)
-  }
-  
-  # Convert to instance
-  return(map_milestone_to_instance(milestone_period))
+  return(unname(instance))
 }
 
 #' Check if Resident Should Be Reviewed
@@ -182,19 +159,19 @@ map_app_period_to_coach_period <- function(app_period, resident_level) {
 #' @return Logical indicating if resident should be reviewed
 #' @export
 should_resident_be_reviewed <- function(level, period) {
-  
+
   if (is.null(level) || is.null(period)) {
     return(FALSE)
   }
-  
+
   level <- trimws(as.character(level))
   period <- trimws(as.character(period))
-  
+
   # Interns get all three reviews
   if (level == "Intern") {
     return(TRUE)
   }
-  
+
   # PGY2 and PGY3 only get Mid and End reviews
   if (level %in% c("PGY2", "PGY3")) {
     if (period == "Intern Intro") {
@@ -203,7 +180,7 @@ should_resident_be_reviewed <- function(level, period) {
       return(TRUE)  # Reviews during Mid and End periods
     }
   }
-  
+
   # Unknown level - default to no review
   return(FALSE)
 }
@@ -219,11 +196,11 @@ should_resident_be_reviewed <- function(level, period) {
 #' @return Character string of previous period or NA if no previous period
 #' @export
 get_previous_period <- function(current_period, level, form_context = NULL) {
-  
+
   if (is.null(current_period) || is.null(level)) {
     return(NA_character_)
   }
-  
+
   # Define previous period relationships
   previous_map <- list(
     "Intern" = list(
@@ -235,19 +212,19 @@ get_previous_period <- function(current_period, level, form_context = NULL) {
       "End Review" = "Mid Review"   # Current year's mid review
     ),
     "PGY3" = list(
-      "Mid Review" = "End Review",  # Previous year's end review (as PGY2)  
+      "Mid Review" = "End Review",  # Previous year's end review (as PGY2)
       "End Review" = "Mid Review"   # Current year's mid review
     )
   )
-  
+
   # Get previous period for this level
   level_map <- previous_map[[level]]
   if (is.null(level_map)) {
     return(NA_character_)
   }
-  
+
   previous_period <- level_map[[current_period]]
-  
+
   # Handle special cases
   if (!is.null(form_context) && form_context == "milestone") {
     # For milestone context, "Intern Intro" doesn't have milestone data
@@ -255,7 +232,7 @@ get_previous_period <- function(current_period, level, form_context = NULL) {
       return(NA_character_)
     }
   }
-  
+
   return(previous_period)
 }
 
@@ -268,26 +245,11 @@ get_previous_period <- function(current_period, level, form_context = NULL) {
 #' @export
 is_intern_intro_period <- function(period) {
   if (is.null(period) || is.na(period)) return(FALSE)
-  
+
   return(period %in% c("Intern Intro", "7", "Intro"))
 }
 
-#' Get Academic Year from Date
-#'
-#' Determines the academic year (July 1 - June 30) for a given date.
-#'
-#' @param date Date object (defaults to current date)
-#' @return Numeric academic year (starting year)
-#' @export
-get_academic_year <- function(date = Sys.Date()) {
-  if (format(date, "%m-%d") >= "07-01") {
-    return(as.numeric(format(date, "%Y")))
-  } else {
-    return(as.numeric(format(date, "%Y")) - 1)
-  }
-}
-
-#' Calculate Resident Level Based on Data - ENHANCED VERSION  
+#' Calculate Resident Level Based on Data - ENHANCED VERSION
 #'
 #' Enhanced to handle the grad_yr/type pattern from your coaching app.
 #'
@@ -296,15 +258,15 @@ get_academic_year <- function(date = Sys.Date()) {
 #' @return Data frame with Level column added or updated
 #' @export
 calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
-  
+
   if (!requireNamespace("dplyr", quietly = TRUE)) {
     stop("Package 'dplyr' is required for data processing")
   }
-  
+
   if (is.null(resident_data) || nrow(resident_data) == 0) {
     return(resident_data)
   }
-  
+
   # If Level column already exists and is populated, use it
   if ("Level" %in% names(resident_data)) {
     existing_levels <- resident_data$Level[!is.na(resident_data$Level) & resident_data$Level != ""]
@@ -317,21 +279,21 @@ calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
       }
     }
   }
-  
+
   # METHOD 1: Complex calculation using type + grad_yr (RDM 2.0 pattern)
   if ("type" %in% names(resident_data) && "grad_yr" %in% names(resident_data)) {
-    
+
     message("Using type/grad_yr calculation method (RDM 2.0 pattern)")
-    
+
     # Calculate current academic year (July 1 - June 30)
     if (format(current_date, "%m-%d") >= "07-01") {
       current_academic_year <- as.numeric(format(current_date, "%Y"))
     } else {
       current_academic_year <- as.numeric(format(current_date, "%Y")) - 1
     }
-    
+
     message("Current academic year: ", current_academic_year)
-    
+
     # Normalise type: accept both raw numeric codes (1/2) and text labels
     # Data dict: 1 = Preliminary, 2 = Categorical
     resident_data <- resident_data %>%
@@ -377,28 +339,28 @@ calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
         )
       ) %>%
       dplyr::select(-.type_norm, -.gyr_raw, -.grad_yr_actual)
-    
+
     # METHOD 2: Simple year field (legacy apps)
   } else if ("year" %in% names(resident_data)) {
-    
+
     message("Using simple year field calculation method")
-    
+
     resident_data <- resident_data %>%
       dplyr::mutate(
         Level = dplyr::case_when(
           .data$year == 1 ~ "Intern",
           .data$year == 2 ~ "PGY2",
-          .data$year == 3 ~ "PGY3", 
+          .data$year == 3 ~ "PGY3",
           TRUE ~ "Intern"  # Default fallback
         )
       )
-    
+
   } else {
     # Fallback - add default Level
     message("No type/grad_yr or year columns found, using default Level")
     resident_data$Level <- "Intern"
   }
-  
+
   # Report level distribution — use single-bracket [ to avoid subscript errors
   # when a level is absent (single-resident filtered data only has one level)
   if ("Level" %in% names(resident_data)) {
@@ -409,7 +371,7 @@ calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
     message("Level distribution: Intern: ", lc("Intern"),
             ", PGY2: ", lc("PGY2"), ", PGY3: ", lc("PGY3"))
   }
-  
+
   return(resident_data)
 }
 
@@ -425,49 +387,48 @@ calculate_resident_level <- function(resident_data, current_date = Sys.Date()) {
 #' @param app_data Complete app data structure (from load_rdm_complete or similar)
 #' @param verbose Logical. Print selection details for debugging
 #' @return Character string of the most recent period with data
-#' @export
 #' @examples
 #' \dontrun{
 #' # In a Shiny app
 #' period <- get_most_recent_period_for_resident(resident_info(), app_data())
-#' 
+#'
 #' # With debugging
 #' period <- get_most_recent_period_for_resident(resident_info(), app_data(), verbose = TRUE)
 #' }
 get_most_recent_period_for_resident <- function(resident_info, app_data, verbose = FALSE) {
-  
+
   resident_level <- resident_info$Level %||% "Unknown"
   resident_id <- resident_info$record_id
-  
+
   if (verbose) message("Finding most recent period for resident ", resident_id, " (", resident_level, ")")
-  
+
   # Standard evaluation period hierarchy (most recent first)
   period_hierarchy <- c("Graduating", "Mid PGY3", "End PGY2", "Mid PGY2", "End Intern", "Mid Intern")
-  
+
   # Check what periods actually have data for this resident
   available_periods <- c()
-  
+
   # Check across all milestone forms
   if (!is.null(app_data$all_forms)) {
     milestone_forms <- c("milestone_entry", "milestone_selfevaluation_c33c", "acgme_miles", "acgme_entry")
-    
+
     for (form_name in milestone_forms) {
       if (form_name %in% names(app_data$all_forms)) {
         form_data <- app_data$all_forms[[form_name]]
-        
+
         if (!is.null(form_data) && nrow(form_data) > 0 && resident_id %in% form_data$record_id) {
           # Get period column (flexible naming)
           period_cols <- grep("period", names(form_data), ignore.case = TRUE, value = TRUE)
-          
+
           if (length(period_cols) > 0) {
             resident_periods <- form_data %>%
               dplyr::filter(record_id == !!resident_id) %>%
               dplyr::pull(!!period_cols[1]) %>%
               unique() %>%
               na.omit()
-            
+
             available_periods <- c(available_periods, resident_periods)
-            
+
             if (verbose && length(resident_periods) > 0) {
               message("  Found periods in ", form_name, ": ", paste(resident_periods, collapse = ", "))
             }
@@ -476,14 +437,14 @@ get_most_recent_period_for_resident <- function(resident_info, app_data, verbose
       }
     }
   }
-  
+
   # Remove duplicates and clean up
   available_periods <- unique(available_periods[!is.na(available_periods) & available_periods != ""])
-  
+
   if (verbose) {
     message("  All available periods: ", paste(available_periods, collapse = ", "))
   }
-  
+
   # Find the most recent period that exists in our data
   for (period in period_hierarchy) {
     if (period %in% available_periods) {
@@ -491,7 +452,7 @@ get_most_recent_period_for_resident <- function(resident_info, app_data, verbose
       return(period)
     }
   }
-  
+
   # Fallback based on resident level if no data periods found
   fallback_period <- dplyr::case_when(
     grepl("PGY3|Graduating", resident_level, ignore.case = TRUE) ~ "Graduating",
@@ -499,13 +460,10 @@ get_most_recent_period_for_resident <- function(resident_info, app_data, verbose
     grepl("Intern", resident_level, ignore.case = TRUE) ~ "End Intern",
     TRUE ~ "End PGY2"
   )
-  
+
   if (verbose) {
     message("  No data periods found, using level-based fallback: ", fallback_period)
   }
-  
+
   return(fallback_period)
 }
-
-
-

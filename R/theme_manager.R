@@ -52,7 +52,6 @@ apply_gmed_style <- function(element, style = "gmed-card") {
 #' \code{\link{ssm_colors}} for the deprecated SSM-branded alias.
 #'
 #' @return Named list of gmed brand colors
-#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -281,7 +280,6 @@ gmed_page <- function(...,
 #' @param class Additional CSS classes
 #'
 #' @return HTML div element with header styling
-#' @export
 #'
 #' @examples
 #' \dontrun{

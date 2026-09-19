@@ -21,7 +21,6 @@ NULL
 #' @param data_dict Data dictionary from get_evaluation_dictionary()
 #' @param verbose Logical. Print detection details
 #' @return List of milestone configurations found
-#' @export
 extract_milestone_configs_from_dict <- function(data_dict, verbose = TRUE) {
 
   if (verbose) {
@@ -138,7 +137,6 @@ extract_milestone_configs_from_dict <- function(data_dict, verbose = TRUE) {
 #' Creates a standardized period mapping that works across all milestone forms
 #'
 #' @return Data frame with period mappings
-#' @export
 create_universal_period_mapping <- function() {
   
   # Universal period structure - handles both raw period codes and "Period X" format
@@ -330,50 +328,6 @@ get_milestone_data <- function(workflow_results, milestone_type = "program", mil
   }
 
   return(result)
-}
-
-#' Test the new workflow with your data
-#' @param complete_data Your loaded complete_data
-#' @export
-test_dict_driven_workflow <- function(complete_data) {
-  
-  message("Testing data dictionary-driven milestone workflow...")
-  
-  # Process all milestone data using data dictionary
-  milestone_results <- create_milestone_workflow_from_dict(
-    all_forms = complete_data$all_forms,
-    data_dict = complete_data$data_dict,
-    resident_data = complete_data$residents,
-    verbose = TRUE
-  )
-  
-  # Test getting specific data types
-  rep_program <- get_milestone_data(milestone_results, "program", "rep")
-  rep_self <- get_milestone_data(milestone_results, "self", "rep")
-  acgme_program <- get_milestone_data(milestone_results, "program", "acgme")
-  
-  # Test spider plot if we have data
-  if (!is.null(rep_program) && !is.null(rep_program$data) && nrow(rep_program$data) > 0) {
-    sample_resident <- rep_program$data$record_id[1]
-    sample_period <- rep_program$data$prog_mile_period[1]
-    
-    message("Testing spider plot...")
-    spider_plot <- create_milestone_spider_plot_final(
-      milestone_data = rep_program$data,
-      median_data = rep_program$medians,
-      resident_id = sample_resident,
-      period_text = sample_period,
-      milestone_type = "program",
-      resident_data = complete_data$residents
-    )
-    
-    return(list(
-      milestone_results = milestone_results,
-      spider_plot = spider_plot
-    ))
-  }
-  
-  return(milestone_results)
 }
 
 #' Detect Milestone Format
@@ -622,7 +576,6 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
 #' @param data Milestone data frame
 #' @param type Type of milestone instrument ("program", "self", "acgme", "acgme_self")
 #' @return Vector of milestone column names
-#' @export
 get_milestone_columns_simple <- function(data, type = "program") {
   
   if (is.null(data) || nrow(data) == 0) {
@@ -672,7 +625,6 @@ get_milestone_columns_simple <- function(data, type = "program") {
 #' @param milestone_data Raw milestone data
 #' @param type Milestone type ("program", "self", "acgme", "acgme_self")
 #' @return Processed milestone data
-#' @export
 process_milestone_data_simple <- function(milestone_data, type = "program") {
 
   if (!requireNamespace("dplyr", quietly = TRUE)) {
@@ -733,65 +685,6 @@ process_milestone_data_simple <- function(milestone_data, type = "program") {
   return(processed_data)
 }
 
-#' Calculate Milestone Medians (RDM 2.0 Version)
-#' 
-#' Calculates median milestone scores by period.
-#' Supports both REP and ACGME milestone formats.
-#' 
-#' @param processed_milestone_data Processed milestone data
-#' @return Data frame with median scores by period
-#' @export
-calculate_milestone_medians_simple <- function(processed_milestone_data) {
-
-  if (!requireNamespace("dplyr", quietly = TRUE)) {
-    stop("Package 'dplyr' is required for data processing")
-  }
-
-  if (!requireNamespace("rlang", quietly = TRUE)) {
-    stop("Package 'rlang' is required for data processing")
-  }
-
-  if (is.null(processed_milestone_data) || nrow(processed_milestone_data) == 0) {
-    return(NULL)
-  }
-
-  # Get milestone columns (numeric ones only) - supports both REP and ACGME
-  milestone_cols <- names(processed_milestone_data)[
-    grepl("^(rep_|acgme_)(pc|mk|sbp|pbl|prof|ics)\\d+", names(processed_milestone_data)) &
-      !grepl("_desc|_self$", names(processed_milestone_data))
-  ]
-
-  if (length(milestone_cols) == 0) {
-    return(NULL)
-  }
-
-  # Dynamically detect which period field exists in the data
-  # Support: prog_mile_period (REP program), prog_mile_period_self (REP self), acgme_mile_period (ACGME)
-  period_field <- NULL
-  if ("acgme_mile_period" %in% names(processed_milestone_data)) {
-    period_field <- "acgme_mile_period"
-  } else if ("prog_mile_period_self" %in% names(processed_milestone_data)) {
-    period_field <- "prog_mile_period_self"
-  } else if ("prog_mile_period" %in% names(processed_milestone_data)) {
-    period_field <- "prog_mile_period"
-  } else {
-    stop("No recognized period field found in data. Expected one of: prog_mile_period, prog_mile_period_self, acgme_mile_period")
-  }
-
-  # Create a symbol for dynamic evaluation
-  period_sym <- rlang::sym(period_field)
-
-  medians <- processed_milestone_data %>%
-    dplyr::group_by(!!period_sym, period_name) %>%
-    dplyr::summarise(
-      dplyr::across(dplyr::all_of(milestone_cols), ~ median(.x, na.rm = TRUE)),
-      n_residents = dplyr::n(),
-      .groups = "drop"
-    )
-
-  return(medians)
-}
-
 # ============================================================================
 # FIELD MAPPING FUNCTIONS (UPDATED FOR RDM 2.0)
 # ============================================================================
@@ -841,237 +734,9 @@ get_milestone_field_mapping_rdm2 <- function(target_form = "milestone_entry") {
   return(final_mapping)
 }
 
-#' Get Milestone Description Fields
-#'
-#' Returns the list of milestone fields that support description text.
-#' These are typically used for higher ratings that require explanation.
-#'
-#' @param milestone_format Format of milestones ("rep", "acgme", or "both")
-#' @return Character vector of milestone fields with description support
-#' @export
-get_milestone_desc_fields <- function(milestone_format = "rep") {
-  
-  base_fields <- c(
-    "PC_1", "PC_2", "PC_3", "PC_6",
-    "PBLI_1", "PBLI_2",
-    "PROF_1", "PROF_2", "PROF_3", "PROF_4",
-    "ICS_1", "ICS_2", "ICS_3"
-  )
-  
-  if (milestone_format == "rep") {
-    return(paste0("rep_", tolower(gsub("_", "", base_fields)), "_desc"))
-  } else if (milestone_format == "acgme") {
-    return(paste0("acgme_", tolower(gsub("_", "", base_fields)), "_desc"))
-  } else if (milestone_format == "both") {
-    rep_fields <- paste0("rep_", tolower(gsub("_", "", base_fields)), "_desc")
-    acgme_fields <- paste0("acgme_", tolower(gsub("_", "", base_fields)), "_desc")
-    return(c(rep_fields, acgme_fields))
-  } else {
-    stop("Unknown milestone_format: ", milestone_format, ". Use 'rep', 'acgme', or 'both'")
-  }
-}
-
-#' Milestone Definitions for UI Display (RDM 2.0 Version)
-#'
-#' Organized milestone definitions for use in UI components.
-#' Supports both REP and ACGME milestone formats.
-#'
-#' @param milestone_format Format to return ("rep", "acgme", or "both")
-#' @return List containing organized milestone definitions
-#' @export
-get_milestone_definitions <- function(milestone_format = "rep") {
-  
-  # Base milestone structure (same for both formats)
-  base_structure <- list(
-    pc_mk = list(
-      title = "Patient Care & Medical Knowledge",
-      items = c(
-        "pc1" = "PC1: History",
-        "pc2" = "PC2: Physical Examination", 
-        "pc3" = "PC3: Clinical Reasoning",
-        "pc4" = "PC4: Patient Management - Inpatient",
-        "pc5" = "PC5: Patient Management - Outpatient",
-        "pc6" = "PC6: Digital Health",
-        "mk1" = "MK1: Applied Foundational Sciences",
-        "mk2" = "MK2: Therapeutic Knowledge",
-        "mk3" = "MK3: Knowledge of Diagnostic Testing"
-      )
-    ),
-    sbp_pbl = list(
-      title = "Systems-Based Practice & Practice-Based Learning",
-      items = c(
-        "sbp1" = "SBP1: Patient Safety and Quality Improvement",
-        "sbp2" = "SBP2: System Navigation for Patient-Centered Care", 
-        "sbp3" = "SBP3: Physician Role in Health Care Systems",
-        "pbl1" = "PBLI1: Evidence-Based and Informed Practice",
-        "pbl2" = "PBLI2: Reflective Practice and Commitment to Personal Growth"
-      )
-    ),
-    prof_ics = list(
-      title = "Professionalism & Interpersonal Communication",
-      items = c(
-        "prof1" = "PROF1: Professional Behavior",
-        "prof2" = "PROF2: Ethical Principles",
-        "prof3" = "PROF3: Accountability/Conscientiousness", 
-        "prof4" = "PROF4: Knowledge of Systemic and Individual Factors of Well-Being",
-        "ics1" = "ICS1: Patient- and Family-Centered Communication",
-        "ics2" = "ICS2: Interprofessional and Team Communication",
-        "ics3" = "ICS3: Communication within Health Care Systems"
-      )
-    )
-  )
-  
-  if (milestone_format == "rep") {
-    # Add rep_ prefix
-    result <- base_structure
-    for (section in names(result)) {
-      names(result[[section]]$items) <- paste0("rep_", names(result[[section]]$items))
-    }
-    return(result)
-    
-  } else if (milestone_format == "acgme") {
-    # Add acgme_ prefix
-    result <- base_structure
-    for (section in names(result)) {
-      names(result[[section]]$items) <- paste0("acgme_", names(result[[section]]$items))
-    }
-    return(result)
-    
-  } else if (milestone_format == "both") {
-    # Return both with prefixes
-    rep_result <- base_structure
-    acgme_result <- base_structure
-    
-    for (section in names(rep_result)) {
-      names(rep_result[[section]]$items) <- paste0("rep_", names(rep_result[[section]]$items))
-      names(acgme_result[[section]]$items) <- paste0("acgme_", names(acgme_result[[section]]$items))
-    }
-    
-    return(list(
-      rep = rep_result,
-      acgme = acgme_result
-    ))
-    
-  } else {
-    stop("Unknown milestone_format: ", milestone_format, ". Use 'rep', 'acgme', or 'both'")
-  }
-}
-
 # ============================================================================
 # TRANSITION AND COMPATIBILITY FUNCTIONS
 # ============================================================================
-
-#' Convert REP Milestones to ACGME Format
-#' 
-#' Converts milestone data from REP format to ACGME format for transition period
-#' @param rep_milestone_data Data frame with REP milestone data
-#' @return Data frame with ACGME format milestone data
-#' @export
-convert_rep_to_acgme_format <- function(rep_milestone_data) {
-  
-  if (!requireNamespace("dplyr", quietly = TRUE)) {
-    stop("Package 'dplyr' is required for data processing")
-  }
-  
-  if (is.null(rep_milestone_data) || nrow(rep_milestone_data) == 0) {
-    return(rep_milestone_data)
-  }
-
-  # Get REP milestone columns
-  rep_cols <- grep("^rep_(pc|mk|sbp|pbl|prof|ics)\\d+", names(rep_milestone_data), value = TRUE)
-
-  if (length(rep_cols) == 0) {
-    return(rep_milestone_data)
-  }
-  
-  # Create conversion mapping
-  acgme_data <- rep_milestone_data
-  
-  for (col in rep_cols) {
-    # Convert rep_pc1 to acgme_pc1, etc.
-    new_col <- gsub("^rep_", "acgme_", col)
-    acgme_data[[new_col]] <- acgme_data[[col]]
-  }
-
-  return(acgme_data)
-}
-
-#' Check Milestone Data Completeness
-#' 
-#' Checks completeness of milestone data for quality assurance
-#' @param milestone_data Milestone data to check
-#' @param milestone_format Format to check ("rep", "acgme", or "both")
-#' @return List with completeness statistics
-#' @export
-check_milestone_completeness <- function(milestone_data, milestone_format = "auto") {
-  
-  if (is.null(milestone_data) || nrow(milestone_data) == 0) {
-    return(list(
-      total_records = 0,
-      complete_records = 0,
-      completion_rate = 0,
-      missing_fields = character(0)
-    ))
-  }
-  
-  # Auto-detect format if needed
-  if (milestone_format == "auto") {
-    milestone_format <- detect_milestone_format(milestone_data)
-  }
-  
-  # Get relevant milestone columns
-  if (milestone_format == "rep") {
-    milestone_cols <- get_milestone_columns_simple(milestone_data, "program")
-  } else if (milestone_format == "acgme") {
-    milestone_cols <- get_milestone_columns_simple(milestone_data, "acgme")
-  } else {
-    rep_cols <- get_milestone_columns_simple(milestone_data, "program")
-    acgme_cols <- get_milestone_columns_simple(milestone_data, "acgme")
-    milestone_cols <- c(rep_cols, acgme_cols)
-  }
-  
-  if (length(milestone_cols) == 0) {
-    return(list(
-      total_records = nrow(milestone_data),
-      complete_records = 0,
-      completion_rate = 0,
-      missing_fields = "No milestone columns found"
-    ))
-  }
-  
-  # Check completeness
-  total_records <- nrow(milestone_data)
-  
-  # Count records with at least one milestone score
-  complete_records <- milestone_data %>%
-    dplyr::filter(dplyr::if_any(dplyr::all_of(milestone_cols), ~ !is.na(.))) %>%
-    nrow()
-  
-  completion_rate <- if (total_records > 0) complete_records / total_records else 0
-  
-  # Find fields with high missing rates
-  missing_rates <- sapply(milestone_cols, function(col) {
-    if (col %in% names(milestone_data)) {
-      sum(is.na(milestone_data[[col]])) / total_records
-    } else {
-      1  # Column doesn't exist
-    }
-  })
-  
-  high_missing_fields <- names(missing_rates)[missing_rates > 0.8]
-  
-  result <- list(
-    total_records = total_records,
-    complete_records = complete_records,
-    completion_rate = round(completion_rate, 3),
-    milestone_format = milestone_format,
-    milestone_columns_found = length(milestone_cols),
-    high_missing_fields = high_missing_fields
-  )
-
-  return(result)
-}
-
 
 # ============================================================================
 # MILESTONE PROGRESSION CHARTS
@@ -1087,7 +752,6 @@ check_milestone_completeness <- function(milestone_data, milestone_format = "aut
 #' @param short Logical. If TRUE, return only the competency code (e.g., "PC1")
 #'   rather than the full label ("PC1: History"). Default FALSE.
 #' @return Character string with proper label (e.g., "PC1: History" or "PC1" if short=TRUE)
-#' @export
 get_milestone_label <- function(milestone_col, milestone_format = "rep", short = FALSE) {
 
   full <- .get_milestone_label_full(milestone_col)
@@ -1159,7 +823,6 @@ convert_acgme_to_internal_scale <- function(acgme_score) {
 #'
 #' @param milestone_format Format to return ("rep", "acgme")
 #' @return Data frame with national benchmarks on 9-point scale
-#' @export
 get_national_milestone_benchmarks <- function(milestone_format = "rep") {
   
   if (milestone_format == "rep") {
@@ -1573,7 +1236,6 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
 #' @param resident_data Resident lookup data for name
 #' @param show_national Logical. Include national benchmarks (default: TRUE)
 #' @return Enhanced plotly object with modern styling
-#' @export
 create_enhanced_milestone_progression <- function(milestone_results, resident_id, milestone_col,
                                                   milestone_type = "program", milestone_system = "rep",
                                                   resident_data = NULL, show_national = TRUE) {

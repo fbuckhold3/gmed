@@ -15,7 +15,6 @@ NULL
 #'
 #' @return A data frame with processed summative evaluation data if available; otherwise,
 #' a data frame containing a message indicating no data or describing any error encountered
-#' @export
 process_summative_data <- function(data, resident_name, level) {
   
   if (!requireNamespace("dplyr", quietly = TRUE)) {
@@ -153,45 +152,6 @@ check_self_eval_complete <- function(data, resident_name, period, level) {
     dplyr::pull(any_rating)
   
   return(any(has_ratings, na.rm = TRUE))
-}
-
-#' Generate Traditional Plus-Delta Data (Legacy Support)
-#'
-#' Filters and processes the input data to extract plus-delta evaluations for a specific resident.
-#' This is the traditional version for backward compatibility with older data structures.
-#'
-#' @param data A data frame containing evaluation data
-#' @param resident A character string specifying the resident's name
-#'
-#' @return A data frame containing the Date, Rotation, Level, Plus, Delta, Feedback, and Evaluator
-#' @export
-generate_p_d <- function(data, resident) {
-  
-  if (!requireNamespace("dplyr", quietly = TRUE)) {
-    stop("Package 'dplyr' is required for data processing")
-  }
-  
-  if (is.null(data) || nrow(data) == 0) {
-    return(data.frame(
-      Date = character(0),
-      Rotation = character(0),
-      Level = character(0),
-      Plus = character(0),
-      Delta = character(0),
-      Feedback = character(0),
-      Evaluator = character(0)
-    ))
-  }
-  
-  data %>%
-    dplyr::filter(name == resident) %>%
-    dplyr::select(Date, Rotation, Level, cc_res_does_well, res_to_improve, min_giv_feedback, Evaluator) %>%
-    dplyr::rename(
-      Plus = cc_res_does_well,
-      Delta = res_to_improve,
-      Feedback = min_giv_feedback
-    ) %>%
-    dplyr::filter(!(is.na(Rotation) & is.na(Plus) & is.na(Delta)))
 }
 
 #' Get CC Fields for Quarter and Level

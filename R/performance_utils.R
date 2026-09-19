@@ -10,7 +10,6 @@ NULL
 #'
 #' Clears all cached data (data dictionary, milestone medians, etc.)
 #'
-#' @export
 #' @examples
 #' \dontrun{
 #' clear_rdm_cache()
@@ -51,7 +50,6 @@ set_cached <- function(key, value) {
 #'
 #' Returns information about what's currently cached
 #'
-#' @export
 #' @return Data frame with cache contents
 #' @examples
 #' \dontrun{
@@ -91,7 +89,6 @@ get_cache_info <- function() {
 #' @param verbose Print timing information (default: TRUE)
 #'
 #' @return List with timing information for each major step
-#' @export
 #'
 #' @examples
 #' \dontrun{

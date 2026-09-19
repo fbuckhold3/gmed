@@ -276,7 +276,6 @@ calculate_pgy_and_period <- function(grad_yr,
 #' @param period_number Numeric period number (7, 1-6)
 #' @param data_dict Optional data dictionary to pull labels from
 #' @return Character period label
-#' @export
 #'
 #' @examples
 #' get_period_label(7)  # "Entering Residency"
@@ -336,7 +335,6 @@ get_period_label <- function(period_number, data_dict = NULL) {
 #' @param data_dict Optional data dictionary to pull labels from
 #'
 #' @return Character string with type label
-#' @export
 #'
 #' @examples
 #' translate_resident_type(1)  # "Preliminary"
@@ -420,7 +418,6 @@ parse_redcap_choices <- function(choices_string) {
 #'
 #' @param type Numeric or Character. Residency type: 1/"Preliminary" or 2/"Categorical"
 #' @return Numeric vector of period numbers
-#' @export
 #'
 #' @examples
 #' get_resident_periods(2)  # c(7, 1, 2, 3, 4, 5, 6)

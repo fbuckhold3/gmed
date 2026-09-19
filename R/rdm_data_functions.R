@@ -16,12 +16,12 @@ NULL
 #' config <- initialize_app_config()
 #' }
 initialize_app_config <- function() {
-  
+
   # Try environment variables first (production)
   rdm_token <- Sys.getenv("RDM_TOKEN", unset = NA)
   fac_token <- Sys.getenv("FAC_TOKEN", unset = NA)
   access_code <- Sys.getenv("ACCESS_CODE", unset = NA)
-  
+
   # If environment variables not available, try config file
   if (is.na(rdm_token) || is.na(fac_token)) {
     tryCatch({
@@ -35,7 +35,7 @@ initialize_app_config <- function() {
       message("Config file not found, using environment variables only")
     })
   }
-  
+
   # Default values
   config <- list(
     url = "https://redcapsurvey.slu.edu/api/",
@@ -43,16 +43,16 @@ initialize_app_config <- function() {
     fac_token = fac_token,
     access_code = access_code
   )
-  
+
   # Validate required tokens
   if (is.na(config$rdm_token)) {
     stop("RDM_TOKEN is required but not found in environment or config file")
   }
-  
+
   if (is.na(config$fac_token)) {
     stop("FAC_TOKEN is required but not found in environment or config file")
   }
-  
+
   return(config)
 }
 
@@ -67,7 +67,6 @@ initialize_app_config <- function() {
 #' @param raw_or_label Character. "label" for human-readable labels (default), "raw" for codes/checkbox fields
 #'
 #' @return Data frame with all REDCap records
-#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -86,7 +85,7 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
   form_data <- list(
     token = token,
     content = "record",
-    action = "export", 
+    action = "export",
     format = "json",  # CHANGED: json instead of csv
     type = "flat",
     rawOrLabel = raw_or_label,
@@ -96,7 +95,7 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
     exportDataAccessGroups = "false",
     returnFormat = "json"
   )
-  
+
   # Make API call — 180s timeout; REDCap full-export responses can be >1.5 MB
   httr::set_config(httr::config(ssl_verifypeer = FALSE, ssl_verifyhost = FALSE))
   response <- httr::POST(
@@ -105,12 +104,12 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
     encode = "form",
     httr::timeout(180)
   )
-  
+
   # Check response status
   if (httr::http_status(response)$category != "Success") {
     stop("REDCap API call failed. Status: ", httr::status_code(response))
   }
-  
+
   # Parse JSON response
   json_content <- httr::content(response, as = "text", encoding = "UTF-8")
   data <- tryCatch({
@@ -118,11 +117,11 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
   }, error = function(e) {
     stop("Failed to parse JSON content from REDCap: ", e$message)
   })
-  
+
   # Convert to data frame and ensure all columns are character
   data <- as.data.frame(data, stringsAsFactors = FALSE)
   data[] <- lapply(data, as.character)
-  
+
   # Ensure record_id is character
   if ("record_id" %in% names(data)) {
     data$record_id <- as.character(data$record_id)
@@ -131,7 +130,7 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
   return(data)
 }
 
- 
+
 #' Get Evaluation Dictionary from REDCap
 #'
 #' Retrieves the data dictionary for field metadata and validation.
@@ -148,11 +147,11 @@ pull_all_redcap_data <- function(token, url, raw_or_label = "label") {
 #' dict <- get_evaluation_dictionary(config$rdm_token, config$url)
 #' }
 get_evaluation_dictionary <- function(token, url) {
-  
+
   if (!requireNamespace("httr", quietly = TRUE)) {
     stop("Package 'httr' is required for REDCap API calls")
   }
-  
+
   response <- tryCatch({
     httr::POST(
       url = url,
@@ -168,14 +167,14 @@ get_evaluation_dictionary <- function(token, url) {
   }, error = function(e) {
     stop("Failed to retrieve data dictionary: ", e$message)
   })
-  
+
   if (httr::status_code(response) != 200) {
     stop("Dictionary request failed with status: ", httr::status_code(response))
   }
-  
+
   content <- httr::content(response, "text", encoding = "UTF-8")
   dict <- jsonlite::fromJSON(content, flatten = TRUE)
-  
+
   # Standardize column names
   if ("field_name" %in% names(dict)) {
     dict$Variable <- dict$field_name
@@ -186,56 +185,6 @@ get_evaluation_dictionary <- function(token, url) {
 
   return(dict)
 }
-
-#' Get Record ID from Resident Name
-#' 
-#' Looks up resident record_id from name in REDCap data
-#' @param resident_name Name of resident
-#' @param redcap_url REDCap API URL
-#' @param redcap_token REDCap API token
-#' @return Character record_id or NULL if not found
-#' @export
-get_record_id_from_name <- function(resident_name, redcap_url, redcap_token) {
-  
-  tryCatch({
-    # Query REDCap for resident data
-    response <- httr::POST(
-      url = redcap_url,
-      body = list(
-        token = redcap_token,
-        content = "record",
-        action = "export",
-        format = "json",
-        type = "flat", 
-        fields = "record_id,name",
-        returnFormat = "json"
-      ),
-      encode = "form",
-      httr::timeout(30)
-    )
-    
-    if (httr::status_code(response) == 200) {
-      content <- httr::content(response, "text", encoding = "UTF-8")
-      data <- jsonlite::fromJSON(content)
-      
-      if (is.data.frame(data) && nrow(data) > 0) {
-        # Look for exact name match
-        matching_record <- data[data$name == resident_name, ]
-        
-        if (nrow(matching_record) > 0) {
-          return(as.character(matching_record$record_id[1]))
-        }
-      }
-    }
-    
-    return(NULL)
-    
-  }, error = function(e) {
-    message("Error looking up record ID: ", e$message)
-    return(NULL)
-  })
-}
-
 
 #' Helper operator for NULL coalescing
 #'
@@ -260,7 +209,6 @@ get_record_id_from_name <- function(resident_name, redcap_url, redcap_token) {
 #' @param verbose Boolean. Print detailed loading messages (default: TRUE)
 #'
 #' @return List containing data organized by form names
-#' @export
 load_data_by_forms <- function(rdm_token = NULL,
                                redcap_url = "https://redcapsurvey.slu.edu/api/",
                                filter_archived = TRUE,
@@ -289,18 +237,18 @@ load_data_by_forms <- function(rdm_token = NULL,
   # Get all unique form names from data dictionary
   form_names <- unique(data_dict$form_name)
   form_names <- form_names[!is.na(form_names)]
-  
+
   # Initialize result structure
   result <- list(
     raw_data = raw_data,
     data_dict = data_dict,
     forms = list()
   )
-  
+
   # Extract base resident data (non-repeating)
   resident_data <- raw_data %>%
     dplyr::filter(is.na(redcap_repeat_instrument) | redcap_repeat_instrument == "")
-  
+
   # Filter archived residents if requested
   if (filter_archived && "res_archive" %in% names(resident_data)) {
     resident_data <- resident_data %>%
@@ -315,22 +263,22 @@ load_data_by_forms <- function(rdm_token = NULL,
       resident_data # Return as-is if calculation fails
     })
   }
-  
+
   result$resident_data <- resident_data
-  
+
   # For each form, extract relevant fields and data
   # For each form, extract relevant fields and data
 for (current_form in form_names) {
-  
+
   # Get all field names for this form from data dictionary
   form_fields <- data_dict %>%
     dplyr::filter(form_name == current_form) %>%
     dplyr::pull(field_name)
-  
+
   # Always include REDCap metadata fields
-  metadata_fields <- c("record_id", "redcap_repeat_instrument", "redcap_repeat_instance", 
+  metadata_fields <- c("record_id", "redcap_repeat_instrument", "redcap_repeat_instance",
                        "redcap_event_name", "redcap_survey_identifier")
-  
+
   # For checkbox fields, also include all the ___1, ___2, etc. variants
   checkbox_fields <- character()
   for (field in form_fields) {
@@ -339,18 +287,18 @@ for (current_form in form_names) {
     matching_cols <- grep(pattern, names(raw_data), value = TRUE)
     checkbox_fields <- c(checkbox_fields, matching_cols)
   }
-  
+
   # Combine metadata + form fields + checkbox variants, keep only those that exist in data
   all_fields <- c(metadata_fields, form_fields, checkbox_fields)
   existing_fields <- intersect(all_fields, names(raw_data))
-  
-    
+
+
     # Extract data for this form
     if (length(existing_fields) > length(metadata_fields)) {
       # Filter data to only include records with data in this form's fields
       form_data <- raw_data %>%
         dplyr::select(all_of(existing_fields))
-      
+
       # Remove rows where all form-specific fields are NA/empty
       form_specific_fields <- setdiff(existing_fields, metadata_fields)
       if (length(form_specific_fields) > 0) {
@@ -360,7 +308,7 @@ for (current_form in form_names) {
             if_any(all_of(form_specific_fields), ~ !is.na(.) & . != "")
           )
       }
-      
+
       # Store with clean form name
       clean_form_name <- tolower(gsub("[^a-zA-Z0-9_]", "_", current_form))
       clean_form_name <- gsub("_+", "_", clean_form_name)  # Remove multiple underscores
@@ -389,17 +337,16 @@ for (current_form in form_names) {
 #' @param data_list List returned from load_data_by_forms()
 #' @param form_name Character. Name of form to extract (partial matching supported)
 #' @return Data frame with form data, or NULL if not found
-#' @export
 get_form_data <- function(data_list, form_name) {
-  
+
   # Direct match first
   if (form_name %in% names(data_list$forms)) {
     return(data_list$forms[[form_name]])
   }
-  
+
   # Partial match
   matches <- grep(form_name, names(data_list$forms), value = TRUE, ignore.case = TRUE)
-  
+
   if (length(matches) == 1) {
     return(data_list$forms[[matches[1]]])
   } else if (length(matches) > 1) {
@@ -419,9 +366,8 @@ get_form_data <- function(data_list, form_name) {
 #'
 #' @param data_list List returned from load_data_by_forms()
 #' @return Data frame with form info
-#' @export
 list_forms <- function(data_list) {
-  
+
   if (length(data_list$forms) == 0) {
     return(data.frame(
       form_name = character(0),
@@ -430,66 +376,39 @@ list_forms <- function(data_list) {
       stringsAsFactors = FALSE
     ))
   }
-  
+
   form_summary <- data.frame(
     form_name = names(data_list$forms),
     n_records = sapply(data_list$forms, nrow),
     n_fields = sapply(data_list$forms, function(x) {
       # Count non-metadata fields
-      metadata_fields <- c("record_id", "redcap_repeat_instrument", "redcap_repeat_instance", 
+      metadata_fields <- c("record_id", "redcap_repeat_instrument", "redcap_repeat_instance",
                            "redcap_event_name", "redcap_survey_identifier")
       ncol(x) - length(intersect(names(x), metadata_fields))
     }),
     stringsAsFactors = FALSE
   )
-  
+
   # Sort by number of records
   form_summary <- form_summary[order(form_summary$n_records, decreasing = TRUE), ]
   rownames(form_summary) <- NULL
-  
+
   return(form_summary)
 }
 
-#' Debug Data Dictionary Structure
-#'
-#' Helper function to see what columns are in your data dictionary
-#'
-#' @param data_dict Data dictionary from get_evaluation_dictionary()
-#' @export
-debug_data_dict <- function(data_dict) {
-  cat("=== DATA DICTIONARY DEBUG ===\n")
-  cat("Total rows:", nrow(data_dict), "\n")
-  cat("Column names:\n")
-  for (i in 1:length(names(data_dict))) {
-    cat("  ", i, ". '", names(data_dict)[i], "'\n", sep = "")
-  }
-  
-  # Show sample form names
-  cat("\nSample Form Names:\n")
-  sample_forms <- unique(data_dict$form_name)[1:10]
-  for (form in sample_forms) {
-    cat("  - ", form, "\n")
-  }
-  
-  # Show sample field names
-  cat("\nSample Field Names:\n")
-  sample_fields <- data_dict$field_name[1:5]
-  cat("  ", paste(sample_fields, collapse = ", "), "\n")
-}
-
 # Example usage:
-# 
+#
 # # Load data organized by forms
 # data <- load_data_by_forms(rdm_token = "your_token")
-# 
+#
 # # See what forms are available
 # list_forms(data)
-# 
+#
 # # Get specific form data
 # acgme_data <- get_form_data(data, "acgme_miles")
 # ccc_data <- get_form_data(data, "ccc_review")
 # milestone_data <- get_form_data(data, "milestone_entry")
-# 
+#
 # # Or access directly
 # acgme_data <- data$forms$acgme_miles
 # ccc_data <- data$forms$ccc_review
@@ -497,7 +416,7 @@ debug_data_dict <- function(data_dict) {
 
 #' Filter Archived Residents from RDM Data
 #'
-#' Removes residents marked as archived (res_archive = "Yes", "Y", "1", etc.) 
+#' Removes residents marked as archived (res_archive = "Yes", "Y", "1", etc.)
 #' from all forms in the data structure.
 #'
 #' @param data List containing forms data (output from load_data_by_forms)
@@ -505,17 +424,16 @@ debug_data_dict <- function(data_dict) {
 #' @param verbose Logical, whether to print filtering summary (default: TRUE)
 #'
 #' @return Data structure with archived residents filtered out
-#' @export
 #'
 #' @examples
 #' \dontrun{
 #' # Load data then filter archives
 #' data <- load_data_by_forms(rdm_token)
 #' clean_data <- filter_archived_residents(data)
-#' 
+#'
 #' # Quiet filtering
 #' clean_data <- filter_archived_residents(data, verbose = FALSE)
-#' 
+#'
 #' # Custom archive field name
 #' clean_data <- filter_archived_residents(data, archive_field = "archived")
 #' }
@@ -581,31 +499,30 @@ filter_archived_residents <- function(data, archive_field = "res_archive", verbo
 #' @param archive_field Character string name of archive field (default: "res_archive")
 #'
 #' @return List with archive summary information
-#' @export
 get_archive_summary <- function(data, archive_field = "res_archive") {
-  
+
   if (!is.list(data) || !"forms" %in% names(data) || !"resident_data" %in% names(data$forms)) {
     return(list(error = "Invalid data structure"))
   }
-  
+
   resident_data <- data$forms$resident_data
-  
+
   if (!archive_field %in% names(resident_data)) {
     return(list(error = paste("Archive field", archive_field, "not found")))
   }
-  
+
   # Count archive values
   archive_table <- table(resident_data[[archive_field]], useNA = "always")
-  
+
   # Find archived residents
   archive_values <- c("Yes", "Y", "1", 1, "true", "True", "TRUE")
   archived_count <- sum(resident_data[[archive_field]] %in% archive_values, na.rm = TRUE)
   total_count <- nrow(resident_data)
   active_count <- total_count - archived_count
-  
+
   return(list(
     total_residents = total_count,
-    archived_residents = archived_count, 
+    archived_residents = archived_count,
     active_residents = active_count,
     archive_field_values = as.list(archive_table),
     archive_percentage = round((archived_count / total_count) * 100, 1)
@@ -617,7 +534,7 @@ get_archive_summary <- function(data, archive_field = "res_archive") {
 # ============================================================================
 
 #' Example usage in your data pipeline:
-#' 
+#'
 #' # Standard pipeline
 #' data <- load_data_by_forms(rdm_token = rdm_token)
 #' clean_data <- filter_archived_residents(data)  # <-- Use this instead
@@ -628,13 +545,13 @@ get_archive_summary <- function(data, archive_field = "res_archive") {
 #' archive_info <- get_archive_summary(data)
 #' print(archive_info)
 #'
-#' # Quiet filtering 
+#' # Quiet filtering
 #' clean_data <- filter_archived_residents(data, verbose = FALSE)
 
 
 
 
-# 
+#
 #' Calculate Resident Level at Time of Data Collection
 #'
 #' Calculates what level a resident was at the specific date when data was collected,
@@ -645,43 +562,42 @@ get_archive_summary <- function(data, archive_field = "res_archive") {
 #' @param date_col_name Name of the date column to use (e.g., "ass_date", "fac_eval_date")
 #'
 #' @return Dataframe with added 'level' column showing level at time of data collection
-#' @export
 calculate_level_at_time <- function(data, resident_lookup, date_col_name) {
-  
+
   # Check if date column exists
   if (!date_col_name %in% names(data)) {
     warning("Date column '", date_col_name, "' not found in data")
     data$level <- NA_character_
     return(data)
   }
-  
+
   # Join with resident lookup to get type and grad_yr
   data_with_resident_info <- data %>%
     dplyr::left_join(
       resident_lookup %>% dplyr::select(record_id, type, grad_yr),
       by = "record_id"
     )
-  
+
   # Calculate level at time of data collection
   data_with_level <- data_with_resident_info %>%
     dplyr::mutate(
       # Convert date column to Date type
       collection_date = as.Date(.data[[date_col_name]]),
-      
+
       # Convert grad_yr to numeric
       grad_yr_numeric = suppressWarnings(as.numeric(grad_yr)),
-      
+
       # Calculate level based on date, type, and graduation year
       level = dplyr::case_when(
         # Missing date -> missing level
         is.na(collection_date) ~ NA_character_,
-        
-        # Missing type or grad_yr -> missing level  
+
+        # Missing type or grad_yr -> missing level
         is.na(type) | is.na(grad_yr_numeric) ~ NA_character_,
-        
+
         # Preliminary residents are always Intern
         type == "Preliminary" ~ "Intern",
-        
+
         # Categorical residents - calculate based on academic year at collection date
         type == "Categorical" ~ {
           # Determine academic year of the collection date
@@ -691,13 +607,13 @@ calculate_level_at_time <- function(data, resident_lookup, date_col_name) {
             as.numeric(format(collection_date, "%Y")),
             as.numeric(format(collection_date, "%Y")) - 1
           )
-          
+
           # Calculate level based on how many years before graduation
           years_to_grad <- grad_yr_numeric - academic_year
-          
+
           dplyr::case_when(
             years_to_grad == 3 ~ "Intern",    # 3 years until graduation
-            years_to_grad == 2 ~ "PGY2",      # 2 years until graduation  
+            years_to_grad == 2 ~ "PGY2",      # 2 years until graduation
             years_to_grad == 1 ~ "PGY3",      # 1 year until graduation
             years_to_grad == 0 ~ "Graduating", # Graduation year
             years_to_grad < 0 ~ "Graduated",   # Past graduation
@@ -705,14 +621,14 @@ calculate_level_at_time <- function(data, resident_lookup, date_col_name) {
             TRUE ~ "Unknown"
           )
         },
-        
+
         # Other types
         TRUE ~ "Unknown"
       )
     ) %>%
     # Remove temporary columns
     dplyr::select(-collection_date, -grad_yr_numeric, -type, -grad_yr)
-  
+
   return(data_with_level)
 }
 
@@ -720,13 +636,12 @@ calculate_level_at_time <- function(data, resident_lookup, date_col_name) {
 #'
 #' Automatically adds level calculation to specified forms that have date fields
 #'
-#' @param data_list List from load_data_by_forms() 
+#' @param data_list List from load_data_by_forms()
 #' @param forms Named vector or list specifying forms and their date columns
 #'   e.g., c("assessment" = "ass_date", "faculty_evaluation" = "fac_eval_date")
 #' @param verbose Print progress messages
 #'
 #' @return Same data structure with level columns added to specified forms
-#' @export
 add_level_at_time_to_forms <- function(data_list,
                                        forms = c("assessment" = "ass_date",
                                                  "faculty_evaluation" = "fac_eval_date",
@@ -765,13 +680,13 @@ add_level_at_time_to_forms <- function(data_list,
 #
 # # Default: Apply to assessment, faculty_evaluation, and questions forms
 # data_with_levels <- add_level_at_time_to_forms(clean_data)
-# 
+#
 # # Custom: Apply only to assessment form
 # data_with_levels <- add_level_at_time_to_forms(
-#   clean_data, 
+#   clean_data,
 #   forms = c("assessment" = "ass_date")
 # )
-# 
+#
 # # Custom: Apply to different forms/date combinations
 # data_with_levels <- add_level_at_time_to_forms(
 #   clean_data,
@@ -784,4 +699,4 @@ add_level_at_time_to_forms <- function(data_list,
 #
 # # Check results
 # table(data_with_levels$forms$assessment$level, useNA = "always")
-# 
+#

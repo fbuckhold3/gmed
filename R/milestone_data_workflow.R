@@ -10,7 +10,6 @@
 #' @param verbose Boolean. Print progress messages (default: TRUE)
 #'
 #' @return List containing processed milestone data and medians for each form
-#' @export
 calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
 
   if (verbose) {
@@ -170,7 +169,6 @@ calculate_all_milestone_medians <- function(data_list, verbose = TRUE) {
 #' @param verbose Print progress messages
 #'
 #' @return List with organized milestone data ready for app usage
-#' @export
 prepare_milestone_app_data <- function(data_list, verbose = TRUE) {
 
   if (verbose) {
@@ -270,28 +268,4 @@ prepare_milestone_app_data <- function(data_list, verbose = TRUE) {
   }
 
   return(app_data)
-}
-
-#' Join Individual Milestone Data with Medians for Plotting
-#'
-#' Helper function to join individual and median data when needed for visualization
-#'
-#' @param individual_data Individual milestone data for one form
-#' @param median_data Median data for the same form  
-#' @param milestone_cols Vector of milestone column names
-#'
-#' @return Data frame with individual and median values for plotting
-#' @export
-join_individual_with_medians <- function(individual_data, median_data, milestone_cols) {
-  
-  # Join individual data with corresponding medians
-  joined_data <- individual_data %>%
-    dplyr::left_join(
-      median_data %>% 
-        dplyr::select(prog_mile_period, dplyr::all_of(milestone_cols)) %>%
-        dplyr::rename_with(~ paste0(.x, "_median"), dplyr::all_of(milestone_cols)),
-      by = "prog_mile_period"
-    )
-  
-  return(joined_data)
 }

@@ -13,7 +13,6 @@ NULL
 #' @param ... Additional UI elements to include in the container
 #'
 #' @return HTML div element with GMED selector styling
-#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -59,7 +58,6 @@ gmed_selector_container <- function(label = NULL, style = NULL, class = "", ...)
 #' @param style Additional CSS styles to apply
 #'
 #' @return HTML div element with resident information
-#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -148,7 +146,6 @@ gmed_resident_panel <- function(resident_name = NULL,
 #' @param id HTML id attribute for the progress bar
 #'
 #' @return HTML div element with progress bar styling
-#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -203,7 +200,6 @@ gmed_progress_bar <- function(value = 0,
 #' @param style Additional CSS styles to apply
 #'
 #' @return HTML span element with status badge styling
-#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -295,7 +291,6 @@ gmed_card <- function(title = NULL, ...,
 #' @param style Additional CSS styles to apply
 #'
 #' @return HTML div element with step indicator styling
-#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -347,7 +342,6 @@ gmed_step_indicator <- function(current_step,
 #' @param btn_label Label for the sign-in button (default: "Sign In")
 #'
 #' @return Shiny tagList with the login screen UI
-#' @export
 gmed_login_page <- function(id              = "access_code",
                             app_title       = "IMSLU Resident Portal",
                             app_subtitle    = "Internal Medicine Residency",

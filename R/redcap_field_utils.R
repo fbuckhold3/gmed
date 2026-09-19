@@ -69,18 +69,3 @@ completion_icon <- function(is_complete, size = "1.2em") {
     )
   }
 }
-
-
-#' Clean a Raw REDCap String
-#'
-#' Trims whitespace and converts \code{NA} or the literal string
-#' \code{"NA"} to an empty string. Useful when concatenating optional
-#' free-text fields for display.
-#'
-#' @param x A length-1 value coercible to character.
-#' @return Character scalar.
-#' @export
-clean_redcap_string <- function(x) {
-  s <- trimws(as.character(x))
-  if (length(s) == 0 || is.na(s) || s == "NA") "" else s
-}

@@ -522,7 +522,6 @@ mod_miles_rating_server <- function(id, period,
 #' @param milestone_type Type of milestones ("program", "self", "acgme")
 #' @param height Height of the dashboard (default: "600px")
 #' @return Shiny UI tagList
-#' @export
 milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600px") {
   
   ns <- NS(id)
@@ -611,8 +610,7 @@ milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600
 #' @param milestone_type Type of milestones ("program", "self", "acgme")
 #' @param resident_data Reactive containing resident lookup data
 #' @return Server function
-#' @export
-milestone_dashboard_server <- function(id, milestone_results, record_id, period, 
+milestone_dashboard_server <- function(id, milestone_results, record_id, period,
                                        milestone_type = "program", resident_data) {
   
   moduleServer(id, function(input, output, session) {
@@ -755,7 +753,6 @@ return(list(
 #' @param milestone_types Vector of milestone types to display (e.g., c("program", "self"))
 #' @param column_width Bootstrap column width (e.g., 4 for 3 columns, 6 for 2 columns)
 #' @return Shiny UI fluidRow
-#' @export
 create_milestone_dashboard_layout <- function(milestone_results, record_id, period, resident_data,
                                               milestone_types = c("program", "self"), 
                                               column_width = 6) {
@@ -775,80 +772,3 @@ create_milestone_dashboard_layout <- function(milestone_results, record_id, peri
   do.call(fluidRow, columns)
 }
 
-#' Example Usage in App Server
-#' 
-#' @examples
-#' # In your app server function:
-#' 
-#' # Create multiple dashboard modules
-#' milestone_dashboard_server("milestone_dash_1", milestone_results, record_id, period, "program", resident_data)
-#' milestone_dashboard_server("milestone_dash_2", milestone_results, record_id, period, "self", resident_data)
-#' 
-#' # In your app UI:
-#' fluidRow(
-#'   column(6, milestone_dashboard_ui("milestone_dash_1", milestone_type = "program")),
-#'   column(6, milestone_dashboard_ui("milestone_dash_2", milestone_type = "self"))
-#' )
-#' 
-#' # Or use the helper function:
-#' output$milestone_layout <- renderUI({
-#'   create_milestone_dashboard_layout(
-#'     milestone_results = reactive(milestone_results),
-#'     record_id = reactive(input$resident_select),
-#'     period = reactive(input$period_select), 
-#'     resident_data = reactive(complete_data$residents),
-#'     milestone_types = c("program", "self"),
-#'     column_width = 6
-#'   )
-#' })
-#' @export
-example_milestone_dashboard_usage <- function() {
-  # This is just documentation - see examples above
-}
-
-#' Add Required CSS for Milestone Dashboard
-#'
-#' Adds CSS styling for the milestone dashboard modules
-#'
-#' @return HTML tags with CSS
-#' @export
-milestone_dashboard_css <- function() {
-  tags$head(
-    tags$style(HTML("
-      .milestone-dashboard-container {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease;
-      }
-      
-      .milestone-dashboard-container:hover {
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        transform: translateY(-2px);
-      }
-      
-      .dashboard-header h4 {
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-      }
-      
-      .spider-section, .progression-section {
-        background: white;
-        border-radius: 6px;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-      }
-      
-      .controls-section {
-        padding: 10px;
-        background: rgba(255,255,255,0.7);
-        border-radius: 6px;
-      }
-      
-      /* Responsive adjustments */
-      @media (max-width: 768px) {
-        .milestone-dashboard-container {
-          height: auto !important;
-          min-height: 500px;
-        }
-      }
-    "))
-  )
-}

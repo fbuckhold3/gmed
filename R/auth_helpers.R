@@ -10,7 +10,6 @@
 #'   - resident_info: List with resident data if successful, NULL if failed
 #'   - message: Character string with status message
 #'
-#' @export
 #'
 #' @examples
 #' \dontrun{

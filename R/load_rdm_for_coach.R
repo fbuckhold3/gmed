@@ -30,7 +30,6 @@
 #'   until enriched externally), \code{historical_medians} (empty list),
 #'   \code{data_loaded}, \code{load_timestamp}, \code{coach_name},
 #'   \code{review_roles}.  Returns NULL on error.
-#' @export
 load_rdm_for_coach <- function(coach_name,
                                rdm_token      = NULL,
                                redcap_url     = "https://redcapsurvey.slu.edu/api/",

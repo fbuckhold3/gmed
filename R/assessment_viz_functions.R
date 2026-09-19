@@ -15,7 +15,6 @@ library(lubridate)
 #' @param resident_name Optional character string with resident name. If NULL, will use "Resident [ID]"
 #'
 #' @return A plotly object showing assessment progress by level
-#' @export
 create_combined_assessment_chart <- function(data, record_id, resident_name = NULL) {
   
   # Use provided name or default to record_id
@@ -161,7 +160,6 @@ create_combined_assessment_chart <- function(data, record_id, resident_name = NU
 #' @param resident_name Optional character string with resident name. If NULL, will use "Resident [ID]"
 #'
 #' @return A plotly object showing faculty evaluation progress by level
-#' @export
 create_combined_faculty_chart <- function(data, record_id, resident_name = NULL) {
   
   # Use provided name or default to record_id
@@ -319,7 +317,6 @@ create_combined_faculty_chart <- function(data, record_id, resident_name = NULL)
 #' @param resident_name Optional character string with resident name
 #'
 #' @return A list containing average, total_weeks, display_text, and detail_text
-#' @export
 create_weekly_questions_average <- function(data, record_id, resident_name = NULL) {
   
   if (is.null(resident_name)) {
@@ -368,7 +365,6 @@ create_weekly_questions_average <- function(data, record_id, resident_name = NUL
 #' @param resident_name Optional character string with resident name
 #'
 #' @return A list containing recent_assessments, recent_faculty, and conference_avg
-#' @export
 create_recent_activity_summary <- function(data, record_id, resident_name = NULL) {
   
   four_weeks_ago <- Sys.Date() - 28

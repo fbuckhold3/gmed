@@ -10,7 +10,6 @@
 #' @param return_format Character. "list" for structured data, "html" for formatted display
 #'
 #' @return Based on return_format: list of goal data or HTML formatted string
-#' @export
 #' @examples
 #' \dontrun{
 #' # Get all goals for a resident from period 2

@@ -468,7 +468,6 @@ mod_plus_delta_table_server <- function(id, rdm_data, record_id) {
 #' @param resident_name Optional character string with resident name. If NULL, will use "Resident [ID]"
 #'
 #' @return A plotly object displaying the questions average as a large number
-#' @export
 #'
 #' @examples
 #' \dontrun{

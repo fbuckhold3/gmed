@@ -45,7 +45,7 @@ and enhanced functionality for use across all GMED applications.
 create_gmed_datatable(mtcars, "Car Data")
 
 # With highlighting
-create_gmed_datatable(mtcars, "Car Data", 
+create_gmed_datatable(mtcars, "Car Data",
                       highlight_columns = c("mpg", "hp"))
 }
 }
