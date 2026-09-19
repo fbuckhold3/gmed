@@ -12,7 +12,7 @@ Suggests:
     rmarkdown,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
-Imports: dplyr, httr, readr, jsonlite, DT, reactable, htmltools,
+Imports: dplyr, httr, curl, readr, jsonlite, DT, reactable, htmltools,
         plotly, rlang, config, lubridate, tidyr, shinyjs, shiny, bslib,
         data.table, tibble, purrr, roundsui
 Remotes: fbuckhold3/roundsui

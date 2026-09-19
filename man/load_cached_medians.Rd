@@ -7,7 +7,7 @@
 load_cached_medians(
   rdm_token = Sys.getenv("RDM_TOKEN"),
   redcap_url = "https://redcapsurvey.slu.edu/api/",
-  cache_record_id = Sys.getenv("CACHE_RECORD_ID"),
+  cache_record_id = default_cache_record_id(),
   max_age_hours = 3
 )
 }
@@ -17,7 +17,8 @@ load_cached_medians(
 \item{redcap_url}{REDCap API URL.}
 
 \item{cache_record_id}{Record ID of the cache record
-(default: \code{CACHE_RECORD_ID} env var).}
+(default: \code{CACHE_RECORD_ID} env var, or "2040", the prod
+\code{app_cache} record, when unset).}
 
 \item{max_age_hours}{Warn if the cache is older than this many hours.
 Set to \code{Inf} to silence the warning.}

@@ -11,6 +11,13 @@
 #'   gmed module compatibility.
 #' @param use_cache Logical. Whether to use cached data dictionary and milestone medians
 #'   to speed up loading. Default: TRUE. Use clear_rdm_cache() to clear cached data.
+#' @param per_form Logical. If TRUE, fetch each REDCap instrument with its own
+#'   parallel export instead of one flat export of the whole project (~2-4 s
+#'   vs ~25 s against prod RDM). The returned structure is the same except
+#'   that \code{$raw_data} is \code{NULL} (the wide all-instruments frame is
+#'   never built). If the parallel fetch fails it falls back to the single
+#'   export. Default: FALSE, so existing callers are unchanged; callers that
+#'   read \code{$raw_data} must keep FALSE.
 #'
 #' @return List containing RDM 2.0 data structure with historical medians preserved
 #' @export
@@ -19,7 +26,8 @@ load_rdm_complete <- function(rdm_token = NULL,
                               verbose = TRUE,
                               ensure_gmed_columns = TRUE,
                               raw_or_label = "label",
-                              use_cache = TRUE) {
+                              use_cache = TRUE,
+                              per_form = FALSE) {
   
   # TOKEN HANDLING
   if (is.null(rdm_token)) {
@@ -30,18 +38,8 @@ load_rdm_complete <- function(rdm_token = NULL,
     stop("RDM_TOKEN must be provided or set as environment variable")
   }
 
-  # STEP 1: LOAD ALL RAW DATA (INCLUDING ARCHIVED) USING EXISTING FUNCTION
-  if (verbose) message("Loading raw data from REDCap...")
-  raw_data <- load_data_by_forms(
-    rdm_token = rdm_token,
-    redcap_url = redcap_url,
-    filter_archived = FALSE,
-    calculate_levels = FALSE,
-    raw_or_label = raw_or_label,
-    verbose = FALSE  # Suppress verbose from load_data_by_forms
-  )
-
-  # STEP 2: LOAD DATA DICTIONARY (WITH CACHING)
+  # STEP 1: LOAD DATA DICTIONARY (WITH CACHING)
+  # Fetched first so the per-form path can reuse it instead of re-fetching.
   dict_cache_key <- paste0("data_dict_", redcap_url)
   if (use_cache) {
     data_dict <- get_cached(dict_cache_key)
@@ -60,9 +58,44 @@ load_rdm_complete <- function(rdm_token = NULL,
     }
   }
 
+  # STEP 2: LOAD ALL RAW DATA (INCLUDING ARCHIVED)
+  raw_data <- NULL
+  if (isTRUE(per_form)) {
+    if (verbose) message("Loading data from REDCap (parallel per-instrument export)...")
+    raw_data <- tryCatch(
+      load_data_by_forms_fast(
+        rdm_token = rdm_token,
+        redcap_url = redcap_url,
+        raw_or_label = raw_or_label,
+        data_dict = data_dict
+      ),
+      error = function(e) {
+        message("Per-instrument load failed (", conditionMessage(e),
+                ") \u2014 falling back to single full export")
+        NULL
+      }
+    )
+  }
+  if (is.null(raw_data)) {
+    if (verbose) message("Loading raw data from REDCap...")
+    raw_data <- load_data_by_forms(
+      rdm_token = rdm_token,
+      redcap_url = redcap_url,
+      filter_archived = FALSE,
+      calculate_levels = FALSE,
+      raw_or_label = raw_or_label,
+      verbose = FALSE  # Suppress verbose from load_data_by_forms
+    )
+  }
+
   # STEP 3: CALCULATE HISTORICAL MILESTONE MEDIANS (BEFORE FILTERING!)
   # Create cache key based on number of records (invalidates when data changes)
-  medians_cache_key <- paste0("milestone_medians_", nrow(raw_data$raw_data))
+  n_source_rows <- if (!is.null(raw_data$raw_data)) {
+    nrow(raw_data$raw_data)
+  } else {
+    sum(vapply(raw_data$forms, nrow, integer(1)))
+  }
+  medians_cache_key <- paste0("milestone_medians_", n_source_rows)
 
   if (use_cache) {
     historical_milestone_medians <- get_cached(medians_cache_key)

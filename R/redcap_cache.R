@@ -27,6 +27,19 @@
 
 # ── Write ─────────────────────────────────────────────────────────────────────
 
+#' Default app_cache record id for the read-side cache loaders
+#'
+#' Returns the \code{CACHE_RECORD_ID} env var when set, otherwise \code{"2040"}
+#' (the prod RDM \code{app_cache} record). Only the \code{load_cached_*}
+#' readers use this; the \code{write_*_cache} writers still require the env
+#' var to be set explicitly so a write can never silently target a hard-coded
+#' record. The id is not a secret.
+#' @keywords internal
+default_cache_record_id <- function() {
+  id <- Sys.getenv("CACHE_RECORD_ID")
+  if (nzchar(id)) id else "2040"
+}
+
 #' Write milestone medians to REDCap cache
 #'
 #' Serialises the output of \code{calculate_all_milestone_medians()} to JSON
@@ -126,7 +139,8 @@ write_medians_cache <- function(
 #' @param rdm_token REDCap API token (default: \code{RDM_TOKEN} env var).
 #' @param redcap_url REDCap API URL.
 #' @param cache_record_id Record ID of the cache record
-#'   (default: \code{CACHE_RECORD_ID} env var).
+#'   (default: \code{CACHE_RECORD_ID} env var, or "2040", the prod
+#'   \code{app_cache} record, when unset).
 #' @param max_age_hours Warn if the cache is older than this many hours.
 #'   Set to \code{Inf} to silence the warning.
 #'
@@ -135,7 +149,7 @@ write_medians_cache <- function(
 load_cached_medians <- function(
     rdm_token       = Sys.getenv("RDM_TOKEN"),
     redcap_url      = "https://redcapsurvey.slu.edu/api/",
-    cache_record_id = Sys.getenv("CACHE_RECORD_ID"),
+    cache_record_id = default_cache_record_id(),
     max_age_hours   = 3
 ) {
 
@@ -319,7 +333,8 @@ write_amion_cache <- function(
 #' @param rdm_token REDCap API token (default: \code{RDM_TOKEN} env var).
 #' @param redcap_url REDCap API URL.
 #' @param cache_record_id Record ID of the cache record
-#'   (default: \code{CACHE_RECORD_ID} env var).
+#'   (default: \code{CACHE_RECORD_ID} env var, or "2040", the prod
+#'   \code{app_cache} record, when unset).
 #' @param max_age_hours Warn if the cache is older than this many hours.
 #'   Set to \code{Inf} to silence the warning. Default 192h (8 days) —
 #'   the Amion cache refreshes weekly, unlike the medians cache's 3h default.
@@ -330,7 +345,7 @@ write_amion_cache <- function(
 load_cached_amion <- function(
     rdm_token       = Sys.getenv("RDM_TOKEN"),
     redcap_url      = "https://redcapsurvey.slu.edu/api/",
-    cache_record_id = Sys.getenv("CACHE_RECORD_ID"),
+    cache_record_id = default_cache_record_id(),
     max_age_hours   = 192
 ) {
 
@@ -501,7 +516,8 @@ write_expected_calendar_cache <- function(
 #' @param rdm_token REDCap API token (default: \code{RDM_TOKEN} env var).
 #' @param redcap_url REDCap API URL.
 #' @param cache_record_id Record ID of the cache record
-#'   (default: \code{CACHE_RECORD_ID} env var).
+#'   (default: \code{CACHE_RECORD_ID} env var, or "2040", the prod
+#'   \code{app_cache} record, when unset).
 #' @param max_age_hours Warn if the cache is older than this many hours.
 #'   Default 192h (8 days) — refreshes weekly, same as the Amion cache.
 #'
@@ -510,7 +526,7 @@ write_expected_calendar_cache <- function(
 load_cached_expected_calendar <- function(
     rdm_token       = Sys.getenv("RDM_TOKEN"),
     redcap_url      = "https://redcapsurvey.slu.edu/api/",
-    cache_record_id = Sys.getenv("CACHE_RECORD_ID"),
+    cache_record_id = default_cache_record_id(),
     max_age_hours   = 192
 ) {
 

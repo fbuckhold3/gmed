@@ -10,7 +10,8 @@ load_rdm_complete(
   verbose = TRUE,
   ensure_gmed_columns = TRUE,
   raw_or_label = "label",
-  use_cache = TRUE
+  use_cache = TRUE,
+  per_form = FALSE
 )
 }
 \arguments{
@@ -26,6 +27,14 @@ gmed module compatibility.}
 
 \item{use_cache}{Logical. Whether to use cached data dictionary and milestone medians
 to speed up loading. Default: TRUE. Use clear_rdm_cache() to clear cached data.}
+
+\item{per_form}{Logical. If TRUE, fetch each REDCap instrument with its own
+parallel export instead of one flat export of the whole project (~2-4 s
+vs ~25 s against prod RDM). The returned structure is the same except
+that \code{$raw_data} is \code{NULL} (the wide all-instruments frame is
+never built). If the parallel fetch fails it falls back to the single
+export. Default: FALSE, so existing callers are unchanged; callers that
+read \code{$raw_data} must keep FALSE.}
 }
 \value{
 List containing RDM 2.0 data structure with historical medians preserved
