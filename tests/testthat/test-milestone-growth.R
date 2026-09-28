@@ -191,3 +191,19 @@ test_that("module server renders with and without a fit", {
       })
   }
 })
+
+test_that("label exports parse the same as raw exports", {
+  expect_equal(ilp_goal_subcomp("sbppbl", "PBLI1 \u2014 Self-directed learning"), "pbl1")
+  expect_equal(ilp_goal_subcomp("pcmk", "MK3: Diagnostics"), "mk3")
+  expect_true(is.na(ilp_goal_subcomp("pcmk", "ICS1")))       # wrong domain
+  expect_equal(ilp_goal_level_to_rating("Level 4"), 7)
+  forms <- list(
+    milestone_entry = data.frame(record_id = "1", prog_mile_period = "End Intern",
+                                 rep_pc1 = 5, stringsAsFactors = FALSE),
+    ccc_review = data.frame(record_id = "1", ccc_session = "End Intern", ccc_mile = "Yes",
+                            stringsAsFactors = FALSE))
+  l <- build_milestone_long(forms)
+  expect_equal(l$period, 2L)
+  expect_equal(l$rater, "ccc")
+  expect_equal(gmed:::.mg_sort_classes(c("10", "7", "9")), c("7", "9", "10"))
+})

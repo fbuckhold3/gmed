@@ -102,6 +102,9 @@ milestone_program_expectation <- function() {
 #' @export
 ilp_goal_level_to_rating <- function(level) {
   lv <- suppressWarnings(as.numeric(as.character(level)))
+  # Label exports ("Level 3", "3 - Competent"): use the first number
+  lab <- is.na(lv) & grepl("^\\D*\\d", as.character(level))
+  lv[lab] <- as.numeric(sub("^\\D*(\\d+(\\.\\d+)?).*$", "\\1", as.character(level)[lab]))
   out <- 2 * lv - 1
   out[is.na(lv) | lv < 1 | lv > 5 | lv != round(lv)] <- NA_real_
   out
@@ -121,7 +124,8 @@ ilp_goal_level_to_rating <- function(level) {
 #' Map an ILP domain choice code to a subcompetency
 #'
 #' @param domain One of "pcmk", "sbppbl", "profics".
-#' @param code The REDCap choice code stored in the goal field.
+#' @param code The REDCap choice code stored in the goal field (raw export),
+#'   or its label (e.g. "PC1 - History"; label export).
 #' @return Subcompetency id (e.g. "mk2") or \code{NA}.
 #' @export
 ilp_goal_subcomp <- function(domain, code) {
@@ -131,6 +135,13 @@ ilp_goal_subcomp <- function(domain, code) {
   out <- rep(NA_character_, length(code))
   ok <- !is.na(i) & i >= 1 & i <= length(codes)
   out[ok] <- codes[i[ok]]
+  # Label exports ("PC1 - History", "PBLI2: ..."): read the leading code
+  lab <- toupper(trimws(as.character(code)))
+  m <- regmatches(lab, regexec("^(PC|MK|SBP|PBLI|PBL|PROF|ICS)\\s*(\\d+)", lab))
+  from_lab <- vapply(m, function(x) if (length(x) == 3)
+    paste0(tolower(sub("PBLI", "PBL", x[2])), x[3]) else NA_character_, character(1))
+  use <- is.na(out) & from_lab %in% codes
+  out[use] <- from_lab[use]
   out
 }
 
@@ -292,7 +303,7 @@ build_milestone_long <- function(all_forms, residents = NULL,
   pf <- intersect(c("ccc_session", "ccc_period"), names(cr))
   if (!length(pf)) return(character(0))
   per <- .mg_period_num(cr[[pf[1]]])
-  flag <- as.character(cr$ccc_mile) == "1"
+  flag <- tolower(as.character(cr$ccc_mile)) %in% c("1", "yes")   # raw or label export
   keep <- !is.na(per) & !is.na(flag) & flag
   paste(as.character(cr$record_id[keep]), per[keep])
 }
