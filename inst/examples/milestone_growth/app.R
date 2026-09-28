@@ -12,9 +12,13 @@ if (!"gmed" %in% loadedNamespaces()) library(gmed)
 use_redcap <- identical(Sys.getenv("MG_USE_REDCAP"), "1") && nzchar(Sys.getenv("RDM_TOKEN_TEST"))
 
 if (use_redcap) {
-  rdm <- load_rdm_complete(rdm_token = Sys.getenv("RDM_TOKEN_TEST"))
-  all_forms <- rdm$all_forms
-  residents <- rdm$residents
+  # Unfiltered load: graduated (archived) residents are the cohort history
+  rdm <- load_data_by_forms(rdm_token = Sys.getenv("RDM_TOKEN_TEST"),
+                            filter_archived = FALSE, calculate_levels = FALSE,
+                            raw_or_label = "raw")
+  all_forms <- rdm$forms
+  residents <- rdm$resident_data
+  if (!"name" %in% names(residents)) residents$name <- residents$record_id
 } else {
   sim <- simulate_milestone_cohort(n_per_class = 15, seed = 42)
   all_forms <- sim$all_forms

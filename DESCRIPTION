@@ -14,6 +14,6 @@ Suggests:
 Config/testthat/edition: 3
 Imports: dplyr, httr, curl, readr, jsonlite, DT, reactable, htmltools,
         plotly, rlang, config, lubridate, tidyr, shinyjs, shiny, bslib,
-        data.table, tibble, purrr, roundsui
+        data.table, tibble, purrr, roundsui, lme4, quantreg, splines
 Remotes: fbuckhold3/roundsui
 Config/roxygen2/version: 8.0.0

@@ -1228,6 +1228,13 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
 #'
 #' Creates a visually stunning line chart with gradients, better colors, and modern design
 #'
+#' @section Superseded:
+#' Superseded by the shared milestone growth module
+#' (\code{mod_milestone_growth_ui()} / \code{mod_milestone_growth_server()})
+#' and \code{plot_milestone_trajectory()}, which add smoothed cohort
+#' percentile bands, the program expectation line, source-aware points and a
+#' mixed-model projection. Kept for existing callers; no new features.
+#'
 #' @param milestone_results Results from create_milestone_workflow_from_dict()
 #' @param resident_id Character string of resident record ID
 #' @param milestone_col Column name of milestone to plot (e.g., "rep_pc1")

@@ -35,3 +35,12 @@ Enhanced plotly object with modern styling
 \description{
 Creates a visually stunning line chart with gradients, better colors, and modern design
 }
+\section{Superseded}{
+
+Superseded by the shared milestone growth module
+(\code{mod_milestone_growth_ui()} / \code{mod_milestone_growth_server()})
+and \code{plot_milestone_trajectory()}, which add smoothed cohort
+percentile bands, the program expectation line, source-aware points and a
+mixed-model projection. Kept for existing callers; no new features.
+}
+
