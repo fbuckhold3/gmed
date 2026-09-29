@@ -9,8 +9,8 @@ mod_milestone_growth_ui(id, show = c("overview", "dumbbell", "trajectory"))
 \arguments{
 \item{id}{Module id.}
 
-\item{show}{Views to include: any of \code{"overview"}, \code{"dumbbell"},
-\code{"trajectory"}.}
+\item{show}{Views to include: any of \code{"overview"} (range snapshot),
+\code{"dumbbell"}, \code{"trajectory"}.}
 }
 \value{
 A \code{tagList}.

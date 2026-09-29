@@ -1,6 +1,6 @@
 # milestone_growth_models.R
 # Statistics for the shared milestone growth module:
-#   1. cohort bands   - smoothed 10th/50th/90th percentiles by period
+#   1. cohort bands   - smoothed 10th/25th/50th/75th/90th percentiles
 #                       (quantile regression on a low-df natural spline)
 #   2. growth model   - lme4 mixed model per subcompetency; predictions for a
 #                       resident are computed from the cached coefficients
@@ -16,7 +16,7 @@
 #' Fit smoothed cohort percentile bands
 #'
 #' For each subcompetency, fits quantile regressions of rating on period at
-#' the 10th, 50th and 90th percentiles using a natural spline with
+#' the 10th, 25th, 50th, 75th and 90th percentiles using a natural spline with
 #' \code{df} degrees of freedom, so sparse periods borrow strength from their
 #' neighbours. Quantile crossings are removed by sorting the fitted
 #' quantiles within each period (monotone rearrangement) and values are
@@ -28,13 +28,16 @@
 #'
 #' @param ratings Selected ratings (\code{select_milestone_rating()} output):
 #'   \code{record_id}, \code{period}, \code{subcomp}, \code{rating}.
-#' @param taus Quantiles (default 0.1, 0.5, 0.9).
+#' @param taus Quantiles (default 0.1, 0.25, 0.5, 0.75, 0.9; columns are
+#'   named \code{p10} etc.).
 #' @param df Spline degrees of freedom (capped at distinct periods - 1).
 #' @param min_n Minimum observations for the smoothed fit.
-#' @return Data frame: \code{subcomp}, \code{period}, \code{p10}, \code{p50},
-#'   \code{p90}, \code{n}, \code{method} ("rq" or "empirical").
+#' @return Data frame: \code{subcomp}, \code{period}, \code{p10},
+#'   \code{p25}, \code{p50}, \code{p75}, \code{p90}, \code{n},
+#'   \code{method} ("rq" or "empirical").
 #' @export
-fit_cohort_bands <- function(ratings, taus = c(0.1, 0.5, 0.9), df = 3, min_n = 30) {
+fit_cohort_bands <- function(ratings, taus = c(0.1, 0.25, 0.5, 0.75, 0.9),
+                             df = 3, min_n = 30) {
   if (is.null(ratings) || !nrow(ratings)) return(.mg_empty_bands())
   has_rq <- requireNamespace("quantreg", quietly = TRUE)
   out <- lapply(split(ratings, ratings$subcomp), function(d) {
@@ -61,12 +64,13 @@ fit_cohort_bands <- function(ratings, taus = c(0.1, 0.5, 0.9), df = 3, min_n = 3
         stats::quantile(v, taus, names = FALSE, type = 7)
       }, numeric(length(taus))))
     }
+    q <- matrix(q, nrow = nrow(grid))
     q <- t(apply(q, 1, function(r) if (anyNA(r)) r else sort(r)))
-    q <- pmin(pmax(q, 1), 9)
-    data.frame(subcomp = d$subcomp[1], period = grid$period,
-               p10 = q[, 1], p50 = q[, 2], p90 = q[, 3],
+    q <- matrix(pmin(pmax(q, 1), 9), nrow = nrow(grid))
+    colnames(q) <- paste0("p", round(100 * taus))
+    data.frame(subcomp = d$subcomp[1], period = grid$period, q,
                n = as.integer(n_by), method = method,
-               stringsAsFactors = FALSE)
+               stringsAsFactors = FALSE, check.names = FALSE)
   })
   res <- do.call(rbind, out)
   if (is.null(res)) return(.mg_empty_bands())
@@ -76,8 +80,9 @@ fit_cohort_bands <- function(ratings, taus = c(0.1, 0.5, 0.9), df = 3, min_n = 3
 
 .mg_empty_bands <- function() {
   data.frame(subcomp = character(0), period = integer(0), p10 = numeric(0),
-             p50 = numeric(0), p90 = numeric(0), n = integer(0),
-             method = character(0), stringsAsFactors = FALSE)
+             p25 = numeric(0), p50 = numeric(0), p75 = numeric(0),
+             p90 = numeric(0), n = integer(0), method = character(0),
+             stringsAsFactors = FALSE)
 }
 
 # ── 2. Growth model ──────────────────────────────────────────────────────────
@@ -350,8 +355,8 @@ print.milestone_growth_fit <- function(x, ...) {
 
 #' Raw (unsmoothed) cohort quantiles
 #'
-#' Cheap fallback for the module when no cached fit is available: per-period
-#' 10th/50th/90th percentiles without model fitting.
+#' Cheap fallback for the module when no cached fit is available: raw
+#' per-period percentiles without model fitting.
 #'
 #' @param data Long milestone data.
 #' @return Bands data frame, as \code{fit_cohort_bands()}.

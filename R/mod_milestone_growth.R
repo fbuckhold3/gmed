@@ -4,20 +4,21 @@
 # .milestone_prog_plot_combined(), the CCC dashboard's inline
 # output$ccc_milestone_plot and gmed's create_enhanced_milestone_progression().
 #
-# Views: overview heat table, self vs faculty dumbbell, drill-down trajectory,
-# with ILP goals marked in all three. No model fitting happens here: pass the
-# cached fit from load_cached_milestone_growth() (fitted by the data-refresh
-# job). Without a fit the module still draws the overview and dumbbell
-# against raw per-period cohort quantiles, and the trajectory without a
-# projection.
+# Views: range snapshot (each subcompetency against where past residents at
+# the same period fell, with guidance text), self vs faculty dumbbell, and a
+# drill-down trajectory. ILP goals are a separate module
+# (mod_ilp_goal_progress_*). No model fitting happens here: pass the cached fit
+# from load_cached_milestone_growth() (fitted by the data-refresh job).
+# Without a fit the module uses raw per-period cohort percentiles and draws
+# the trajectory without a projection.
 
 .MG_VIEWS <- c("overview", "dumbbell", "trajectory")
 
 #' Milestone growth module UI
 #'
 #' @param id Module id.
-#' @param show Views to include: any of \code{"overview"}, \code{"dumbbell"},
-#'   \code{"trajectory"}.
+#' @param show Views to include: any of \code{"overview"} (range snapshot),
+#'   \code{"dumbbell"}, \code{"trajectory"}.
 #' @return A \code{tagList}.
 #' @export
 mod_milestone_growth_ui <- function(id, show = c("overview", "dumbbell", "trajectory")) {
@@ -30,17 +31,20 @@ mod_milestone_growth_ui <- function(id, show = c("overview", "dumbbell", "trajec
       ...))
   }
   shiny::tagList(
+    if (any(c("overview", "dumbbell") %in% show))
+      shiny::div(class = "d-flex align-items-center gap-2 mb-2",
+        shiny::tags$span(class = "small text-muted", "Period:"),
+        shiny::uiOutput(ns("period_ui"), inline = TRUE)),
     if ("overview" %in% show) card(
-      "Milestones vs cohort median",
+      "Milestones in context",
       shiny::tags$p(class = "small text-muted mb-1",
-        "Each cell is the resident's rating minus the median of past residents at the same ",
-        shiny::HTML("period. &#9660; marks ratings below the cohort 10th percentile. Click a row to open it below.")),
-      shiny::uiOutput(ns("overview_ui"))),
+        "Grey bars show where past residents at the same period were rated: ",
+        "light = the usual range (middle 80%), dark = the middle half, tick = median. ",
+        "Click a row to see its trajectory below."),
+      shiny::uiOutput(ns("overview_ui")),
+      shiny::uiOutput(ns("overview_summary"))),
     if ("dumbbell" %in% show) card(
       "Self vs faculty",
-      shiny::div(class = "d-flex align-items-center gap-2 mb-1",
-        shiny::tags$span(class = "small text-muted", "Period:"),
-        shiny::uiOutput(ns("dumbbell_period_ui"), inline = TRUE)),
       shiny::uiOutput(ns("dumbbell_ui"))),
     if ("trajectory" %in% show) card(
       "Trajectory",
@@ -58,27 +62,25 @@ mod_milestone_growth_ui <- function(id, show = c("overview", "dumbbell", "trajec
 #'   data from \code{build_milestone_long()} (preferred: build it once at app
 #'   start), or the forms list it accepts (\code{all_forms}).
 #' @param resident_id Reactive resident record id.
-#' @param period Reactive current period (1-6 or label). Used as the default
-#'   dumbbell period, the last overview column, and to pick current vs
-#'   previous ILP goals. \code{NULL}/NA = latest period with data.
-#' @param ilp_data Optional reactive of ILP rows (\code{all_forms$ilp}).
+#' @param period Reactive current period (1-6 or label), the default for the
+#'   period picker. \code{NULL}/NA = latest period with data.
 #' @param fit Optional reactive of the cached \code{milestone_growth_fit}
 #'   (\code{load_cached_milestone_growth()}).
 #' @param show Views rendered (should match the UI).
 #' @param height Plot height.
+#' @param show_target Draw the graduation target line (7) on the trajectory.
 #' @return Invisibly, a list of reactives: \code{selected_subcomp},
-#'   \code{trajectory} (the trajectory data incl. readout).
+#'   \code{period}, \code{trajectory} (the trajectory data incl. readout).
 #' @export
 mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
-                                        ilp_data = NULL, fit = NULL,
+                                        fit = NULL,
                                         show = c("overview", "dumbbell", "trajectory"),
-                                        height = "560px") {
+                                        height = "560px", show_target = TRUE) {
   show <- match.arg(show, .MG_VIEWS, several.ok = TRUE)
   as_r <- function(x) if (shiny::is.reactive(x)) x else shiny::reactive(x)
   milestone_data <- as_r(milestone_data)
   resident_id <- as_r(resident_id)
   period <- as_r(period)
-  ilp_r <- as_r(ilp_data)
   fit_r <- as_r(fit)
 
   shiny::moduleServer(id, function(input, output, session) {
@@ -96,37 +98,53 @@ mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
       d[d$record_id == as.character(rid), , drop = FALSE]
     })
     selected <- shiny::reactive(select_milestone_rating(long_res()))
-    cur_period <- shiny::reactive({
-      p <- .mg_period_num(if (is.null(period())) NA else period())
-      if (is.na(p) && nrow(long_res())) p <- max(long_res()$period)
-      p
-    })
     bands <- shiny::reactive({
       f <- fit_r()
       if (!is.null(f) && nrow(f$bands)) f$bands else empirical_cohort_bands(long_all())
     })
-    goals <- shiny::reactive({
-      il <- ilp_r()
-      if (is.null(il)) return(NULL)
-      tryCatch(extract_ilp_goals(il, resident_id(), cur_period()),
-               error = function(e) NULL)
+
+    # ── Shared period picker (overview + dumbbell) ─────────────────────────
+    avail_periods <- shiny::reactive(sort(unique(long_res()$period)))
+    default_period <- shiny::reactive({
+      ps <- avail_periods()
+      p <- .mg_period_num(if (is.null(period())) NA else period())
+      if (!length(ps)) return(p)
+      if (!is.na(p) && p %in% ps) p else max(ps[is.na(p) | ps <= p], ps[1])
+    })
+    output$period_ui <- shiny::renderUI({
+      ps <- avail_periods()
+      if (!length(ps)) return(NULL)
+      shiny::selectInput(ns("period_pick"), NULL, width = "180px",
+                         choices = stats::setNames(ps, .mg_period_name(ps)),
+                         selected = default_period())
+    })
+    view_period <- shiny::reactive({
+      p <- suppressWarnings(as.integer(input$period_pick))
+      if (length(p) && !is.na(p)) p else default_period()
     })
 
-    # ── Overview ──────────────────────────────────────────────────────────
+    # ── Range snapshot ─────────────────────────────────────────────────────
+    range_plot <- shiny::reactive({
+      plot_milestone_range(selected(), bands(), view_period(), source = ns("range"))
+    })
     if ("overview" %in% show) {
       output$overview_ui <- shiny::renderUI({
-        if (!nrow(selected())) return(.mg_empty_state("No faculty or ACGME milestone ratings yet for this resident."))
+        if (is.null(range_plot()))
+          return(.mg_empty_state("No faculty or ACGME milestone ratings for this period."))
         plotly::plotlyOutput(ns("overview_plot"), height = height)
       })
       output$overview_plot <- plotly::renderPlotly({
-        maxp <- max(c(cur_period(), selected()$period), na.rm = TRUE)
-        p <- plot_milestone_heat_table(selected(), bands(), goals(),
-                                       max_period = maxp, source = ns("heat"))
-        shiny::req(p)
+        p <- range_plot(); shiny::req(p)
         plotly::event_register(p, "plotly_click")
       })
-      shiny::observeEvent(plotly::event_data("plotly_click", source = ns("heat")), {
-        ev <- plotly::event_data("plotly_click", source = ns("heat"))
+      output$overview_summary <- shiny::renderUI({
+        p <- range_plot()
+        s <- if (is.null(p)) NULL else attr(p, "milestone_range_summary")
+        if (is.null(s)) return(NULL)
+        shiny::tags$p(class = "small mt-1 mb-0", shiny::HTML(s))
+      })
+      shiny::observeEvent(plotly::event_data("plotly_click", source = ns("range")), {
+        ev <- plotly::event_data("plotly_click", source = ns("range"))
         sc <- milestone_subcompetencies()$subcomp
         y <- suppressWarnings(as.integer(round(ev$y[1])))
         if (!is.na(y) && y >= 1 && y <= length(sc))
@@ -136,27 +154,14 @@ mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
 
     # ── Dumbbell ──────────────────────────────────────────────────────────
     if ("dumbbell" %in% show) {
-      avail_periods <- shiny::reactive(sort(unique(long_res()$period)))
-      output$dumbbell_period_ui <- shiny::renderUI({
-        ps <- avail_periods()
-        if (!length(ps)) return(NULL)
-        sel <- if (!is.na(cur_period()) && cur_period() %in% ps) cur_period() else max(ps)
-        shiny::selectInput(ns("dumbbell_period"), NULL, width = "180px",
-                           choices = stats::setNames(ps, .mg_period_name(ps)),
-                           selected = sel)
-      })
-      dumbbell_period <- shiny::reactive({
-        p <- suppressWarnings(as.integer(input$dumbbell_period))
-        if (length(p) && !is.na(p)) p else cur_period()
-      })
       output$dumbbell_ui <- shiny::renderUI({
         d <- long_res()
-        if (!nrow(d) || !any(d$period == dumbbell_period(), na.rm = TRUE))
+        if (!nrow(d) || !any(d$period == view_period(), na.rm = TRUE))
           return(.mg_empty_state("No self or faculty ratings for this period."))
         plotly::plotlyOutput(ns("dumbbell_plot"), height = height)
       })
       output$dumbbell_plot <- plotly::renderPlotly({
-        p <- plot_milestone_dumbbell(long_res(), dumbbell_period(), goals())
+        p <- plot_milestone_dumbbell(long_res(), view_period())
         shiny::req(p)
         p
       })
@@ -167,7 +172,7 @@ mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
       shiny::req(input$subcomp)
       if (!any(long_res()$subcomp == input$subcomp)) return(NULL)
       plot_milestone_trajectory(long_res(), input$subcomp, fit = fit_r(),
-                                bands = bands(), goals = goals())
+                                bands = bands(), show_target = show_target)
     })
     if ("trajectory" %in% show) {
       output$trajectory_ui <- shiny::renderUI({
@@ -182,12 +187,14 @@ mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
         p <- traj()
         if (is.null(p)) return(NULL)
         td <- attr(p, "milestone_trajectory")
-        shiny::div(class = "small mt-1", lapply(td$readout, function(x) shiny::tags$p(class = "mb-1", shiny::HTML(x))))
+        shiny::div(class = "small mt-1",
+                   lapply(td$readout, function(x) shiny::tags$p(class = "mb-1", shiny::HTML(x))))
       })
     }
 
     invisible(list(
       selected_subcomp = shiny::reactive(input$subcomp),
+      period = view_period,
       trajectory = shiny::reactive({ p <- traj(); if (is.null(p)) NULL else attr(p, "milestone_trajectory") })
     ))
   })

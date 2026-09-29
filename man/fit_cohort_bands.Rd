@@ -4,25 +4,32 @@
 \alias{fit_cohort_bands}
 \title{Fit smoothed cohort percentile bands}
 \usage{
-fit_cohort_bands(ratings, taus = c(0.1, 0.5, 0.9), df = 3, min_n = 30)
+fit_cohort_bands(
+  ratings,
+  taus = c(0.1, 0.25, 0.5, 0.75, 0.9),
+  df = 3,
+  min_n = 30
+)
 }
 \arguments{
 \item{ratings}{Selected ratings (\code{select_milestone_rating()} output):
 \code{record_id}, \code{period}, \code{subcomp}, \code{rating}.}
 
-\item{taus}{Quantiles (default 0.1, 0.5, 0.9).}
+\item{taus}{Quantiles (default 0.1, 0.25, 0.5, 0.75, 0.9; columns are
+named \code{p10} etc.).}
 
 \item{df}{Spline degrees of freedom (capped at distinct periods - 1).}
 
 \item{min_n}{Minimum observations for the smoothed fit.}
 }
 \value{
-Data frame: \code{subcomp}, \code{period}, \code{p10}, \code{p50},
-\code{p90}, \code{n}, \code{method} ("rq" or "empirical").
+Data frame: \code{subcomp}, \code{period}, \code{p10},
+\code{p25}, \code{p50}, \code{p75}, \code{p90}, \code{n},
+\code{method} ("rq" or "empirical").
 }
 \description{
 For each subcompetency, fits quantile regressions of rating on period at
-the 10th, 50th and 90th percentiles using a natural spline with
+the 10th, 25th, 50th, 75th and 90th percentiles using a natural spline with
 \code{df} degrees of freedom, so sparse periods borrow strength from their
 neighbours. Quantile crossings are removed by sorting the fitted
 quantiles within each period (monotone rearrangement) and values are

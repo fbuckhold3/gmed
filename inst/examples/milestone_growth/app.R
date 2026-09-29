@@ -44,7 +44,8 @@ ui <- bslib::page_fluid(
     column(3, selectInput("period", "Current period", selected = 4,
                           choices = stats::setNames(1:6, milestone_periods()$period_name)))
   ),
-  mod_milestone_growth_ui("mg")
+  mod_milestone_growth_ui("mg"),
+  mod_ilp_goal_progress_ui("goals")
 )
 
 server <- function(input, output, session) {
@@ -53,8 +54,13 @@ server <- function(input, output, session) {
     milestone_data = long,
     resident_id    = reactive(input$rid),
     period         = reactive(input$period),
-    ilp_data       = all_forms$ilp,
     fit            = fit
+  )
+  mod_ilp_goal_progress_server(
+    "goals",
+    ilp_data       = all_forms$ilp,
+    milestone_data = long,
+    resident_id    = reactive(input$rid)
   )
 }
 

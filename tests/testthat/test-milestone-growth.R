@@ -63,20 +63,27 @@ test_that("ILP goal codes map to subcompetencies and current/previous goals are 
   expect_equal(g$subcomp[g$which == "previous"], "pc3")
 })
 
-test_that("program expectation steps 3 / 5 / 7 across the six periods", {
-  expect_equal(milestone_program_expectation()$expected, c(3, 5, 5, 7, 7, 7))
+test_that("range position and guidance describe the cohort range, not a target", {
+  pos <- milestone_range_position(c(2, 3, 5, 7, 8, NA), p10 = 3, p25 = 4, p75 = 6, p90 = 7)
+  expect_equal(pos, c("below", "lower", "middle", "upper", "above", NA))
+  band <- data.frame(period = 4L, p10 = 4.6, p25 = 5.2, p50 = 6, p75 = 6.8, p90 = 7.4)
+  g <- milestone_range_guidance(6, band)
+  expect_match(g, "At End PGY2, past residents were usually rated 5&#8211;7 \\(median 6\\)")
+  expect_match(g, "middle of the usual range")
+  expect_false(grepl("expect", g, ignore.case = TRUE))
 })
 
-test_that("cohort bands are ordered p10 <= p50 <= p90 and within 1-9", {
+test_that("cohort bands are ordered p10 <= p25 <= p50 <= p75 <= p90 and within 1-9", {
   b <- fit_cohort_bands(sel)
   expect_equal(nrow(b), 21 * 6)
-  expect_true(all(b$p10 <= b$p50 + 1e-9 & b$p50 <= b$p90 + 1e-9))
+  expect_true(all(b$p10 <= b$p25 + 1e-9 & b$p25 <= b$p50 + 1e-9 &
+                  b$p50 <= b$p75 + 1e-9 & b$p75 <= b$p90 + 1e-9))
   expect_true(all(b$p10 >= 1 & b$p90 <= 9))
   expect_true(all(b$method == "rq"))
   # Fallback path (too little data for the smoothed fit) is ordered too
   e <- fit_cohort_bands(sel[sel$subcomp == "pc1", ], min_n = Inf)
   expect_true(all(e$method == "empirical"))
-  expect_true(all(e$p10 <= e$p50 & e$p50 <= e$p90))
+  expect_true(all(e$p10 <= e$p25 & e$p25 <= e$p50 & e$p50 <= e$p75 & e$p75 <= e$p90))
 })
 
 test_that("band ordering survives quantile crossing", {
@@ -86,7 +93,7 @@ test_that("band ordering survives quantile crossing", {
                   period = rep(1:6, length.out = 40),
                   rating = sample(1:9, 40, replace = TRUE))
   b <- fit_cohort_bands(d, min_n = 10, df = 3)
-  expect_true(all(b$p10 <= b$p50 & b$p50 <= b$p90))
+  expect_true(all(b$p10 <= b$p25 & b$p25 <= b$p50 & b$p50 <= b$p75 & b$p75 <= b$p90))
 })
 
 skip_if_not_installed("lme4")
@@ -158,24 +165,50 @@ test_that("fit survives serialisation for the REDCap cache", {
 test_that("charts build, and return NULL instead of a blank chart when empty", {
   rid <- sel$record_id[1]
   r_long <- long[long$record_id == rid, ]
-  goals <- extract_ilp_goals(sim$all_forms$ilp, rid, 4)
-  expect_s3_class(plot_milestone_heat_table(sel[sel$record_id == rid, ], fit$bands, goals), "plotly")
-  expect_s3_class(plot_milestone_dumbbell(r_long, 2, goals), "plotly")
-  tp <- plot_milestone_trajectory(r_long, "pc1", fit, goals = goals)
+  rp <- plot_milestone_range(sel[sel$record_id == rid, ], fit$bands, 2)
+  expect_s3_class(rp, "plotly")
+  expect_match(attr(rp, "milestone_range_summary"), "^At End Intern, \\d+ of 21")
+  expect_s3_class(plot_milestone_dumbbell(r_long, 2), "plotly")
+  tp <- plot_milestone_trajectory(r_long, "pc1", fit)
   expect_s3_class(tp, "plotly")
-  expect_true(length(attr(tp, "milestone_trajectory")$readout) >= 1)
-  expect_null(plot_milestone_heat_table(sel[0, ], fit$bands))
+  expect_true(length(attr(tp, "milestone_trajectory")$readout) >= 2)
+  expect_null(plot_milestone_range(sel[0, ], fit$bands, 2))
+  expect_null(plot_milestone_range(sel[sel$record_id == rid, ], fit$bands, NA))
   expect_null(plot_milestone_dumbbell(r_long[0, ], 2))
   expect_null(plot_milestone_trajectory(r_long[0, ], "pc1", fit))
 })
 
-test_that("heat data flags cells below the cohort 10th percentile", {
-  b <- data.frame(subcomp = "pc1", period = 1:2, p10 = 3, p50 = 4, p90 = 6)
-  r <- data.frame(subcomp = "pc1", period = 1:2, rating = c(2, 5), source = "coach")
-  h <- milestone_heat_data(r, b, max_period = 2)
-  h <- h[h$subcomp == "pc1", ]
-  expect_equal(h$below_p10, c(TRUE, FALSE))
-  expect_equal(h$diff, c(-2, 1))
+test_that("range data places each rating in the cohort range", {
+  b <- data.frame(subcomp = c("pc1", "pc2"), period = 2L, p10 = 3, p25 = 4, p50 = 5,
+                  p75 = 6, p90 = 7)
+  r <- data.frame(subcomp = c("pc1", "pc2"), period = 2L, rating = c(2, 8),
+                  source = "coach")
+  rd <- milestone_range_data(r, b, 2)
+  expect_equal(nrow(rd), 21)
+  expect_equal(rd$position[1:2], c("below", "above"))
+  expect_true(all(is.na(rd$position[-(1:2)])))
+  s <- milestone_range_summary(rd)
+  expect_match(s, "0 of 2 rated")
+  expect_match(s, "Above the usual range: PC2")
+  expect_match(s, "Below the usual range: PC1")
+})
+
+test_that("ILP goal progress compares the target with the next rating", {
+  ilp <- data.frame(record_id = "1", redcap_repeat_instrument = "ilp",
+                    year_resident = c("1", "2", "3"),
+                    goal_pcmk = c("1", "1", "3"), goal_level_pcmk = c("3", "4", "4"),
+                    stringsAsFactors = FALSE)
+  ms <- data.frame(record_id = "1", subcomp = c("pc1", "pc1", "pc1", "pc3"),
+                   period = c(1L, 2L, 3L, 3L), rater = "coach",
+                   rating = c(4, 5, 6, 6), stringsAsFactors = FALSE)
+  g <- ilp_goal_progress_data(ilp, ms, "1")
+  expect_equal(g$period, c(3L, 2L, 1L))                    # newest first
+  expect_equal(g$target_rating, c(7, 7, 5))
+  expect_equal(g$status, c("Awaiting next rating", "Not yet", "Reached"))
+  expect_equal(g$rating_at_set, c(6, 5, 4))
+  expect_equal(g$next_rating, c(NA, 6, 5))
+  expect_s3_class(ilp_goal_progress_table(g), "shiny.tag")
+  expect_equal(nrow(ilp_goal_progress_data(ilp, ms, "2")), 0)
 })
 
 test_that("module server renders with and without a fit", {
@@ -183,8 +216,9 @@ test_that("module server renders with and without a fit", {
   for (f in list(fit, NULL)) {
     shiny::testServer(mod_milestone_growth_server,
       args = list(milestone_data = long, resident_id = shiny::reactive(rid),
-                  period = shiny::reactive(3), ilp_data = sim$all_forms$ilp, fit = f), {
-        session$setInputs(subcomp = "pc2", dumbbell_period = "2")
+                  period = shiny::reactive(3), fit = f), {
+        session$setInputs(subcomp = "pc2", period_pick = "2")
+        expect_equal(view_period(), 2L)
         expect_false(is.null(output$overview_plot))
         expect_false(is.null(output$trajectory_plot))
         expect_false(is.null(output$dumbbell_plot))
@@ -206,4 +240,14 @@ test_that("label exports parse the same as raw exports", {
   expect_equal(l$period, 2L)
   expect_equal(l$rater, "ccc")
   expect_equal(gmed:::.mg_sort_classes(c("10", "7", "9")), c("7", "9", "10"))
+})
+
+test_that("goal progress module renders separately from the milestone module", {
+  rid <- sel$record_id[1]
+  shiny::testServer(mod_ilp_goal_progress_server,
+    args = list(ilp_data = sim$all_forms$ilp, milestone_data = long,
+                resident_id = shiny::reactive(rid)), {
+      expect_gt(nrow(prog()), 0)
+      expect_false(is.null(output$table))
+    })
 })

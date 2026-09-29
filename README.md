@@ -33,21 +33,34 @@ and `imslu.ccc.dashboard`. It replaces ind.dash's
 `output$ccc_milestone_plot` and gmed's `create_enhanced_milestone_progression()`
 (now marked superseded but kept for existing callers).
 
-It has three views, and ILP goals are marked in all of them:
+It has three views. None of them builds in a per-year target: the context
+is always where past residents at the same period were rated (the "usual
+range", i.e. the middle 80%), with plain-language guidance.
 
-1. **Overview heat table.** Rows are the 21 subcompetencies grouped by
-   competency and columns are periods. Each cell is the resident's rating
-   minus the cohort median, and ▼ marks a rating below the cohort 10th
-   percentile. Clicking a row opens it in view 3.
-2. **Self vs faculty dumbbell.** Shows one period. The faculty rating is the
-   CCC rating, else the coach rating, and ACGME is drawn as a third mark.
+1. **Range snapshot** (`overview`). Shows one period, with one row per
+   subcompetency grouped by competency. Grey bars show the cohort range
+   (light = 10th–90th percentile, dark = 25th–75th, tick = median), with the
+   resident's rating on top; marker shape and colour show its source. A
+   guidance line under the chart reads, for example, "At Mid PGY2, 18 of 21
+   rated subcompetencies are within the usual range … Above the usual range:
+   PC6, ICS1, ICS3." Clicking a row opens it in view 3.
+2. **Self vs faculty dumbbell.** Shows the same period. The faculty rating is
+   the CCC rating, else the coach rating, and ACGME is drawn as a third mark.
    Rows are sorted by the size of the self vs faculty gap.
-3. **Trajectory.** Shows the cohort 10th–90th percentile band, the program
-   expectation step line (3 / 5 / 5 / 7 / 7 / 7 for periods 1–6) and the
-   graduation line at 7. The resident's points use marker shape to show the
-   source. It also draws the projection with an 80% prediction interval and
-   gives P(reach 7 by graduation) plus the empirical check, which is
-   suppressed when n < 10.
+3. **Trajectory.** Shows the cohort range across periods (same two bands plus
+   the median) and the resident's points. It also draws the projection with
+   an 80% prediction interval. The readout gives range guidance for the
+   latest rating, the projected graduation rating, P(reach 7 by graduation)
+   and the empirical check (suppressed when n < 10). The graduation line at
+   7 is on by default; `show_target = FALSE` turns it off.
+
+**ILP goals are a separate module**, `mod_ilp_goal_progress_ui/server()`,
+so each app can place it on its own. It lists every goal the resident has
+set, newest first, with columns for:
+- the target (goal level → rating: 1→1, 2→3, 3→5, 4→7, 5→9)
+- the rating when the goal was set
+- the next rating after that
+- a status: Reached, Not yet, or Awaiting next rating
 
 **Which rating counts:** ACGME if present, else CCC, else coach. The
 `source` column records which one was used.
@@ -88,16 +101,21 @@ milestone_fit  <- load_cached_milestone_growth()             # NULL if not cache
 ```
 
 **Coach dashboard.** Use all three views for the coachee and the review
-period:
+period, with goals on their own:
 
 ```r
 mod_milestone_growth_ui("growth")
+mod_ilp_goal_progress_ui("goals")
+
 mod_milestone_growth_server("growth",
   milestone_data = milestone_long,
   resident_id    = reactive(selected_resident()$record_id),
   period         = reactive(review_period()),       # 1-6 or label
-  ilp_data       = reactive(app_data()$all_forms$ilp),
   fit            = milestone_fit)
+mod_ilp_goal_progress_server("goals",
+  ilp_data       = reactive(app_data()$all_forms$ilp),
+  milestone_data = milestone_long,
+  resident_id    = reactive(selected_resident()$record_id))
 ```
 
 The coach app still uses `create_milestone_spider_plot_final()` and
@@ -112,9 +130,11 @@ mod_milestone_growth_server("growth",
   milestone_data = reactive(rdm_data()$milestone_long),  # built in global.R
   resident_id    = resident_id,
   period         = reactive(NULL),                       # latest with data
-  ilp_data       = reactive(rdm_data()$all_forms$ilp),
   fit            = reactive(rdm_data()$milestone_fit))
 ```
+
+ind.dash already shows ILP goals in its own learning tab, so it can add
+`mod_ilp_goal_progress_*` there instead of next to the charts.
 
 **imslu.ccc.dashboard** (`server.R`). Put the module in
 `output$ccc_mile_section` in place of `ccc_mile_selector` and
@@ -130,7 +150,6 @@ mod_milestone_growth_server("ccc_growth",
   resident_id    = selected_resident_id,
   period         = reactive(app_data()$residents$current_period[
                      app_data()$residents$record_id == selected_resident_id()]),
-  ilp_data       = reactive(app_data()$all_forms$ilp),
   fit            = milestone_fit)
 ```
 

@@ -71,24 +71,55 @@ milestone_periods <- function() {
 # Rating sources in fallback order: the first present one is "the" rating.
 .MG_SOURCE_ORDER <- c("acgme", "ccc", "coach")
 
-#' Program expectation by period
+#' Where a rating sits in the cohort range
 #'
-#' Step function of what the program expects at each period, drawn separately
-#' from the cohort band:
-#' \itemize{
-#'   \item 3 for intern year: period 1 (Mid Intern)
-#'   \item 5 for late intern / early PGY2: periods 2 (End Intern) and
-#'     3 (Mid PGY2)
-#'   \item 7 for late PGY2 / PGY3: periods 4 (End PGY2), 5 (Mid PGY3) and
-#'     6 (Graduating)
-#' }
+#' Describes a rating against the cohort percentiles for the same period and
+#' subcompetency, without any stage-based expectation. The "usual range" is
+#' the middle 80\% of past residents (10th-90th percentile).
 #'
-#' @return Data frame with \code{period}, \code{period_name}, \code{expected}.
+#' @param rating Numeric rating(s).
+#' @param p10,p25,p75,p90 Cohort percentiles (same length as \code{rating}).
+#' @return Character position: "below", "lower", "middle", "upper",
+#'   "above" (NA when the rating or band is missing).
 #' @export
-milestone_program_expectation <- function() {
-  p <- milestone_periods()
-  p$expected <- c(3, 5, 5, 7, 7, 7)
-  p[, c("period", "period_name", "expected")]
+milestone_range_position <- function(rating, p10, p25, p75, p90) {
+  out <- rep(NA_character_, length(rating))
+  ok <- !is.na(rating) & !is.na(p10) & !is.na(p90)
+  out[ok] <- "middle"
+  out[ok & rating < p25] <- "lower"
+  out[ok & rating > p75] <- "upper"
+  out[ok & rating < p10] <- "below"
+  out[ok & rating > p90] <- "above"
+  out
+}
+
+.MG_POSITION_LABEL <- c(
+  below  = "below the usual range",
+  lower  = "in the lower part of the usual range",
+  middle = "in the middle of the usual range",
+  upper  = "in the upper part of the usual range",
+  above  = "above the usual range"
+)
+
+#' Plain-language guidance for one rating
+#'
+#' @param rating The resident's rating.
+#' @param band One row of cohort bands (\code{p10} ... \code{p90}, \code{period}).
+#' @return A sentence, e.g. "At End PGY2, past residents were usually rated
+#'   5-7 (median 6). This rating (6) is in the middle of the usual range."
+#' @export
+milestone_range_guidance <- function(rating, band) {
+  if (is.null(band) || !nrow(band) || is.na(band$p10[1])) return(NULL)
+  b <- band[1, ]
+  lo <- round(b$p10); hi <- round(b$p90)
+  rng <- if (lo == hi) as.character(lo) else paste0(lo, "&#8211;", hi)
+  txt <- sprintf("At %s, past residents were usually rated %s (median %s).",
+                 .mg_period_name(b$period), rng, round(b$p50))
+  if (!is.null(rating) && !is.na(rating)) {
+    pos <- milestone_range_position(rating, b$p10, b$p25, b$p75, b$p90)
+    txt <- paste(txt, sprintf("This rating (%s) is %s.", round(rating), .MG_POSITION_LABEL[[pos]]))
+  }
+  txt
 }
 
 #' Convert an ILP goal level to a milestone rating
@@ -376,28 +407,28 @@ extract_ilp_goals <- function(ilp_data, resident_id, period) {
   cur <- .mg_period_num(period)
   if (is.na(cur)) cur <- suppressWarnings(max(ilp$period_num, na.rm = TRUE))
 
-  rows_for <- function(r, which) {
-    do.call(rbind, lapply(names(.MG_ILP_DOMAINS), function(d) {
-      f <- .MG_ILP_DOMAINS[[d]]
-      if (!f$goal %in% names(r)) return(NULL)
-      sc <- ilp_goal_subcomp(d, r[[f$goal]][1])
-      if (is.na(sc)) return(NULL)
-      lv <- if (f$level %in% names(r)) suppressWarnings(as.numeric(r[[f$level]][1])) else NA_real_
-      data.frame(subcomp = sc, domain = d, goal_level = lv,
-                 target_rating = ilp_goal_level_to_rating(lv),
-                 period = r$period_num[1], which = which,
-                 stringsAsFactors = FALSE)
-    }))
-  }
-
   out <- list()
   c_row <- ilp[!is.na(ilp$period_num) & ilp$period_num == cur, , drop = FALSE]
-  if (nrow(c_row)) out$cur <- rows_for(c_row[nrow(c_row), , drop = FALSE], "current")
+  if (nrow(c_row)) out$cur <- .mg_ilp_goal_rows(c_row[nrow(c_row), , drop = FALSE], "current")
   prev <- ilp[!is.na(ilp$period_num) & ilp$period_num < cur, , drop = FALSE]
   if (nrow(prev)) {
     prev <- prev[prev$period_num == max(prev$period_num), , drop = FALSE]
-    out$prev <- rows_for(prev[nrow(prev), , drop = FALSE], "previous")
+    out$prev <- .mg_ilp_goal_rows(prev[nrow(prev), , drop = FALSE], "previous")
   }
   res <- do.call(rbind, out)
   if (is.null(res)) empty else { rownames(res) <- NULL; res }
+}
+
+# Goals in one ILP row -> one row per domain with a chosen subcompetency.
+.mg_ilp_goal_rows <- function(r, which = NA_character_) {
+  do.call(rbind, lapply(names(.MG_ILP_DOMAINS), function(d) {
+    f <- .MG_ILP_DOMAINS[[d]]
+    if (!f$goal %in% names(r)) return(NULL)
+    sc <- ilp_goal_subcomp(d, r[[f$goal]][1])
+    if (is.na(sc)) return(NULL)
+    target <- if (f$level %in% names(r)) ilp_goal_level_to_rating(r[[f$level]][1]) else NA_real_
+    data.frame(subcomp = sc, domain = d, goal_level = (target + 1) / 2,
+               target_rating = target, period = r$period_num[1], which = which,
+               stringsAsFactors = FALSE)
+  }))
 }

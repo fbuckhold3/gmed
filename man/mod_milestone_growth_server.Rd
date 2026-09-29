@@ -9,10 +9,10 @@ mod_milestone_growth_server(
   milestone_data,
   resident_id,
   period,
-  ilp_data = NULL,
   fit = NULL,
   show = c("overview", "dumbbell", "trajectory"),
-  height = "560px"
+  height = "560px",
+  show_target = TRUE
 )
 }
 \arguments{
@@ -24,11 +24,8 @@ start), or the forms list it accepts (\code{all_forms}).}
 
 \item{resident_id}{Reactive resident record id.}
 
-\item{period}{Reactive current period (1-6 or label). Used as the default
-dumbbell period, the last overview column, and to pick current vs
-previous ILP goals. \code{NULL}/NA = latest period with data.}
-
-\item{ilp_data}{Optional reactive of ILP rows (\code{all_forms$ilp}).}
+\item{period}{Reactive current period (1-6 or label), the default for the
+period picker. \code{NULL}/NA = latest period with data.}
 
 \item{fit}{Optional reactive of the cached \code{milestone_growth_fit}
 (\code{load_cached_milestone_growth()}).}
@@ -36,10 +33,12 @@ previous ILP goals. \code{NULL}/NA = latest period with data.}
 \item{show}{Views rendered (should match the UI).}
 
 \item{height}{Plot height.}
+
+\item{show_target}{Draw the graduation target line (7) on the trajectory.}
 }
 \value{
 Invisibly, a list of reactives: \code{selected_subcomp},
-\code{trajectory} (the trajectory data incl. readout).
+\code{period}, \code{trajectory} (the trajectory data incl. readout).
 }
 \description{
 Milestone growth module server

@@ -9,9 +9,9 @@ plot_milestone_trajectory(
   subcomp,
   fit = NULL,
   bands = NULL,
-  goals = NULL,
   level = 0.8,
-  show_self = FALSE
+  show_self = FALSE,
+  show_target = TRUE
 )
 }
 \arguments{
@@ -23,11 +23,11 @@ plot_milestone_trajectory(
 
 \item{bands}{Bands to use when \code{fit} is \code{NULL}.}
 
-\item{goals}{ILP goals, or \code{NULL}.}
-
 \item{level}{Prediction interval level.}
 
 \item{show_self}{Show self ratings (hidden in the legend by default).}
+
+\item{show_target}{Draw the graduation target line at 7.}
 }
 \value{
 A plotly object, or \code{NULL} when the resident has no ratings
@@ -35,8 +35,9 @@ for this subcompetency. The trajectory data (incl. \code{readout}) is
 attached as attribute \code{"milestone_trajectory"}.
 }
 \description{
-Shows the cohort band (10th-90th percentile, median dotted), the program
-expectation step line, the graduation line at 7, the resident's ratings
-(marker shape = source), the projection with its prediction interval, the
-ILP goal targets, and a readout of P(reach 7).
+Shows the cohort range by period (light: 10th-90th percentile, darker:
+25th-75th, dotted: median), the resident's ratings (marker shape =
+source), the projection with its prediction interval, and a readout with
+range guidance and P(reach 7). The graduation target line at 7 is
+optional.
 }

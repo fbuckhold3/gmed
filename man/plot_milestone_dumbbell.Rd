@@ -4,14 +4,12 @@
 \alias{plot_milestone_dumbbell}
 \title{Self vs faculty dumbbell for one period}
 \usage{
-plot_milestone_dumbbell(long, period, goals = NULL)
+plot_milestone_dumbbell(long, period)
 }
 \arguments{
 \item{long}{Resident's long milestone data (all raters).}
 
 \item{period}{Period (1-6).}
-
-\item{goals}{ILP goals, or \code{NULL}.}
 }
 \value{
 A plotly object, or \code{NULL} if the period has no ratings.

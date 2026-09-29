@@ -3,6 +3,12 @@
 # a *_data() function (testable, no plotly) and a plot_*() function that
 # returns a plotly object, or NULL when there is nothing to draw (the module
 # shows an empty state instead of a blank chart).
+#
+# Context is always the cohort range (where past residents at the same period
+# fell) plus plain-language guidance. There are no stage-based expectation
+# lines, and ILP goals live in their own module (mod_ilp_goal_progress.R).
+# Strings use HTML entities rather than non-ASCII characters so they render
+# the same in any R locale.
 
 # ── Palette & chrome ─────────────────────────────────────────────────────────
 
@@ -10,23 +16,21 @@
   acgme  = "#2a78d6",   # categorical slot 1 (blue)
   ccc    = "#eb6834",   # slot 2 (orange)
   coach  = "#1baf7a",   # slot 3 (aqua)
-  self   = "#898781",   # muted ink
-  goal   = "#4a3aa7",   # slot 7 (violet)
+  self   = "#52514e",   # secondary ink (open marker)
   ink    = "#0b0b0b",
   ink2   = "#52514e",
   muted  = "#898781",
   grid   = "#e1e0d9",
-  band   = "rgba(137,135,129,0.20)",
+  range_outer = "#e1e0d9",                  # 10th-90th
+  range_inner = "#c3c2b7",                  # 25th-75th
+  band_outer  = "rgba(137,135,129,0.14)",
+  band_inner  = "rgba(137,135,129,0.26)",
   proj   = "rgba(42,120,214,0.16)"
 )
 .MG_SYMBOL <- c(acgme = "diamond", ccc = "square", coach = "circle",
-                self = "triangle-up-open")
+                self = "circle-open")
 .MG_SOURCE_LABEL <- c(acgme = "ACGME", ccc = "CCC", coach = "Coach",
                       self = "Self")
-# Diverging: red (below cohort median) -> neutral gray -> blue (above)
-.MG_DIVERGING <- list(c(0, "#c83b3a"), c(0.25, "#eea3a2"), c(0.5, "#f0efec"),
-                      c(0.75, "#86b6ef"), c(1, "#1c5cab"))
-.MG_GOAL_GLYPH <- c(current = "&#9670;", previous = "&#9671;")   # ◆ ◇
 
 # roundsui chrome when available; plain plotly layout otherwise.
 .mg_style <- function(p, ...) {
@@ -42,134 +46,135 @@
 
 .mg_fmt <- function(x, d = 1) ifelse(is.na(x), "&#8211;", formatC(x, format = "f", digits = d))
 
-# Subcomp tick labels with ILP goal glyphs appended.
-.mg_tick_labels <- function(subcomps, goals = NULL) {
-  lab <- toupper(subcomps)
-  if (!is.null(goals) && nrow(goals)) {
-    for (w in c("previous", "current")) {
-      hit <- subcomps %in% goals$subcomp[goals$which == w]
-      lab[hit] <- paste(lab[hit], .MG_GOAL_GLYPH[[w]])
-    }
-  }
-  lab
+# Horizontal lines between competency groups, for charts whose rows are the
+# 21 subcompetencies at y = 21 (PC1) ... 1 (ICS3).
+.mg_group_separators <- function() {
+  sc <- milestone_subcompetencies()
+  ny <- nrow(sc)
+  grp_end <- cumsum(rle(sc$competency)$lengths)
+  lapply(grp_end[-length(grp_end)], function(k) list(
+    type = "line", xref = "paper", x0 = 0, x1 = 1,
+    y0 = ny + 0.5 - k, y1 = ny + 0.5 - k,
+    line = list(color = .MG_COL$grid, width = 1)))
 }
 
-.mg_goal_note <- function(goals) {
-  if (is.null(goals) || !nrow(goals)) return(NULL)
-  paste0(.MG_GOAL_GLYPH[["current"]], " current ILP goal   ",
-         .MG_GOAL_GLYPH[["previous"]], " previous ILP goal")
-}
+# ── View 1: range snapshot ───────────────────────────────────────────────────
 
-# ── View 1: overview heat table ──────────────────────────────────────────────
-
-#' Data for the overview heat table
+#' Data for the range snapshot
 #'
 #' @param ratings Resident's selected ratings
 #'   (\code{select_milestone_rating()} rows for one resident).
 #' @param bands Cohort bands (\code{fit_cohort_bands()}).
-#' @param max_period Last period to show (default: all).
-#' @return Data frame, one row per subcomp x period with \code{rating},
-#'   \code{source}, \code{p10}, \code{p50}, \code{p90}, \code{diff}
-#'   (rating - p50) and \code{below_p10}.
+#' @param period Period (1-6).
+#' @return Data frame, one row per subcompetency (display order) with
+#'   \code{rating}, \code{source}, the cohort percentiles and
+#'   \code{position} (\code{milestone_range_position()}).
 #' @export
-milestone_heat_data <- function(ratings, bands, max_period = 6) {
+milestone_range_data <- function(ratings, bands, period) {
   sc <- milestone_subcompetencies()
-  periods <- seq_len(max_period)
-  grid <- expand.grid(subcomp = sc$subcomp, period = periods,
-                      stringsAsFactors = FALSE)
-  r <- ratings[, intersect(c("subcomp", "period", "rating", "source"), names(ratings))]
-  out <- merge(grid, r, by = c("subcomp", "period"), all.x = TRUE)
+  r <- ratings[ratings$period == period, c("subcomp", "rating", "source"), drop = FALSE]
   b <- if (is.null(bands) || !nrow(bands)) .mg_empty_bands() else bands
-  out <- merge(out, b[, c("subcomp", "period", "p10", "p50", "p90")],
-               by = c("subcomp", "period"), all.x = TRUE)
-  out$diff <- out$rating - out$p50
-  out$below_p10 <- !is.na(out$rating) & !is.na(out$p10) & out$rating < out$p10
-  out[order(match(out$subcomp, sc$subcomp), out$period), , drop = FALSE]
+  b <- b[b$period == period, c("subcomp", "p10", "p25", "p50", "p75", "p90"), drop = FALSE]
+  out <- merge(data.frame(subcomp = sc$subcomp, label = sc$label,
+                          competency = sc$competency, stringsAsFactors = FALSE),
+               r, by = "subcomp", all.x = TRUE)
+  out <- merge(out, b, by = "subcomp", all.x = TRUE)
+  out$period <- as.integer(period)
+  out$position <- milestone_range_position(out$rating, out$p10, out$p25, out$p75, out$p90)
+  out <- out[match(sc$subcomp, out$subcomp), , drop = FALSE]
+  rownames(out) <- NULL
+  out
 }
 
-#' Overview heat table: resident minus cohort median
+#' One-paragraph guidance for a range snapshot
 #'
-#' Rows are the 21 subcompetencies grouped by competency, columns are
-#' periods, cells are the resident's rating minus the cohort median on a
-#' diverging scale. Cells below the cohort 10th percentile are flagged with a
-#' marker. Row y values are 1-21 (PC1 at the top); a click event's \code{y}
-#' maps to \code{milestone_subcompetencies()$subcomp[22 - y]}.
-#'
-#' @inheritParams milestone_heat_data
-#' @param goals ILP goals (\code{extract_ilp_goals()}), or \code{NULL}.
-#' @param source Plotly event source id (for click handling).
-#' @return A plotly object, or \code{NULL} when the resident has no ratings.
+#' @param rd \code{milestone_range_data()} output.
+#' @return Character (HTML entities allowed) or \code{NULL} if nothing is rated.
 #' @export
-plot_milestone_heat_table <- function(ratings, bands, goals = NULL,
-                                      max_period = 6, source = "mg_heat") {
-  if (is.null(ratings) || !nrow(ratings)) return(NULL)
-  hd <- milestone_heat_data(ratings, bands, max_period)
-  sc <- milestone_subcompetencies()
-  periods <- seq_len(max_period)
-  pnames <- .mg_period_name(periods)
-  ny <- nrow(sc)
-  yval <- ny + 1 - match(hd$subcomp, sc$subcomp)      # PC1 at the top
+milestone_range_summary <- function(rd) {
+  rated <- rd[!is.na(rd$position), , drop = FALSE]
+  if (!nrow(rated)) return(NULL)
+  n_in <- sum(rated$position %in% c("lower", "middle", "upper"))
+  txt <- sprintf(
+    "At %s, %d of %d rated subcompetencies are within the usual range for past residents at the same point (middle 80%%).",
+    .mg_period_name(rd$period[1]), n_in, nrow(rated))
+  codes <- function(pos) paste(toupper(rated$subcomp[rated$position == pos]), collapse = ", ")
+  if (any(rated$position == "above")) txt <- paste0(txt, " Above the usual range: ", codes("above"), ".")
+  if (any(rated$position == "below")) txt <- paste0(txt, " Below the usual range: ", codes("below"), ".")
+  txt
+}
 
-  zmat <- matrix(NA_real_, ny, length(periods))
-  tmat <- matrix("", ny, length(periods))
-  for (i in seq_len(nrow(hd))) {
-    yi <- yval[i]; xi <- hd$period[i]
-    zmat[yi, xi] <- hd$diff[i]
-    lab <- sc$label[sc$subcomp == hd$subcomp[i]]
-    tmat[yi, xi] <- if (is.na(hd$rating[i])) paste0(lab, "<br>", pnames[xi], "<br>No rating") else
-      paste0(lab, "<br>", pnames[xi],
-             "<br>Rating ", .mg_fmt(hd$rating[i], 0), " (", .MG_SOURCE_LABEL[hd$source[i]], ")",
-             "<br>Cohort median ", .mg_fmt(hd$p50[i]), "  [p10 ", .mg_fmt(hd$p10[i]),
-             ", p90 ", .mg_fmt(hd$p90[i]), "]",
-             "<br>Difference ", ifelse(is.na(hd$diff[i]), "&#8211;", sprintf("%+.1f", hd$diff[i])),
-             if (isTRUE(hd$below_p10[i])) "<br><b>Below cohort 10th percentile</b>" else "")
+#' Range snapshot: each subcompetency against the cohort range
+#'
+#' For one period, one row per subcompetency (grouped by competency) showing
+#' where past residents at the same period fell (light bar: 10th-90th
+#' percentile, the "usual range"; darker bar: 25th-75th; tick: median) and
+#' the resident's rating that counts, with marker shape and colour showing
+#' its source. Row y values are 21 (PC1) down to 1 (ICS3); a click event's
+#' \code{y} maps to \code{milestone_subcompetencies()$subcomp[22 - y]}.
+#'
+#' @inheritParams milestone_range_data
+#' @param source Plotly event source id (for click handling).
+#' @return A plotly object (with the summary sentence as attribute
+#'   \code{"milestone_range_summary"}), or \code{NULL} when the resident has
+#'   no rating in that period.
+#' @export
+plot_milestone_range <- function(ratings, bands, period, source = "mg_range") {
+  if (is.null(ratings) || !nrow(ratings) || is.na(period)) return(NULL)
+  rd <- milestone_range_data(ratings, bands, period)
+  if (all(is.na(rd$rating))) return(NULL)
+  ny <- nrow(rd)
+  rd$y <- rev(seq_len(ny))
+  seg <- function(lo, hi) {
+    k <- !is.na(lo) & !is.na(hi)
+    list(x = as.vector(rbind(lo[k], hi[k], NA)), y = as.vector(rbind(rd$y[k], rd$y[k], NA)))
   }
+  outer <- seg(rd$p10, rd$p90)
+  inner <- seg(rd$p25, rd$p75)
+  band_hover <- sprintf("%s<br>Past residents at %s:<br>middle 80%%: %s&#8211;%s<br>middle half: %s&#8211;%s<br>median: %s",
+                        rd$label, .mg_period_name(period), .mg_fmt(rd$p10), .mg_fmt(rd$p90),
+                        .mg_fmt(rd$p25), .mg_fmt(rd$p75), .mg_fmt(rd$p50))
 
   p <- plotly::plot_ly(source = source) |>
-    plotly::add_heatmap(
-      x = periods, y = seq_len(ny), z = zmat, text = tmat,
-      hoverinfo = "text", zmin = -3, zmax = 3, zmid = 0,
-      colorscale = .MG_DIVERGING, xgap = 2, ygap = 2,
-      colorbar = list(title = list(text = "vs cohort<br>median"), len = 0.6,
-                      tickvals = c(-3, 0, 3), ticktext = c("&#8722;3", "0", "+3")),
-      name = "Resident &#8722; cohort median"
-    )
+    plotly::add_trace(x = outer$x, y = outer$y, type = "scatter", mode = "lines",
+                      line = list(color = .MG_COL$range_outer, width = 10),
+                      name = "Usual range (10th&#8211;90th percentile)", hoverinfo = "skip") |>
+    plotly::add_trace(x = inner$x, y = inner$y, type = "scatter", mode = "lines",
+                      line = list(color = .MG_COL$range_inner, width = 10),
+                      name = "Middle half (25th&#8211;75th)", hoverinfo = "skip") |>
+    plotly::add_markers(x = rd$p50, y = rd$y, name = "Cohort median",
+                        marker = list(symbol = "line-ns-open", size = 16, color = .MG_COL$ink2,
+                                      line = list(color = .MG_COL$ink2, width = 2)),
+                        text = band_hover, hoverinfo = "text")
 
-  flag <- hd[hd$below_p10, , drop = FALSE]
-  if (nrow(flag)) {
+  for (s in c("coach", "ccc", "acgme")) {
+    k <- !is.na(rd$rating) & rd$source == s
+    if (!any(k)) next
     p <- p |> plotly::add_markers(
-      x = flag$period, y = ny + 1 - match(flag$subcomp, sc$subcomp),
-      marker = list(symbol = "triangle-down", size = 9, color = .MG_COL$ink),
-      name = "Below cohort 10th percentile", hoverinfo = "skip"
-    )
+      x = rd$rating[k], y = rd$y[k], name = .MG_SOURCE_LABEL[[s]],
+      marker = list(color = .MG_COL[[s]], symbol = .MG_SYMBOL[[s]], size = 12,
+                    line = list(color = "#ffffff", width = 2)),
+      text = paste0(rd$label[k], "<br>Rating ", .mg_fmt(rd$rating[k], 0), " (",
+                    .MG_SOURCE_LABEL[[s]], ")<br>",
+                    ifelse(is.na(rd$position[k]), "No cohort range for this period",
+                           paste0("Sits ", .MG_POSITION_LABEL[rd$position[k]]))),
+      hoverinfo = "text")
   }
 
-  # Competency group separators
-  grp_end <- cumsum(rle(sc$competency)$lengths)
-  seps <- lapply(grp_end[-length(grp_end)], function(k) list(
-    type = "line", xref = "paper", x0 = 0, x1 = 1,
-    y0 = ny + 0.5 - k, y1 = ny + 0.5 - k,
-    line = list(color = .MG_COL$ink2, width = 1.5)))
-
-  note <- .mg_goal_note(goals)
-  p |>
+  out <- p |>
     .mg_style(
-      xaxis = list(tickvals = periods, ticktext = pnames, title = "",
-                   side = "top", showgrid = FALSE, zeroline = FALSE),
-      yaxis = list(tickvals = seq_len(ny),
-                   ticktext = rev(.mg_tick_labels(sc$subcomp, goals)),
-                   title = "", showgrid = FALSE, zeroline = FALSE,
-                   range = c(0.5, ny + 0.5)),
-      shapes = seps,
-      showlegend = nrow(flag) > 0,
-      legend = list(orientation = "h", x = 0, y = -0.02, yanchor = "top"),
-      annotations = if (!is.null(note)) list(list(
-        text = note, xref = "paper", yref = "paper", x = 0, y = -0.09,
-        xanchor = "left", showarrow = FALSE,
-        font = list(size = 11, color = .MG_COL$goal))) else NULL,
-      margin = list(l = 70, r = 20, t = 40, b = 60)
+      xaxis = list(range = c(0.5, 9.5), dtick = 1, title = "Rating (1&#8211;9)",
+                   zeroline = FALSE),
+      yaxis = list(tickvals = rd$y, ticktext = toupper(rd$subcomp), title = "",
+                   range = c(0.4, ny + 0.6), zeroline = FALSE, showgrid = FALSE),
+      shapes = .mg_group_separators(),
+      legend = list(orientation = "h", x = 0, y = -0.11, yanchor = "top"),
+      hovermode = "closest",
+      margin = list(l = 60, r = 20, t = 20, b = 90)
     ) |>
     plotly::config(displayModeBar = FALSE)
+  attr(out, "milestone_range_summary") <- milestone_range_summary(rd)
+  out
 }
 
 # ── View 2: self vs faculty dumbbell ─────────────────────────────────────────
@@ -209,10 +214,9 @@ milestone_dumbbell_data <- function(long, period) {
 #'
 #' @param long Resident's long milestone data (all raters).
 #' @param period Period (1-6).
-#' @param goals ILP goals, or \code{NULL}.
 #' @return A plotly object, or \code{NULL} if the period has no ratings.
 #' @export
-plot_milestone_dumbbell <- function(long, period, goals = NULL) {
+plot_milestone_dumbbell <- function(long, period) {
   if (is.null(long) || !nrow(long) || is.na(period)) return(NULL)
   dd <- milestone_dumbbell_data(long, period)
   if (all(is.na(dd$self) & is.na(dd$faculty) & is.na(dd$acgme))) return(NULL)
@@ -226,11 +230,10 @@ plot_milestone_dumbbell <- function(long, period, goals = NULL) {
   both <- !is.na(dd$self) & !is.na(dd$faculty)
   seg_x <- as.vector(rbind(dd$self[both], dd$faculty[both], NA))
   seg_y <- as.vector(rbind(dd$y[both], dd$y[both], NA))
-  exp_val <- milestone_program_expectation()$expected[period]
 
   p <- plotly::plot_ly() |>
     plotly::add_trace(x = seg_x, y = seg_y, type = "scatter", mode = "lines",
-                      line = list(color = "#c3c2b7", width = 3),
+                      line = list(color = .MG_COL$range_inner, width = 3),
                       hoverinfo = "skip", showlegend = FALSE)
   fac_src <- ifelse(is.na(dd$faculty_source), "coach", dd$faculty_source)
   for (s in c("coach", "ccc")) {
@@ -240,14 +243,14 @@ plot_milestone_dumbbell <- function(long, period, goals = NULL) {
       x = dd$faculty[k], y = dd$y[k], name = paste("Faculty:", .MG_SOURCE_LABEL[[s]]),
       marker = list(color = .MG_COL[[s]], symbol = .MG_SYMBOL[[s]], size = 11,
                     line = list(color = "#ffffff", width = 2)),
-      text = hov(paste("Faculty"), dd$faculty, .MG_SOURCE_LABEL[fac_src])[k],
+      text = hov("Faculty", dd$faculty, .MG_SOURCE_LABEL[fac_src])[k],
       hoverinfo = "text")
   }
   if (any(!is.na(dd$self))) {
     k <- !is.na(dd$self)
     p <- p |> plotly::add_markers(
       x = dd$self[k], y = dd$y[k], name = "Self",
-      marker = list(color = .MG_COL$ink2, symbol = "circle-open", size = 11,
+      marker = list(color = .MG_COL$self, symbol = .MG_SYMBOL[["self"]], size = 11,
                     line = list(width = 2)),
       text = hov("Self", dd$self)[k], hoverinfo = "text")
   }
@@ -260,33 +263,16 @@ plot_milestone_dumbbell <- function(long, period, goals = NULL) {
       text = hov("ACGME", dd$acgme)[k], hoverinfo = "text")
   }
 
-  note <- .mg_goal_note(goals)
   p |>
     .mg_style(
       xaxis = list(range = c(0.5, 9.5), dtick = 1, title = "Rating (1&#8211;9)",
                    zeroline = FALSE),
-      yaxis = list(tickvals = dd$y, ticktext = .mg_tick_labels(dd$subcomp, goals),
+      yaxis = list(tickvals = dd$y, ticktext = toupper(dd$subcomp),
                    title = "", range = c(0.3, n + 0.7), zeroline = FALSE,
                    showgrid = FALSE),
-      shapes = list(
-        list(type = "line", x0 = exp_val, x1 = exp_val, yref = "paper", y0 = 0, y1 = 1,
-             line = list(color = .MG_COL$muted, dash = "dash", width = 1.5)),
-        list(type = "line", x0 = .MG_TARGET, x1 = .MG_TARGET, yref = "paper", y0 = 0, y1 = 1,
-             line = list(color = .MG_COL$ink, width = 1))),
-      annotations = c(
-        list(list(x = .MG_TARGET, y = 1, yref = "paper", yanchor = "bottom",
-                  text = if (exp_val == .MG_TARGET) "Expected = graduation 7" else "Graduation 7",
-                  showarrow = FALSE, font = list(size = 10, color = .MG_COL$ink))),
-        if (exp_val != .MG_TARGET)
-          list(list(x = exp_val, y = 1, yref = "paper", yanchor = "bottom",
-                    text = paste("Expected", exp_val), showarrow = FALSE,
-                    font = list(size = 10, color = .MG_COL$muted))),
-        if (!is.null(note)) list(list(text = note, xref = "paper", yref = "paper",
-                                      x = 0, y = -0.2, xanchor = "left", showarrow = FALSE,
-                                      font = list(size = 11, color = .MG_COL$goal)))),
-      legend = list(orientation = "h", x = 0, y = -0.1, yanchor = "top"),
+      legend = list(orientation = "h", x = 0, y = -0.11, yanchor = "top"),
       hovermode = "closest",
-      margin = list(l = 70, r = 20, t = 30, b = 100)
+      margin = list(l = 60, r = 20, t = 20, b = 90)
     ) |>
     plotly::config(displayModeBar = FALSE)
 }
@@ -327,16 +313,20 @@ milestone_trajectory_data <- function(long, subcomp, fit = NULL, bands = NULL,
     empirical_reach_lookup(fit$empirical, subcomp, last_p, sel$rating[nrow(sel)]) else NULL
 
   readout <- character(0)
+  if (nrow(sel) && !is.null(band)) {
+    g <- milestone_range_guidance(sel$rating[nrow(sel)], band[band$period == last_p, , drop = FALSE])
+    if (!is.null(g)) readout <- g
+  }
   if (last_p == 6) {
-    readout <- sprintf("Graduation rating: %s (%s).", .mg_fmt(sel$rating[nrow(sel)], 0),
-                       .MG_SOURCE_LABEL[[sel$source[nrow(sel)]]])
+    readout <- c(readout, sprintf("Graduation rating: %s (%s).", .mg_fmt(sel$rating[nrow(sel)], 0),
+                                  .MG_SOURCE_LABEL[[sel$source[nrow(sel)]]]))
   } else if (!is.null(grad)) {
-    readout <- sprintf(
-      "P(reach 7 by graduation): %d%%. Projected graduation rating %s (%d%% prediction interval %s&#8211;%s).",
-      round(100 * grad$p_reach), .mg_fmt(grad$fit), round(100 * level),
-      .mg_fmt(grad$lwr), .mg_fmt(grad$upr))
-  } else {
-    readout <- "Projection unavailable: no fitted growth model for this subcompetency."
+    readout <- c(readout, sprintf(
+      "Projected graduation rating %s (%d%% prediction interval %s&#8211;%s); chance of reaching 7 by graduation: %d%%.",
+      .mg_fmt(grad$fit), round(100 * level), .mg_fmt(grad$lwr), .mg_fmt(grad$upr),
+      round(100 * grad$p_reach)))
+  } else if (nrow(sel)) {
+    readout <- c(readout, "Projection unavailable: no fitted growth model for this subcompetency.")
   }
   if (!is.null(emp)) {
     readout <- c(readout, if (!is.null(emp$text)) emp$text else
@@ -348,20 +338,22 @@ milestone_trajectory_data <- function(long, subcomp, fit = NULL, bands = NULL,
 
 #' Drill-down trajectory for one subcompetency
 #'
-#' Shows the cohort band (10th-90th percentile, median dotted), the program
-#' expectation step line, the graduation line at 7, the resident's ratings
-#' (marker shape = source), the projection with its prediction interval, the
-#' ILP goal targets, and a readout of P(reach 7).
+#' Shows the cohort range by period (light: 10th-90th percentile, darker:
+#' 25th-75th, dotted: median), the resident's ratings (marker shape =
+#' source), the projection with its prediction interval, and a readout with
+#' range guidance and P(reach 7). The graduation target line at 7 is
+#' optional.
 #'
 #' @inheritParams milestone_trajectory_data
-#' @param goals ILP goals, or \code{NULL}.
 #' @param show_self Show self ratings (hidden in the legend by default).
+#' @param show_target Draw the graduation target line at 7.
 #' @return A plotly object, or \code{NULL} when the resident has no ratings
 #'   for this subcompetency. The trajectory data (incl. \code{readout}) is
 #'   attached as attribute \code{"milestone_trajectory"}.
 #' @export
 plot_milestone_trajectory <- function(long, subcomp, fit = NULL, bands = NULL,
-                                      goals = NULL, level = 0.8, show_self = FALSE) {
+                                      level = 0.8, show_self = FALSE,
+                                      show_target = TRUE) {
   if (is.null(long) || !nrow(long)) return(NULL)
   td <- milestone_trajectory_data(long, subcomp, fit, bands, level)
   if (!nrow(td$points)) return(NULL)
@@ -374,25 +366,27 @@ plot_milestone_trajectory <- function(long, subcomp, fit = NULL, bands = NULL,
   if (!is.null(band) && nrow(band)) {
     p <- p |>
       plotly::add_ribbons(x = band$period, ymin = band$p10, ymax = band$p90,
-                          fillcolor = .MG_COL$band, line = list(width = 0),
-                          name = "Cohort 10th&#8211;90th percentile",
-                          text = sprintf("%s<br>Cohort p10 %s &#8211; p90 %s", pnames[band$period],
-                                         .mg_fmt(band$p10), .mg_fmt(band$p90)),
+                          fillcolor = .MG_COL$band_outer, line = list(width = 0),
+                          name = "Usual range (10th&#8211;90th percentile)",
+                          text = sprintf("%s<br>Past residents: middle 80%% %s&#8211;%s",
+                                         pnames[band$period], .mg_fmt(band$p10), .mg_fmt(band$p90)),
+                          hoverinfo = "text") |>
+      plotly::add_ribbons(x = band$period, ymin = band$p25, ymax = band$p75,
+                          fillcolor = .MG_COL$band_inner, line = list(width = 0),
+                          name = "Middle half (25th&#8211;75th)",
+                          text = sprintf("%s<br>Past residents: middle half %s&#8211;%s",
+                                         pnames[band$period], .mg_fmt(band$p25), .mg_fmt(band$p75)),
                           hoverinfo = "text") |>
       plotly::add_lines(x = band$period, y = band$p50, name = "Cohort median",
                         line = list(color = .MG_COL$muted, width = 2, dash = "dot"),
                         text = sprintf("%s<br>Cohort median %s", pnames[band$period],
                                        .mg_fmt(band$p50)), hoverinfo = "text")
   }
-
-  exp <- milestone_program_expectation()
-  p <- p |>
-    plotly::add_lines(x = c(0.5, exp$period + 0.5), y = c(exp$expected[1], exp$expected),
-                      line = list(color = .MG_COL$ink2, width = 2, dash = "dash", shape = "vh"),
-                      name = "Program expectation", hoverinfo = "skip") |>
-    plotly::add_lines(x = c(0.5, 6.5), y = c(.MG_TARGET, .MG_TARGET),
-                      line = list(color = .MG_COL$ink, width = 1),
-                      name = "Graduation target (7)", hoverinfo = "skip")
+  if (isTRUE(show_target)) {
+    p <- p |> plotly::add_lines(x = c(0.7, 6.3), y = c(.MG_TARGET, .MG_TARGET),
+                                line = list(color = .MG_COL$ink, width = 1),
+                                name = "Graduation target (7)", hoverinfo = "skip")
+  }
 
   # Projection from the last observed rating to graduation
   sel <- td$selected
@@ -436,36 +430,17 @@ plot_milestone_trajectory <- function(long, subcomp, fit = NULL, bands = NULL,
       hoverinfo = "text")
   }
 
-  g <- if (is.null(goals)) NULL else goals[goals$subcomp == subcomp & !is.na(goals$target_rating), , drop = FALSE]
-  if (!is.null(g) && nrow(g)) {
-    for (w in c("current", "previous")) {
-      gw <- g[g$which == w, , drop = FALSE]
-      if (!nrow(gw)) next
-      p <- p |> plotly::add_markers(
-        x = pmin(gw$period + 1, 6), y = gw$target_rating,
-        name = paste(tools::toTitleCase(w), "ILP goal"),
-        marker = list(color = .MG_COL$goal, size = 14,
-                      symbol = if (w == "current") "star" else "star-open",
-                      line = list(color = .MG_COL$goal, width = 1.5)),
-        text = sprintf("%s ILP goal (set %s): level %s = rating %s",
-                       tools::toTitleCase(w), pnames[gw$period],
-                       .mg_fmt(gw$goal_level, 0), .mg_fmt(gw$target_rating, 0)),
-        hoverinfo = "text")
-    }
-  }
-
   out <- p |>
     .mg_style(
-      title = list(text = paste0("<b>", lab, "</b><br><span style='font-size:12px'>",
-                                 td$readout[1], "</span>"),
-                   x = 0, xanchor = "left", font = list(size = 14)),
+      title = list(text = paste0("<b>", lab, "</b>"), x = 0, xanchor = "left",
+                   font = list(size = 14)),
       xaxis = list(tickvals = 1:6, ticktext = pnames, range = c(0.7, 6.3),
                    title = "", zeroline = FALSE),
       yaxis = list(range = c(0.5, 9.5), dtick = 1, title = "Rating (1&#8211;9)",
                    zeroline = FALSE),
       legend = list(orientation = "h", x = 0, y = -0.12, yanchor = "top"),
       hovermode = "closest",
-      margin = list(l = 55, r = 20, t = 70, b = 90)
+      margin = list(l = 55, r = 20, t = 40, b = 90)
     ) |>
     plotly::config(displayModeBar = FALSE)
   attr(out, "milestone_trajectory") <- td

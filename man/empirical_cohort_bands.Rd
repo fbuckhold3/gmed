@@ -13,6 +13,6 @@ empirical_cohort_bands(data)
 Bands data frame, as \code{fit_cohort_bands()}.
 }
 \description{
-Cheap fallback for the module when no cached fit is available: per-period
-10th/50th/90th percentiles without model fitting.
+Cheap fallback for the module when no cached fit is available: raw
+per-period percentiles without model fitting.
 }
