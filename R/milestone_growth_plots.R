@@ -446,3 +446,72 @@ plot_milestone_trajectory <- function(long, subcomp, fit = NULL, bands = NULL,
   attr(out, "milestone_trajectory") <- td
   out
 }
+
+# ── View 4: spider (the familiar radar) ──────────────────────────────────────
+
+#' Cohort median per subcompetency for one period and rater
+#'
+#' @param long Long milestone data for all residents.
+#' @param period Period (1-6).
+#' @param rater "faculty" (the rating that counts: ACGME, else CCC, else
+#'   coach), "acgme" or "self".
+#' @return Named numeric vector (names = subcomp ids).
+#' @export
+milestone_cohort_medians <- function(long, period, rater = c("faculty", "acgme", "self")) {
+  rater <- match.arg(rater)
+  d <- long[long$period == period, , drop = FALSE]
+  d <- if (rater == "faculty") select_milestone_rating(d) else d[d$rater == rater, , drop = FALSE]
+  if (!nrow(d)) return(stats::setNames(numeric(0), character(0)))
+  m <- tapply(d$rating, d$subcomp, stats::median, na.rm = TRUE)
+  m[intersect(milestone_subcompetencies()$subcomp, names(m))]
+}
+
+#' Milestone spider (radar) for one period
+#'
+#' The radar chart the programs already use, drawn by
+#' \code{create_enhanced_milestone_spider_plot()} (unchanged look), fed from
+#' long milestone data: the resident's ratings for one period against the
+#' cohort median for the same period and rater.
+#'
+#' @param long_res Resident's long milestone data (all raters).
+#' @param long_all Long milestone data for the cohort (for the medians).
+#' @param period Period (1-6).
+#' @param rater "faculty" (rating that counts), "acgme" or "self".
+#' @param resident_name Optional name for the hover text.
+#' @return A plotly object, or \code{NULL} when the resident has no ratings
+#'   from that rater in that period.
+#' @export
+plot_milestone_spider <- function(long_res, long_all, period,
+                                  rater = c("faculty", "acgme", "self"),
+                                  resident_name = NULL) {
+  rater <- match.arg(rater)
+  if (is.null(long_res) || !nrow(long_res) || is.na(period)) return(NULL)
+  d <- long_res[long_res$period == period, , drop = FALSE]
+  r <- if (rater == "faculty") select_milestone_rating(d) else d[d$rater == rater, , drop = FALSE]
+  if (!nrow(r)) return(NULL)
+  med <- milestone_cohort_medians(long_all, period, rater)
+
+  sc <- milestone_subcompetencies()
+  field <- switch(rater, faculty = sc$field_coach, acgme = sc$field_acgme, self = sc$field_self)
+  pfield <- switch(rater, faculty = "prog_mile_period", acgme = "acgme_mile_period",
+                   self = "prog_mile_period_self")
+  type <- switch(rater, faculty = "program", acgme = "acgme", self = "self")
+
+  rid <- as.character(r$record_id[1])
+  wide <- data.frame(record_id = rid, stringsAsFactors = FALSE)
+  wide[[pfield]] <- as.character(period)
+  med_df <- data.frame(x = as.character(period), stringsAsFactors = FALSE)
+  names(med_df) <- pfield
+  for (j in seq_len(nrow(sc))) {
+    wide[[field[j]]] <- r$rating[match(sc$subcomp[j], r$subcomp)]
+    med_df[[field[j]]] <- unname(med[sc$subcomp[j]])
+  }
+  res_data <- if (!is.null(resident_name))
+    data.frame(record_id = rid, name = resident_name, stringsAsFactors = FALSE) else NULL
+  p <- create_enhanced_milestone_spider_plot(
+    milestone_data = wide, median_data = med_df, resident_id = rid,
+    period_text = .mg_period_name(period), milestone_type = type,
+    resident_data = res_data)
+  if (requireNamespace("roundsui", quietly = TRUE)) p <- roundsui::roundsui_plotly_layout(p)
+  p
+}

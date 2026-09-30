@@ -222,6 +222,9 @@ test_that("module server renders with and without a fit", {
         expect_false(is.null(output$overview_plot))
         expect_false(is.null(output$trajectory_plot))
         expect_false(is.null(output$dumbbell_plot))
+        expect_false(is.null(output$spider_plot))
+        session$setInputs(spider_rater = "self")
+        expect_false(is.null(output$spider_plot))
       })
   }
 })
@@ -250,4 +253,21 @@ test_that("goal progress module renders separately from the milestone module", {
       expect_gt(nrow(prog()), 0)
       expect_false(is.null(output$table))
     })
+})
+
+test_that("spider reuses the familiar radar for each rater, fed from long data", {
+  rid <- sel$record_id[1]
+  r_long <- long[long$record_id == rid, ]
+  med <- milestone_cohort_medians(long, 2, "faculty")
+  expect_length(med, 21)
+  expect_equal(unname(med["pc1"]),
+               stats::median(sel$rating[sel$period == 2 & sel$subcomp == "pc1"]))
+  for (rt in c("faculty", "acgme", "self")) {
+    p <- suppressMessages(suppressWarnings(plot_milestone_spider(r_long, long, 2, rt)))
+    expect_s3_class(p, "plotly")
+    b <- suppressMessages(suppressWarnings(plotly::plotly_build(p)))
+    expect_true(any(vapply(b$x$data, function(t) length(t$r) == 21, logical(1))))
+  }
+  expect_null(plot_milestone_spider(r_long, long, 1, "acgme"))   # no ACGME at period 1
+  expect_null(plot_milestone_spider(r_long[0, ], long, 2))
 })

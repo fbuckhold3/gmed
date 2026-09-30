@@ -4,13 +4,17 @@
 \alias{mod_milestone_growth_ui}
 \title{Milestone growth module UI}
 \usage{
-mod_milestone_growth_ui(id, show = c("overview", "dumbbell", "trajectory"))
+mod_milestone_growth_ui(
+  id,
+  show = c("spider", "overview", "dumbbell", "trajectory")
+)
 }
 \arguments{
 \item{id}{Module id.}
 
-\item{show}{Views to include: any of \code{"overview"} (range snapshot),
-\code{"dumbbell"}, \code{"trajectory"}.}
+\item{show}{Views to include: any of \code{"spider"} (radar vs cohort
+median), \code{"overview"} (range snapshot), \code{"dumbbell"},
+\code{"trajectory"}.}
 }
 \value{
 A \code{tagList}.

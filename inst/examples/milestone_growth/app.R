@@ -54,7 +54,8 @@ server <- function(input, output, session) {
     milestone_data = long,
     resident_id    = reactive(input$rid),
     period         = reactive(input$period),
-    fit            = fit
+    fit            = fit,
+    resident_name  = reactive(residents$name[residents$record_id == input$rid])
   )
   mod_ilp_goal_progress_server(
     "goals",

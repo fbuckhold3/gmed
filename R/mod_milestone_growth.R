@@ -4,24 +4,25 @@
 # .milestone_prog_plot_combined(), the CCC dashboard's inline
 # output$ccc_milestone_plot and gmed's create_enhanced_milestone_progression().
 #
-# Views: range snapshot (each subcompetency against where past residents at
-# the same period fell, with guidance text), self vs faculty dumbbell, and a
-# drill-down trajectory. ILP goals are a separate module
+# Views: the familiar spider (radar) chart, range snapshot (each
+# subcompetency against where past residents at the same period fell, with
+# guidance text), self vs faculty dumbbell, and a drill-down trajectory. ILP goals are a separate module
 # (mod_ilp_goal_progress_*). No model fitting happens here: pass the cached fit
 # from load_cached_milestone_growth() (fitted by the data-refresh job).
 # Without a fit the module uses raw per-period cohort percentiles and draws
 # the trajectory without a projection.
 
-.MG_VIEWS <- c("overview", "dumbbell", "trajectory")
+.MG_VIEWS <- c("spider", "overview", "dumbbell", "trajectory")
 
 #' Milestone growth module UI
 #'
 #' @param id Module id.
-#' @param show Views to include: any of \code{"overview"} (range snapshot),
-#'   \code{"dumbbell"}, \code{"trajectory"}.
+#' @param show Views to include: any of \code{"spider"} (radar vs cohort
+#'   median), \code{"overview"} (range snapshot), \code{"dumbbell"},
+#'   \code{"trajectory"}.
 #' @return A \code{tagList}.
 #' @export
-mod_milestone_growth_ui <- function(id, show = c("overview", "dumbbell", "trajectory")) {
+mod_milestone_growth_ui <- function(id, show = c("spider", "overview", "dumbbell", "trajectory")) {
   ns <- shiny::NS(id)
   show <- match.arg(show, .MG_VIEWS, several.ok = TRUE)
   card <- function(title, ...) {
@@ -31,10 +32,16 @@ mod_milestone_growth_ui <- function(id, show = c("overview", "dumbbell", "trajec
       ...))
   }
   shiny::tagList(
-    if (any(c("overview", "dumbbell") %in% show))
+    if (any(c("spider", "overview", "dumbbell") %in% show))
       shiny::div(class = "d-flex align-items-center gap-2 mb-2",
         shiny::tags$span(class = "small text-muted", "Period:"),
         shiny::uiOutput(ns("period_ui"), inline = TRUE)),
+    if ("spider" %in% show) card(
+      "Milestone profile",
+      shiny::radioButtons(ns("spider_rater"), NULL, inline = TRUE,
+        choices = c("Faculty" = "faculty", "ACGME" = "acgme", "Self" = "self"),
+        selected = "faculty"),
+      shiny::uiOutput(ns("spider_ui"))),
     if ("overview" %in% show) card(
       "Milestones in context",
       shiny::tags$p(class = "small text-muted mb-1",
@@ -69,19 +76,23 @@ mod_milestone_growth_ui <- function(id, show = c("overview", "dumbbell", "trajec
 #' @param show Views rendered (should match the UI).
 #' @param height Plot height.
 #' @param show_target Draw the graduation target line (7) on the trajectory.
+#' @param resident_name Optional reactive (or value) with the resident's name,
+#'   shown in the spider's hover text.
 #' @return Invisibly, a list of reactives: \code{selected_subcomp},
 #'   \code{period}, \code{trajectory} (the trajectory data incl. readout).
 #' @export
 mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
                                         fit = NULL,
-                                        show = c("overview", "dumbbell", "trajectory"),
-                                        height = "560px", show_target = TRUE) {
+                                        show = c("spider", "overview", "dumbbell", "trajectory"),
+                                        height = "560px", show_target = TRUE,
+                                        resident_name = NULL) {
   show <- match.arg(show, .MG_VIEWS, several.ok = TRUE)
   as_r <- function(x) if (shiny::is.reactive(x)) x else shiny::reactive(x)
   milestone_data <- as_r(milestone_data)
   resident_id <- as_r(resident_id)
   period <- as_r(period)
   fit_r <- as_r(fit)
+  name_r <- as_r(resident_name)
 
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -122,6 +133,21 @@ mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
       p <- suppressWarnings(as.integer(input$period_pick))
       if (length(p) && !is.na(p)) p else default_period()
     })
+
+    # ── Spider ────────────────────────────────────────────────────────────
+    if ("spider" %in% show) {
+      spider <- shiny::reactive({
+        rater <- if (is.null(input$spider_rater)) "faculty" else input$spider_rater
+        tryCatch(suppressMessages(suppressWarnings(
+          plot_milestone_spider(long_res(), long_all(), view_period(), rater, name_r()))),
+          error = function(e) { message("mod_milestone_growth spider: ", e$message); NULL })
+      })
+      output$spider_ui <- shiny::renderUI({
+        if (is.null(spider())) return(.mg_empty_state("No ratings from this rater for this period."))
+        plotly::plotlyOutput(ns("spider_plot"), height = "480px")
+      })
+      output$spider_plot <- plotly::renderPlotly({ p <- spider(); shiny::req(p); p })
+    }
 
     # ── Range snapshot ─────────────────────────────────────────────────────
     range_plot <- shiny::reactive({

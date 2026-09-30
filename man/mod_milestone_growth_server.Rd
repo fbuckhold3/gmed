@@ -10,9 +10,10 @@ mod_milestone_growth_server(
   resident_id,
   period,
   fit = NULL,
-  show = c("overview", "dumbbell", "trajectory"),
+  show = c("spider", "overview", "dumbbell", "trajectory"),
   height = "560px",
-  show_target = TRUE
+  show_target = TRUE,
+  resident_name = NULL
 )
 }
 \arguments{
@@ -35,6 +36,9 @@ period picker. \code{NULL}/NA = latest period with data.}
 \item{height}{Plot height.}
 
 \item{show_target}{Draw the graduation target line (7) on the trajectory.}
+
+\item{resident_name}{Optional reactive (or value) with the resident's name,
+shown in the spider's hover text.}
 }
 \value{
 Invisibly, a list of reactives: \code{selected_subcomp},

@@ -33,21 +33,26 @@ and `imslu.ccc.dashboard`. It replaces ind.dash's
 `output$ccc_milestone_plot` and gmed's `create_enhanced_milestone_progression()`
 (now marked superseded but kept for existing callers).
 
-It has three views. None of them builds in a per-year target: the context
+It has four views. None of them builds in a per-year target: the context
 is always where past residents at the same period were rated (the "usual
 range", i.e. the middle 80%), with plain-language guidance.
 
-1. **Range snapshot** (`overview`). Shows one period, with one row per
+1. **Milestone profile** (`spider`). The same radar chart the apps already
+   show (`create_enhanced_milestone_spider_plot()`, unchanged look): the
+   resident's ratings for the chosen period against the cohort median for
+   that period. A switch picks Faculty (the rating that counts), ACGME or
+   Self; each is compared with the median of the same kind of rating.
+2. **Range snapshot** (`overview`). Shows one period, with one row per
    subcompetency grouped by competency. Grey bars show the cohort range
    (light = 10th–90th percentile, dark = 25th–75th, tick = median), with the
    resident's rating on top; marker shape and colour show its source. A
    guidance line under the chart reads, for example, "At Mid PGY2, 18 of 21
    rated subcompetencies are within the usual range … Above the usual range:
-   PC6, ICS1, ICS3." Clicking a row opens it in view 3.
-2. **Self vs faculty dumbbell.** Shows the same period. The faculty rating is
+   PC6, ICS1, ICS3." Clicking a row opens it in view 4.
+3. **Self vs faculty dumbbell.** Shows the same period. The faculty rating is
    the CCC rating, else the coach rating, and ACGME is drawn as a third mark.
    Rows are sorted by the size of the self vs faculty gap.
-3. **Trajectory.** Shows the cohort range across periods (same two bands plus
+4. **Trajectory.** Shows the cohort range across periods (same two bands plus
    the median) and the resident's points. It also draws the projection with
    an 80% prediction interval. The readout gives range guidance for the
    latest rating, the projected graduation rating, P(reach 7 by graduation)
@@ -100,7 +105,7 @@ milestone_long <- build_milestone_long(all_forms, residents)  # once, cheap
 milestone_fit  <- load_cached_milestone_growth()             # NULL if not cached yet
 ```
 
-**Coach dashboard.** Use all three views for the coachee and the review
+**Coach dashboard.** Use all four views for the coachee and the review
 period, with goals on their own:
 
 ```r
@@ -125,7 +130,7 @@ The coach app still uses `create_milestone_spider_plot_final()` and
 card with the module. The spider plots can stay:
 
 ```r
-mod_milestone_growth_ui(ns("growth"), show = c("dumbbell", "trajectory"))
+mod_milestone_growth_ui(ns("growth"), show = c("spider", "dumbbell", "trajectory"))
 mod_milestone_growth_server("growth",
   milestone_data = reactive(rdm_data()$milestone_long),  # built in global.R
   resident_id    = resident_id,
@@ -143,7 +148,7 @@ ind.dash already shows ILP goals in its own learning tab, so it can add
 ```r
 output$ccc_mile_section <- renderUI({
   req(identical(active_toggle(), "mile"), selected_resident_id())
-  mod_milestone_growth_ui("ccc_growth", show = c("overview", "trajectory"))
+  mod_milestone_growth_ui("ccc_growth", show = c("spider", "overview", "trajectory"))
 })
 mod_milestone_growth_server("ccc_growth",
   milestone_data = reactive(build_milestone_long(app_data()$all_forms, app_data()$residents)),
