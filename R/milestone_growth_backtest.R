@@ -131,7 +131,7 @@ write_milestone_backtest_report <- function(bt, path, data_note) {
     "",
     paste0("**Data:** ", data_note, "  "),
     paste0("**Run:** ", bt$settings$run_at, "  "),
-    paste0("**Test classes:** ", paste(bt$classes, collapse = ", "),
+    paste0("**Test classes:** ", paste(.mg_grad_year(bt$classes), collapse = ", "),
            " (training: ", if (bt$settings$training == "prior")
              "earlier graduated classes only" else "all other classes", ")  "),
     paste0("**Model:** `rating ~ t + t^2 + source + (1 + t | resident)` per subcompetency ",
@@ -174,8 +174,17 @@ write_milestone_backtest_report <- function(bt, path, data_note) {
   invisible(path)
 }
 
-# Class order: numeric when grad_yr is a year or a raw REDCap code, else text.
+# Class order: by graduation year when grad_yr is a year or a raw REDCap code,
+# else text. Raw codes are not in year order (see .mg_grad_year()).
 .mg_sort_classes <- function(x) {
-  n <- suppressWarnings(as.numeric(x))
+  n <- .mg_grad_year(x)
   if (!anyNA(n)) x[order(n)] else sort(x)
+}
+
+# grad_yr raw dropdown code -> year, as in period_mapping.R:
+# 1-13 = 2023-2035 (code + 2022), 14-36 = 2000-2022 (code + 1986); years pass through.
+.mg_grad_year <- function(x) {
+  n <- suppressWarnings(as.numeric(as.character(x)))
+  ifelse(n >= 1 & n <= 13, n + 2022, ifelse(n >= 14 & n <= 36, n + 1986,
+         ifelse(n > 100, n, NA_real_)))
 }

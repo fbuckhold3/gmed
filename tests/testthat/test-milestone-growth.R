@@ -243,6 +243,8 @@ test_that("label exports parse the same as raw exports", {
   expect_equal(l$period, 2L)
   expect_equal(l$rater, "ccc")
   expect_equal(gmed:::.mg_sort_classes(c("10", "7", "9")), c("7", "9", "10"))
+  # raw REDCap codes: 36 = 2022 comes before 1 = 2023
+  expect_equal(gmed:::.mg_sort_classes(c("1", "36", "3", "27")), c("27", "36", "1", "3"))
 })
 
 test_that("goal progress module renders separately from the milestone module", {
