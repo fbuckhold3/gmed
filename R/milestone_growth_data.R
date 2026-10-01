@@ -71,6 +71,35 @@ milestone_periods <- function() {
 # Rating sources in fallback order: the first present one is "the" rating.
 .MG_SOURCE_ORDER <- c("acgme", "ccc", "coach")
 
+# First academic year of the comparison cohort (July 2021). Ratings from
+# earlier academic years, and residents who graduated before 2022, are left
+# out of the cohort bands, models and empirical table.
+.MG_COHORT_START <- 2021
+
+# grad_yr raw dropdown code -> year, as in period_mapping.R:
+# 1-13 = 2023-2035 (code + 2022), 14-36 = 2000-2022 (code + 1986); years pass through.
+.mg_grad_year <- function(x) {
+  n <- suppressWarnings(as.numeric(as.character(x)))
+  ifelse(n >= 1 & n <= 13, n + 2022, ifelse(n >= 14 & n <= 36, n + 1986,
+         ifelse(n > 100, n, NA_real_)))
+}
+
+# Keep ratings from academic years starting at or after start_year (July).
+# Period p of a resident graduating in year G falls in the academic year
+# starting G - 3 + (p - 1) %/% 2. Rows without a usable grad_yr are dropped,
+# since their date is unknown. start_year = NULL keeps everything.
+.mg_from_cohort_start <- function(long, start_year = .MG_COHORT_START) {
+  if (is.null(start_year) || !nrow(long)) return(long)
+  if (!"grad_yr" %in% names(long)) {
+    warning("milestone growth: no grad_yr column, so ratings before July ",
+            start_year, " cannot be excluded (pass residents to build_milestone_long())")
+    return(long)
+  }
+  gy <- .mg_grad_year(long$grad_yr)
+  ay <- gy - 3 + (long$period - 1) %/% 2
+  long[!is.na(ay) & ay >= start_year, , drop = FALSE]
+}
+
 #' Where a rating sits in the cohort range
 #'
 #' Describes a rating against the cohort percentiles for the same period and

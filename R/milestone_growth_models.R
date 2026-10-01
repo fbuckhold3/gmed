@@ -316,15 +316,18 @@ empirical_reach_lookup <- function(table, subcomp, period, rating, min_n = 10) {
 #' @param exclude_record_ids Residents to leave out of the fit (e.g. test
 #'   records).
 #' @param min_n Empirical suppression threshold.
+#' @param cohort_start First academic year (starting July) of the cohort;
+#'   earlier ratings are left out. Needs \code{grad_yr} (pass
+#'   \code{residents}). \code{NULL} uses everything.
 #' @return Object of class \code{milestone_growth_fit}: list with
 #'   \code{bands}, \code{models}, \code{empirical}, \code{meta}.
 #' @export
 fit_milestone_growth <- function(data, residents = NULL, exclude_record_ids = NULL,
-                                 min_n = 10) {
+                                 min_n = 10, cohort_start = .MG_COHORT_START) {
   long <- as_milestone_long(data, residents = residents)
   if (length(exclude_record_ids))
     long <- long[!long$record_id %in% as.character(exclude_record_ids), , drop = FALSE]
-  sel <- select_milestone_rating(long)
+  sel <- .mg_from_cohort_start(select_milestone_rating(long), cohort_start)
   models <- list()
   if (nrow(sel)) {
     for (sc in milestone_subcompetencies()$subcomp) {
@@ -339,7 +342,8 @@ fit_milestone_growth <- function(data, residents = NULL, exclude_record_ids = NU
     bands     = fit_cohort_bands(sel),
     models    = Filter(Negate(is.null), models),
     empirical = empirical_reach_table(sel, min_n = min_n),
-    meta      = list(n_residents = length(unique(sel$record_id)),
+    meta      = list(cohort_start = cohort_start,
+                     n_residents = length(unique(sel$record_id)),
                      n_obs = nrow(sel),
                      source_counts = as.list(table(sel$source)))
   ), class = "milestone_growth_fit")

@@ -102,6 +102,8 @@ mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
         message("mod_milestone_growth: ", e$message); .mg_empty_long()
       })
     })
+    # Comparison cohort: ratings from July 2021 on (.MG_COHORT_START)
+    cohort <- shiny::reactive(.mg_from_cohort_start(long_all()))
     long_res <- shiny::reactive({
       rid <- resident_id()
       d <- long_all()
@@ -111,7 +113,7 @@ mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
     selected <- shiny::reactive(select_milestone_rating(long_res()))
     bands <- shiny::reactive({
       f <- fit_r()
-      if (!is.null(f) && nrow(f$bands)) f$bands else empirical_cohort_bands(long_all())
+      if (!is.null(f) && nrow(f$bands)) f$bands else empirical_cohort_bands(cohort())
     })
 
     # ── Shared period picker (overview + dumbbell) ─────────────────────────
@@ -139,7 +141,7 @@ mod_milestone_growth_server <- function(id, milestone_data, resident_id, period,
       spider <- shiny::reactive({
         rater <- if (is.null(input$spider_rater)) "faculty" else input$spider_rater
         tryCatch(suppressMessages(suppressWarnings(
-          plot_milestone_spider(long_res(), long_all(), view_period(), rater, name_r()))),
+          plot_milestone_spider(long_res(), cohort(), view_period(), rater, name_r()))),
           error = function(e) { message("mod_milestone_growth spider: ", e$message); NULL })
       })
       output$spider_ui <- shiny::renderUI({

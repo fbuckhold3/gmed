@@ -9,7 +9,8 @@ backtest_milestone_growth(
   first_periods = c(2, 3),
   training = c("prior", "other"),
   min_train_classes = 2,
-  level = 0.8
+  level = 0.8,
+  cohort_start = .MG_COHORT_START
 )
 }
 \arguments{
@@ -26,6 +27,10 @@ tested. \code{"other"}: leave-one-class-out (uses later classes too).}
 \item{min_train_classes}{Minimum training classes for \code{"prior"}.}
 
 \item{level}{Prediction interval level.}
+
+\item{cohort_start}{First academic year (starting July) of data to use;
+earlier ratings are dropped from training and test classes alike.
+\code{NULL} uses everything.}
 }
 \value{
 List (class \code{milestone_backtest}): \code{predictions}

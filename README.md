@@ -70,6 +70,14 @@ set, newest first, with columns for:
 **Which rating counts:** ACGME if present, else CCC, else coach. The
 `source` column records which one was used.
 
+**Cohort starts July 2021.** The cohort ranges, medians, growth models and
+empirical check use only ratings from the 2021-22 academic year on, so
+residents who graduated before 2022 are left out and 2022/2023 graduates
+contribute only their post-July-2021 periods. This needs `grad_yr` (pass
+`residents` to `build_milestone_long()`). A resident's own points are never
+filtered. The setting is `.MG_COHORT_START`; `cohort_start = NULL` on
+`fit_milestone_growth()` / `backtest_milestone_growth()` turns it off.
+
 **Where CCC ratings are stored:** `ccc_review` does not store milestone
 ratings. It stores only `ccc_mile` ("Any changes to milestones?") and
 `ccc_mile_notes`. When the CCC changes ratings, the CCC dashboard writes them

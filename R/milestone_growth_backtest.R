@@ -24,13 +24,17 @@
 #'   tested. \code{"other"}: leave-one-class-out (uses later classes too).
 #' @param min_train_classes Minimum training classes for \code{"prior"}.
 #' @param level Prediction interval level.
+#' @param cohort_start First academic year (starting July) of data to use;
+#'   earlier ratings are dropped from training and test classes alike.
+#'   \code{NULL} uses everything.
 #' @return List (class \code{milestone_backtest}): \code{predictions}
 #'   (one row per resident x subcomp x k), \code{summary}, \code{calibration},
 #'   \code{by_subcomp}, \code{classes}, \code{settings}.
 #' @export
 backtest_milestone_growth <- function(data, first_periods = c(2, 3),
                                       training = c("prior", "other"),
-                                      min_train_classes = 2, level = 0.8) {
+                                      min_train_classes = 2, level = 0.8,
+                                      cohort_start = .MG_COHORT_START) {
   training <- match.arg(training)
   if (!requireNamespace("lme4", quietly = TRUE))
     stop("backtest_milestone_growth: package 'lme4' is required")
@@ -40,6 +44,7 @@ backtest_milestone_growth <- function(data, first_periods = c(2, 3),
          "(pass residents to build_milestone_long())")
   sel <- select_milestone_rating(long)
   sel <- sel[!is.na(sel$grad_yr), , drop = FALSE]
+  sel <- .mg_from_cohort_start(sel, cohort_start)
   truth <- sel[sel$period == 6, c("record_id", "subcomp", "rating", "grad_yr")]
   names(truth)[3] <- "observed"
   classes <- .mg_sort_classes(unique(truth$grad_yr))
@@ -110,7 +115,7 @@ backtest_milestone_growth <- function(data, first_periods = c(2, 3),
     predictions = pred, summary = summ, calibration = calib, by_subcomp = by_sc,
     classes = tested,
     settings = list(first_periods = first_periods, training = training,
-                    level = level, run_at = format(Sys.time(), "%Y-%m-%d %H:%M"))
+                    level = level, cohort_start = cohort_start, run_at = format(Sys.time(), "%Y-%m-%d %H:%M"))
   ), class = "milestone_backtest")
 }
 
@@ -134,6 +139,8 @@ write_milestone_backtest_report <- function(bt, path, data_note) {
     paste0("**Test classes:** ", paste(.mg_grad_year(bt$classes), collapse = ", "),
            " (training: ", if (bt$settings$training == "prior")
              "earlier graduated classes only" else "all other classes", ")  "),
+    if (!is.null(bt$settings$cohort_start))
+      paste0("**Data from:** July ", bt$settings$cohort_start, " on  "),
     paste0("**Model:** `rating ~ t + t^2 + source + (1 + t | resident)` per subcompetency ",
            "(lme4, REML), predicted for the ACGME source at graduation. ",
            round(100 * bt$settings$level), "% prediction intervals."),
@@ -179,12 +186,4 @@ write_milestone_backtest_report <- function(bt, path, data_note) {
 .mg_sort_classes <- function(x) {
   n <- .mg_grad_year(x)
   if (!anyNA(n)) x[order(n)] else sort(x)
-}
-
-# grad_yr raw dropdown code -> year, as in period_mapping.R:
-# 1-13 = 2023-2035 (code + 2022), 14-36 = 2000-2022 (code + 1986); years pass through.
-.mg_grad_year <- function(x) {
-  n <- suppressWarnings(as.numeric(as.character(x)))
-  ifelse(n >= 1 & n <= 13, n + 2022, ifelse(n >= 14 & n <= 36, n + 1986,
-         ifelse(n > 100, n, NA_real_)))
 }

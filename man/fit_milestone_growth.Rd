@@ -8,7 +8,8 @@ fit_milestone_growth(
   data,
   residents = NULL,
   exclude_record_ids = NULL,
-  min_n = 10
+  min_n = 10,
+  cohort_start = .MG_COHORT_START
 )
 }
 \arguments{
@@ -22,6 +23,10 @@ list of forms).}
 records).}
 
 \item{min_n}{Empirical suppression threshold.}
+
+\item{cohort_start}{First academic year (starting July) of the cohort;
+earlier ratings are left out. Needs \code{grad_yr} (pass
+\code{residents}). \code{NULL} uses everything.}
 }
 \value{
 Object of class \code{milestone_growth_fit}: list with

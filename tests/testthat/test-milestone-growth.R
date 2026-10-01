@@ -123,7 +123,8 @@ test_that("predictions and intervals are clipped to 1-9", {
 })
 
 test_that("cached-coefficient BLUP matches lme4::predict", {
-  d <- sel[sel$subcomp == "pc3", ]
+  d <- gmed:::.mg_from_cohort_start(sel)            # same cohort as fit
+  d <- d[d$subcomp == "pc3", ]
   d$t <- d$period - 3.5
   d$source <- factor(d$source, levels = fit$models$pc3$source_levels)
   f <- lme4::lmer(stats::as.formula(fit$models$pc3$formula), data = d)
@@ -272,4 +273,16 @@ test_that("spider reuses the familiar radar for each rater, fed from long data",
   }
   expect_null(plot_milestone_spider(r_long, long, 1, "acgme"))   # no ACGME at period 1
   expect_null(plot_milestone_spider(r_long[0, ], long, 2))
+})
+
+test_that("cohort starts July 2021: earlier classes and periods are dropped", {
+  long <- data.frame(record_id = "a", subcomp = "pc1", rater = "acgme", rating = 5,
+                     period = c(6, 4, 5, 2, 3, 1),
+                     grad_yr = c("2021", "2022", "2022", "2023", "2023", "2"),  # "2" = 2024
+                     stringsAsFactors = FALSE)
+  kept <- gmed:::.mg_from_cohort_start(long)
+  expect_equal(paste(kept$grad_yr, kept$period), c("2022 5", "2023 3", "2 1"))
+  expect_equal(nrow(gmed:::.mg_from_cohort_start(long, NULL)), nrow(long))
+  expect_warning(out <- gmed:::.mg_from_cohort_start(long[, -6]), "grad_yr")
+  expect_equal(nrow(out), nrow(long))
 })
