@@ -2,7 +2,7 @@
 % Please edit documentation in R/abim_risk.R
 \name{risk_from_prob}
 \alias{risk_from_prob}
-\title{Classify ABIM pass probability into risk tier}
+\title{Classify ABIM pass probability into risk tier (deprecated)}
 \usage{
 risk_from_prob(prob)
 }
@@ -14,5 +14,6 @@ Named list with \code{level} (character), \code{color} (hex), and
 \code{label} (character description).
 }
 \description{
-Classify ABIM pass probability into risk tier
+Deprecated; use \code{iteviz::risk_tier()} (cutoffs 50\% / 90\%). This function keeps
+its old 50\% / 75\% cutoffs so an app's tiers only change when it migrates.
 }

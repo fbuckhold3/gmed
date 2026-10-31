@@ -4,16 +4,14 @@
 #
 # Read-only board-prep summary for coach review:
 #   1. Step 3 status (program-confirmed first; resident self-report fallback)
-#   2. ITE-based ABIM board pass-probability prediction (from gmed::pass_prob)
-#      with a plotly nomogram showing the McDonald 2020 PGY-1/2/3 curves and
-#      the resident's actual score points overlaid.
+#   2. ITE-based ABIM board pass-probability estimate (iteviz card) with the
+#      iteviz plotly nomogram: McDonald 2020 PGY-1/2/3 curves, risk-tier bands
+#      and the resident's actual score points overlaid.
 #   3. Convenience link to MKSAP tracker (configurable) + self-reported
 #      MKSAP completion (translated via the REDCap data dictionary).
 #
-# Distilled from imslu.ind.dash mod_self_eval.R `.ite_board_section_ui` plus
-# imslu.ind.dash mod_learning.R `.nomogram_curves` / `ite_nomogram_plot` so
-# coach.dash and other consumers can render the same prediction card without
-# duplicating the nomogram lookup or plot code.
+# The estimate card, nomogram plot and tiers (High <50%, Intermediate <90%,
+# Low >=90%) come from iteviz, which mirrors im-ite-analyzer's nomogram.py.
 # ============================================================================
 
 #' Boards / Step 3 Display UI
@@ -163,18 +161,6 @@ mod_seval_boards_display_server <- function(id,
       v[!is.na(v)]
     }
 
-    # Build the nomogram reference curves (PGY-1/2/3) using gmed::pass_prob.
-    .build_curves <- function() {
-      do.call(rbind, lapply(1:3, function(p) {
-        x <- seq(20, 100, by = 0.5)
-        data.frame(
-          ITE_Pct   = x,
-          PGY       = p,
-          Pass_Prob = vapply(x, function(v) gmed::pass_prob(v, p), numeric(1))
-        )
-      }))
-    }
-
     # ------------------------------------------------------------- Step 3 ---
     output$step3 <- shiny::renderUI({
       ri <- .pull(resident_info)
@@ -300,38 +286,7 @@ mod_seval_boards_display_server <- function(id,
         ))
       }
 
-      # risk$color/risk$level come from gmed::risk_from_prob() unchanged - a
-      # separately-exported shared function, not just this module's file, so
-      # its own color contract isn't touched here even though the hex it
-      # returns is already close to roundsui's danger/warning/success.
-      prob <- gmed::pass_prob(ite_pct, pgy_int)
-      risk <- gmed::risk_from_prob(prob)
-
-      shiny::div(
-        class = "p-3 d-flex align-items-center gap-3",
-        style = sprintf("background:%s; border:1px solid %s; border-left:5px solid %s; border-radius:8px; font-size:0.95rem;",
-                        rc$surface, rc$border, risk$color),
-        shiny::div(
-          style = "min-width:96px; text-align:center;",
-          shiny::tags$div(style = sprintf("font-size:2rem; font-weight:700; color:%s; line-height:1;", risk$color),
-                          paste0(round(ite_pct, 1), "%")),
-          shiny::tags$div(style = sprintf("color:%s; font-size:0.85rem;", rc$ink_faint), "ITE % correct")
-        ),
-        shiny::div(
-          style = "flex:1;",
-          shiny::tags$div(class = "fw-bold mb-1", style = sprintf("color:%s; font-size:1.05rem;", rc$ink),
-                          sprintf("PGY%d ACP ITE Score", pgy_int)),
-          if (!is.na(prob))
-            shiny::tags$div(
-              shiny::tags$span(style = sprintf("color:%s;", rc$ink),
-                               paste0(round(prob * 100, 0), "% predicted ABIM pass probability")),
-              shiny::tags$span(style = sprintf("margin-left:8px; font-weight:700; color:%s;", risk$color),
-                               paste0("\u2014 ", risk$level))
-            )
-          else
-            shiny::tags$div(style = sprintf("color:%s;", rc$ink_faint), risk$level)
-        )
-      )
+      iteviz::ite_estimate_card(ite_pct, pgy_int)
     })
 
     # --------------------------------------------------- Nomogram plot ---
@@ -339,80 +294,7 @@ mod_seval_boards_display_server <- function(id,
       td <- .pull(test_data)
       if (is.null(td)) td <- data.frame()
       pcts <- .pct_vec(td)
-
-      curves <- .build_curves()
-      curve_cols   <- c("1"="#4e79a7", "2"="#59a14f", "3"="#f28e2b")
-      curve_dashes <- c("1"="solid",   "2"="dash",    "3"="dot")
-
-      fig <- plotly::plot_ly()
-
-      # Risk zone fills
-      fig <- fig %>%
-        plotly::add_ribbons(x = c(20, 100), ymin = 0, ymax = 0.5,
-                            fillcolor = "rgba(211,47,47,0.06)",
-                            line = list(width = 0),
-                            hoverinfo = "none", showlegend = FALSE) %>%
-        plotly::add_ribbons(x = c(20, 100), ymin = 0.5, ymax = 0.75,
-                            fillcolor = "rgba(230,81,0,0.06)",
-                            line = list(width = 0),
-                            hoverinfo = "none", showlegend = FALSE)
-
-      # Reference threshold lines
-      fig <- fig %>%
-        plotly::add_segments(x = 20, xend = 100, y = 0.75, yend = 0.75,
-                             line = list(color = "#e65100", dash = "dash", width = 1),
-                             name = "75% threshold", showlegend = TRUE) %>%
-        plotly::add_segments(x = 20, xend = 100, y = 0.50, yend = 0.50,
-                             line = list(color = "#d32f2f", dash = "dash", width = 1),
-                             name = "50% threshold", showlegend = TRUE)
-
-      # PGY-1/2/3 nomogram curves
-      for (p in 1:3) {
-        cd <- curves[curves$PGY == p, ]
-        fig <- fig %>%
-          plotly::add_trace(data = cd, x = ~ITE_Pct, y = ~Pass_Prob,
-                            type = "scatter", mode = "lines",
-                            line = list(color = curve_cols[[as.character(p)]],
-                                        dash  = curve_dashes[[as.character(p)]],
-                                        width = 2),
-                            name = paste0("PGY-", p, " curve"),
-                            hovertemplate = paste0("PGY-", p, " | %{x:.0f}% correct<br>",
-                                                   "P(pass) = %{y:.1%}<extra></extra>"))
-      }
-
-      # Resident's actual score points
-      for (y in names(pcts)) {
-        pct_v  <- pcts[[y]]
-        prob_v <- gmed::pass_prob(pct_v, as.integer(y))
-        risk   <- gmed::risk_from_prob(prob_v)
-        fig <- fig %>%
-          plotly::add_trace(x = pct_v, y = prob_v,
-                            type = "scatter", mode = "markers",
-                            marker = list(size = 14, color = risk$color,
-                                          line = list(color = "white", width = 2),
-                                          symbol = "diamond"),
-                            name = paste0("Resident PGY-", y, " score"),
-                            hovertemplate = paste0("PGY-", y, "<br>",
-                                                   round(pct_v, 1), "% correct<br>",
-                                                   "P(pass ABIM) = ", round(prob_v * 100, 1), "%<br>",
-                                                   risk$level, "<extra></extra>"))
-      }
-
-      # Chrome (font/axis grid/tick color, transparent background) comes from
-      # roundsui_plotly_layout(); the risk-zone ribbon fills, PGY curve
-      # colors, and resident-score marker colors above stay untouched -
-      # they're semantic data encoding (risk tier), not brand styling.
-      # gridcolor deliberately omitted from both axes so roundsui's own
-      # border-token default applies instead of being overridden.
-      fig %>% roundsui::roundsui_plotly_layout(
-        xaxis = list(title = "ITE % Correct", range = c(20, 100),
-                     showgrid = TRUE, dtick = 10),
-        yaxis = list(title = "Probability of Passing ABIM",
-                     range = c(0, 1), tickformat = ".0%",
-                     showgrid = TRUE),
-        legend = list(orientation = "h", x = 0, y = -0.25),
-        margin = list(t = 10, b = 60)
-      ) %>% plotly::config(displayModeBar = FALSE)
+      iteviz::ite_nomogram_plot(if (length(pcts)) pcts else NULL)
     })
 
     # --------------------------------------------------- Board concerns ---

@@ -2,7 +2,7 @@
 % Please edit documentation in R/abim_risk.R
 \name{pass_prob}
 \alias{pass_prob}
-\title{Calculate ABIM pass probability from ITE \% correct}
+\title{Calculate ABIM pass probability from ITE \% correct (deprecated)}
 \usage{
 pass_prob(pct, pgy)
 }
@@ -15,5 +15,5 @@ pass_prob(pct, pgy)
 Numeric probability (0–1), or NA if inputs are missing.
 }
 \description{
-Calculate ABIM pass probability from ITE \% correct
+Deprecated; delegates to \code{iteviz::pass_prob()}.
 }
