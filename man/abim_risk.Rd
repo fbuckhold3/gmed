@@ -2,10 +2,12 @@
 % Please edit documentation in R/abim_risk.R
 \name{abim_risk}
 \alias{abim_risk}
-\title{ABIM Board Risk — McDonald et al. 2020 Nomogram}
+\title{ABIM Board Risk — McDonald et al. 2020 Nomogram (deprecated)}
 \description{
-Logistic regression coefficients per PGY year, derived from published Figure 2
-anchor points in McDonald et al. (2020), Academic Medicine.
+Deprecated: use the iteviz package (\code{iteviz::pass_prob()},
+\code{iteviz::risk_tier()}, \code{iteviz::prob_label()}). iteviz mirrors the spec in
+im-ite-analyzer (\code{ite_core/nomogram.py}) and is checked against it by parity
+tests. These wrappers stay so deployed apps keep working until they migrate.
 }
 \details{
 P(pass ABIM) = 1 / (1 + exp(-(b0 + b1 * ITE_pct_correct)))

@@ -1,6 +1,6 @@
 Package: gmed
 Title: What the Package Does (One Line, Title Case)
-Version: 0.0.1
+Version: 0.0.2
 Authors@R: 
     person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
@@ -14,6 +14,7 @@ Suggests:
 Config/testthat/edition: 3
 Imports: dplyr, httr, curl, readr, jsonlite, DT, reactable, htmltools,
         plotly, rlang, config, lubridate, tidyr, shinyjs, shiny, bslib,
-        data.table, tibble, purrr, roundsui
-Remotes: fbuckhold3/roundsui
+        data.table, tibble, purrr, roundsui, iteviz
+Remotes: fbuckhold3/roundsui,
+    fbuckhold3/im-ite-analyzer/r/iteviz
 Config/roxygen2/version: 8.0.0
