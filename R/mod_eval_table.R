@@ -15,18 +15,3 @@
 
 
 # Internal choice parser (avoids dependency on export order)
-parse_redcap_choices_internal <- function(choices_str) {
-  if (is.null(choices_str) || is.na(choices_str) || !nzchar(trimws(choices_str)))
-    return(character(0))
-  parts <- trimws(strsplit(choices_str, "\\|")[[1]])
-  result <- character(0)
-  for (part in parts) {
-    kv <- strsplit(part, ",\\s*", perl = TRUE)[[1]]
-    if (length(kv) >= 2) {
-      code  <- trimws(kv[1])
-      label <- trimws(paste(kv[-1], collapse = ", "))
-      result[code] <- label
-    }
-  }
-  result
-}

@@ -679,26 +679,6 @@ create_observation_visualization <- function(data, cat_info, ns) {
   )
 }
 
-#' Format observation sub-type name
-#' @keywords internal
-format_obs_subtype_name <- function(key) {
-  name_map <- c(
-    "pe" = "Physical Exam",
-    "pres" = "Presentations",
-    "writehp" = "Written H&P",
-    "proc" = "Procedures",
-    "counsel" = "Counseling",
-    "handoff" = "Handoffs",
-    "profess" = "Professionalism"
-  )
-
-  if (key %in% names(name_map)) {
-    return(name_map[[key]])
-  }
-
-  # Default: capitalize and clean up
-  gsub("_", " ", tools::toTitleCase(key))
-}
 
 #' Process observation data for visualization
 #' @keywords internal

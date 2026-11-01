@@ -330,62 +330,6 @@ get_milestone_data <- function(workflow_results, milestone_type = "program", mil
   return(result)
 }
 
-#' Detect Milestone Format
-#' 
-#' Auto-detects whether milestone data uses REP or ACGME format
-#' @param milestone_data Raw milestone data
-#' @return Character string: "rep", "acgme", or "mixed"
-detect_milestone_format <- function(milestone_data) {
-  
-  if (is.null(milestone_data) || nrow(milestone_data) == 0) {
-    return("rep")  # Default fallback
-  }
-  
-  # Look for REP milestone columns
-  rep_cols <- grep("^rep_(pc|mk|sbp|pbl|prof|ics)\\d+$", names(milestone_data), value = TRUE)
-  
-  # Look for ACGME milestone columns
-  acgme_cols <- grep("^acgme_(pc|mk|sbp|pbl|prof|ics)\\d+$", names(milestone_data), value = TRUE)
-  
-  if (length(rep_cols) > 0 && length(acgme_cols) > 0) {
-    return("mixed")
-  } else if (length(acgme_cols) > 0) {
-    return("acgme")
-  } else {
-    return("rep")
-  }
-}
-
-#' Create Empty Milestone Workflow Structure
-#' 
-#' Creates empty milestone workflow structure when no data is available
-#' @return List with empty milestone data structure
-create_empty_milestone_workflow <- function() {
-  
-  empty_df <- data.frame(
-    record_id = character(0),
-    name = character(0), 
-    Level = character(0),
-    period = character(0),
-    period_name = character(0),
-    prog_mile_period = character(0),
-    prog_mile_date = character(0),
-    stringsAsFactors = FALSE
-  )
-  
-  return(list(
-    p_miles = empty_df,
-    s_miles = empty_df,
-    p_miles_descriptions = empty_df,
-    s_miles_descriptions = empty_df,
-    milestone_medians = NULL,
-    milestone_format = "unknown",
-    score_columns = character(0),
-    desc_columns = character(0),
-    self_columns = character(0),
-    total_rows_processed = 0
-  ))
-}
 
 # ============================================================================
 # VISUALIZATION FUNCTIONS

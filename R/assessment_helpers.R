@@ -74,47 +74,6 @@ get_assessment_labels <- function(data_dict, form_name = "assessment") {
   return(labels)
 }
 
-#' Format Assessment Data for Display
-#'
-#' Converts assessment data with readable column names and formatting
-#'
-#' @param assessment_data Assessment data frame
-#' @param data_dict Data dictionary
-#' @param priority_cols Column names to place first (default: date, level, faculty)
-#'
-#' @return Formatted data frame
-format_assessment_display <- function(assessment_data,
-                                     data_dict,
-                                     priority_cols = c("ass_date", "ass_level",
-                                                      "ass_faculty", "ass_specialty")) {
-
-  if (nrow(assessment_data) == 0) return(assessment_data)
-
-  # Get field labels
-  field_labels <- get_assessment_labels(data_dict)
-
-  # Rename columns
-  display_data <- assessment_data
-
-  for (col in names(display_data)) {
-    if (col %in% names(field_labels)) {
-      new_name <- field_labels[col]
-      names(display_data)[names(display_data) == col] <- new_name
-    }
-  }
-
-  # Reorder columns - priority columns first
-  priority_labels <- field_labels[priority_cols]
-  priority_labels <- priority_labels[!is.na(priority_labels)]
-
-  available_priority <- intersect(priority_labels, names(display_data))
-  other_cols <- setdiff(names(display_data), available_priority)
-
-  display_data <- display_data %>%
-    dplyr::select(dplyr::all_of(c(available_priority, other_cols)))
-
-  return(display_data)
-}
 
 #' Get Assessment Field Choices
 #'

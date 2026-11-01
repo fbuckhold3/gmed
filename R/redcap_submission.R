@@ -275,32 +275,6 @@ submit_overwrite_data <- function(redcap_url, redcap_token, record_id,
   })
 }
 
-#' Submit Coach Review Data (OVERWRITE TYPE)
-#'
-#' Wrapper for submit_overwrite_data specifically for coaching reviews
-#'
-#' @param redcap_url REDCap API URL
-#' @param redcap_token REDCap API token
-#' @param record_id Resident record ID
-#' @param coach_data List of coaching review fields
-#' @param period Review period
-#' @param level Resident level
-#' @param review_type "scheduled" or "interim"
-#' @return List with success status and message
-submit_coach_review_data <- function(redcap_url, redcap_token, record_id,
-                                     coach_data, period, level, review_type = "scheduled") {
-
-  return(submit_overwrite_data(
-    redcap_url = redcap_url,
-    redcap_token = redcap_token,
-    record_id = record_id,
-    form_data = coach_data,
-    instrument_name = "coach_rev",
-    period = period,
-    level = level,
-    review_type = review_type
-  ))
-}
 
 # ============================================================================
 # PATTERN 2: ADDITIVE SUBMISSIONS (Faculty Evals, Scholarship, etc.)

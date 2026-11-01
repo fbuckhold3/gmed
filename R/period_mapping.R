@@ -109,46 +109,6 @@ map_to_milestone_period <- function(level, period, form_context = NULL) {
   return(NA_character_)
 }
 
-#' Map Period to REDCap Instance Number
-#'
-#' Converts milestone period names to REDCap instance numbers.
-#'
-#' REDCap Instance Mapping:
-#' - 1 = Mid Intern
-#' - 2 = End Intern
-#' - 3 = Mid PGY2
-#' - 4 = End PGY2
-#' - 5 = Mid PGY3
-#' - 6 = Graduation (End PGY3)
-#' - 7 = Intern Intro
-#'
-#' @param milestone_period Character string of milestone period
-#' @return Character string of instance number or NA
-map_milestone_to_instance <- function(milestone_period) {
-
-  if (is.null(milestone_period) || is.na(milestone_period)) {
-    return(NA_character_)
-  }
-
-  instance_map <- c(
-    "Intern Intro" = "7",
-    "Mid Intern" = "1",
-    "End Intern" = "2",
-    "Mid PGY2" = "3",
-    "End PGY2" = "4",
-    "Mid PGY3" = "5",
-    "Graduation" = "6"
-  )
-
-  instance <- instance_map[milestone_period]
-
-  if (is.na(instance)) {
-    message(sprintf("No instance mapping for milestone period: %s", milestone_period))
-    return(NA_character_)
-  }
-
-  return(unname(instance))
-}
 
 #' Check if Resident Should Be Reviewed
 #'

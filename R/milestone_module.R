@@ -742,33 +742,4 @@ return(list(
   })
 }
 
-#' Helper Function to Create Multiple Dashboard Columns
-#'
-#' Creates a layout with multiple milestone dashboard modules side by side
-#'
-#' @param milestone_results Reactive containing processed milestone results
-#' @param record_id Reactive containing selected resident record ID  
-#' @param period Reactive containing selected period
-#' @param resident_data Reactive containing resident lookup data
-#' @param milestone_types Vector of milestone types to display (e.g., c("program", "self"))
-#' @param column_width Bootstrap column width (e.g., 4 for 3 columns, 6 for 2 columns)
-#' @return Shiny UI fluidRow
-create_milestone_dashboard_layout <- function(milestone_results, record_id, period, resident_data,
-                                              milestone_types = c("program", "self"), 
-                                              column_width = 6) {
-  
-  # Create columns for each milestone type
-  columns <- lapply(seq_along(milestone_types), function(i) {
-    milestone_type <- milestone_types[i]
-    module_id <- paste0("milestone_dash_", i)
-    
-    column(column_width,
-           milestone_dashboard_ui(module_id, milestone_type = milestone_type),
-           # Call server function in the parent server
-           # milestone_dashboard_server(module_id, milestone_results, record_id, period, milestone_type, resident_data)
-    )
-  })
-  
-  do.call(fluidRow, columns)
-}
 
