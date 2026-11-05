@@ -426,7 +426,7 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
   if (nrow(individual_data) == 0) {
     return(plotly::plot_ly() %>% 
              plotly::add_annotations(
-               text = paste("No data for resident", resident_id, "in period", period_text), 
+               text = paste("No milestone data available for", period_text), 
                x = 0.5, y = 0.5,
                showarrow = FALSE
              ))
@@ -944,7 +944,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   if (nrow(individual_data) == 0) {
     return(plotly::plot_ly() %>% 
              plotly::add_annotations(
-               text = paste("No data for resident", resident_id, "in period", period_text), 
+               text = paste("No milestone data available for", period_text), 
                x = 0.5, y = 0.5,
                showarrow = FALSE,
                font = list(size = 16, color = "orange")
