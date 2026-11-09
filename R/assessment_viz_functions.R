@@ -329,7 +329,12 @@ create_weekly_questions_average <- function(data, record_id, resident_name = NUL
       source_form == "questions",
       !is.na(q_date) & q_date != ""
     )
-  
+
+  # A "did not attend" entry is not attendance (raw code or label).
+  if ("q_attended" %in% names(questions_data)) {
+    questions_data <- questions_data %>% filter(!q_attended %in% c("0", "Did not attend"))
+  }
+
   if (nrow(questions_data) == 0) {
     return(list(
       average = 0,

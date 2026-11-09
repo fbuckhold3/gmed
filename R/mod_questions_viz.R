@@ -146,7 +146,14 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           !is.na(redcap_repeat_instrument),
           redcap_repeat_instrument == "questions"
         ) %>%
-        dplyr::filter(!is.na(q_date) & q_date != "") %>%
+        dplyr::filter(!is.na(q_date) & q_date != "")
+
+      # A "did not attend" entry is not attendance (raw code or label).
+      if ("q_attended" %in% names(data)) {
+        data <- data %>% dplyr::filter(!q_attended %in% c("0", "Did not attend"))
+      }
+
+      data <- data %>%
         dplyr::mutate(
           q_date = as.Date(q_date, format = "%Y-%m-%d"),
           week = lubridate::floor_date(q_date, "week")
