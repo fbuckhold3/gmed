@@ -117,13 +117,13 @@ mod_seval_reflection_display_server <- function(id,
       shiny::div(
         class = "mb-2 py-2 px-3",
         style = paste(
-          "background:#f6f7fb; border-left:3px solid #adb5bd;",
-          "border-radius:4px; font-size:0.82rem; color:#495057;"
+          "background:var(--roundsui-surface-2, #FBFBFD); border-left:3px solid var(--roundsui-border-strong, #CBD0DB);",
+          "border-radius:4px; font-size:0.82rem; color:var(--roundsui-ink-muted, #5B6472);"
         ),
         shiny::tags$span(
           style = paste(
             "font-size:0.7rem; text-transform:uppercase; letter-spacing:.06em;",
-            "font-weight:700; color:#6c757d; display:block; margin-bottom:4px;"
+            "font-weight:700; color:var(--roundsui-ink-muted, #5B6472); display:block; margin-bottom:4px;"
           ),
           shiny::tags$i(class = "bi bi-clock-history me-1"), label
         ),
@@ -141,8 +141,8 @@ mod_seval_reflection_display_server <- function(id,
       }
       shiny::div(
         style = paste(
-          "padding:10px 12px; background:#ffffff;",
-          "border:1px solid #dee2e6; border-radius:4px;",
+          "padding:10px 12px; background:var(--roundsui-surface, #FFFFFF);",
+          "border:1px solid var(--roundsui-border, #E2E5EC); border-radius:4px;",
           "white-space:pre-wrap;"
         ),
         value
@@ -185,7 +185,7 @@ mod_seval_reflection_display_server <- function(id,
       field      = "s_e_plus",
       label      = "What went well",
       icon       = "bi-plus-circle",
-      icon_style = "color:#198754;",
+      icon_style = "color:var(--roundsui-success, #16A34A);",
       prev_label = "Previous period \u2014 what went well",
       empty_msg  = "Resident has not yet entered a reflection on what went well.",
       absent     = "",
@@ -195,7 +195,7 @@ mod_seval_reflection_display_server <- function(id,
       field      = "s_e_delta",
       label      = "What would you do differently",
       icon       = "bi-arrow-repeat",
-      icon_style = "color:#fd7e14;",
+      icon_style = "color:var(--roundsui-warning, #C2760A);",
       prev_label = "Previous period \u2014 areas to develop",
       empty_msg  = "Resident has not yet entered a reflection on what to do differently.",
       absent     = "",
@@ -205,7 +205,7 @@ mod_seval_reflection_display_server <- function(id,
       field      = "s_e_well",
       label      = "How are you doing \u2014 mentally, emotionally, physically",
       icon       = "bi-heart-pulse",
-      icon_style = "color:#d63384;",
+      icon_style = "color:var(--roundsui-accent, #3355D8);",
       prev_label = "Previous period \u2014 wellness",
       empty_msg  = "Resident did not share a wellness reflection this period.",
       absent     = "",
@@ -215,7 +215,7 @@ mod_seval_reflection_display_server <- function(id,
       field      = "s_e_discussion",
       label      = "Topics resident wants to discuss with their mentor",
       icon       = "bi-chat-square-text",
-      icon_style = "color:#0d6efd;",
+      icon_style = "color:var(--roundsui-accent, #3355D8);",
       prev_label = "Previous period \u2014 mentor agenda",
       empty_msg  = "",
       absent     = "Resident did not flag specific topics to discuss.",
@@ -225,7 +225,7 @@ mod_seval_reflection_display_server <- function(id,
       field      = "s_e_prog_assist",
       label      = "Things the program can do to help",
       icon       = "bi-life-preserver",
-      icon_style = "color:#6f42c1;",
+      icon_style = "color:var(--roundsui-accent, #3355D8);",
       prev_label = "Previous period \u2014 program assistance requested",
       empty_msg  = "",
       absent     = "Resident did not request program assistance.",

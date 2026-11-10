@@ -207,9 +207,9 @@ mod_miles_rating_server <- function(id, period,
       if (allComplete()) {
         return(div(
           class = "d-flex align-items-center gap-2 mb-3 py-2 px-3",
-          style = "background:#f0faf4; border-radius:8px; border:1px solid #a5d6a7;",
-          tags$i(class = "bi bi-check-circle-fill", style = "color:#2e7d32; font-size:1.1rem;"),
-          tags$span(style = "font-weight:700; color:#1a6b3a; font-size:0.88rem;",
+          style = "background:var(--roundsui-success-tint, #E7F6EC); border-radius:8px; border:1px solid var(--roundsui-success, #16A34A);",
+          tags$i(class = "bi bi-check-circle-fill", style = "color:var(--roundsui-success, #16A34A); font-size:1.1rem;"),
+          tags$span(style = "font-weight:700; color:var(--roundsui-success, #16A34A); font-size:0.88rem;",
                     "All 22 milestones rated \u2014 your scores have been auto-saved.")
         ))
       }
@@ -223,14 +223,14 @@ mod_miles_rating_server <- function(id, period,
           k     <- keys_d[j]
           done  <- rated_d[j]
           is_this <- isTRUE(k == curKey())
-          bg    <- if (is_this) "#0c5860"
-                   else if (done) "#2e7d32"
-                   else "#dee2e6"
+          bg    <- if (is_this) "var(--roundsui-accent, #3355D8)"
+                   else if (done) "var(--roundsui-success, #16A34A)"
+                   else "var(--roundsui-border, #E2E5EC)"
           tags$span(
             style = paste0("display:inline-block; width:14px; height:14px;",
                            " border-radius:50%; background:", bg, ";",
                            " margin:1px; cursor:pointer;",
-                           if (is_this) " box-shadow:0 0 0 2px #7fb3d3;" else ""),
+                           if (is_this) " box-shadow:0 0 0 2px var(--roundsui-accent-tint, #EAEFFC);" else ""),
             title = paste0(imageSets[[d]]$imageTitles[j],
                            if (done) " \u2713" else " (not yet rated)"),
             onclick = sprintf("Shiny.setInputValue('%s','%s',{priority:'event'})",
@@ -241,7 +241,7 @@ mod_miles_rating_server <- function(id, period,
         n_d <- sum(rated_d); tot_d <- length(keys_d); all_d <- n_d == tot_d
         div(class = "me-3 mb-1",
           tags$span(style = paste0("font-size:0.7rem; font-weight:", if(is_cur)"700" else "500",
-                                   "; color:", if(all_d)"#2e7d32" else if(is_cur)"#0c5860" else "#6c757d",
+                                   "; color:", if(all_d)"var(--roundsui-success, #16A34A)" else if(is_cur)"var(--roundsui-accent, #3355D8)" else "var(--roundsui-ink-muted, #5B6472)",
                                    "; display:block; margin-bottom:2px;"),
                     paste0(imageSets[[d]]$title, " ", n_d, "/", tot_d)),
           dots
@@ -251,16 +251,16 @@ mod_miles_rating_server <- function(id, period,
       pct <- round(100 * n_rated / totalN)
       div(class = "mb-3",
         div(class = "d-flex justify-content-between align-items-center mb-1",
-          tags$span(style = "font-size:0.78rem; font-weight:600; color:#0c5860;",
+          tags$span(style = "font-size:0.78rem; font-weight:600; color:var(--roundsui-accent, #3355D8);",
                     paste0("Milestone Self-Assessment \u2014 ", n_rated, " of ", totalN, " rated")),
           tags$span(style = paste0("font-size:0.78rem; font-weight:700; color:",
-                                   if(pct == 100) "#2e7d32" else "#0f8a94"),
+                                   if(pct == 100) "var(--roundsui-success, #16A34A)" else "var(--roundsui-accent, #3355D8)"),
                     paste0(pct, "%"))
         ),
         div(class = "progress mb-3", style = "height:5px;",
           div(class = "progress-bar",
               style = paste0("width:", pct, "%; background:",
-                             if(pct == 100) "#2e7d32" else "#0f8a94", ";"))),
+                             if(pct == 100) "var(--roundsui-success, #16A34A)" else "var(--roundsui-accent, #3355D8)", ";"))),
         div(class = "d-flex flex-wrap", domain_blocks)
       )
     })
@@ -282,9 +282,9 @@ mod_miles_rating_server <- function(id, period,
       score_btns <- lapply(1:9, function(v) {
         is_sel   <- isTRUE(sel == v)
         high     <- !is.null(thr) && v >= thr
-        bg  <- if (is_sel && high) "#e65100" else if (is_sel) "#0c5860" else "#f5f5f5"
-        col <- if (is_sel) "white" else "#546e7a"
-        brd <- if (is_sel) bg else "#dee2e6"
+        bg  <- if (is_sel && high) "var(--roundsui-warning, #C2760A)" else if (is_sel) "var(--roundsui-accent, #3355D8)" else "var(--roundsui-surface-2, #FBFBFD)"
+        col <- if (is_sel) "white" else "var(--roundsui-ink-muted, #5B6472)"
+        brd <- if (is_sel) bg else "var(--roundsui-border, #E2E5EC)"
         tags$button(
           type  = "button",
           id    = ns(paste0("box_", v)),
@@ -305,7 +305,7 @@ mod_miles_rating_server <- function(id, period,
       ps_list <- tryCatch(prev_scores(), error = function(e) NULL)
       prev_v  <- if (!is.null(ps_list) && key %in% names(ps_list)) ps_list[[key]] else NULL
       prev_badge <- if (!is.null(prev_v) && !is.na(prev_v) && nzchar(as.character(prev_v)))
-        tags$span(style = "background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe;
+        tags$span(style = "background:var(--roundsui-accent-tint, #EAEFFC); color:var(--roundsui-accent, #3355D8); border:1px solid var(--roundsui-accent-tint, #EAEFFC);
                            border-radius:20px; padding:2px 10px; font-size:0.72rem;
                            font-weight:600; margin-left:8px;",
                   tags$i(class = "bi bi-clock-history me-1"),
@@ -316,10 +316,10 @@ mod_miles_rating_server <- function(id, period,
         # Header: domain + item title
         div(class = "d-flex align-items-baseline justify-content-between mb-2",
           div(
-            tags$span(style = "font-weight:700; color:#0c5860; font-size:0.95rem;",
+            tags$span(style = "font-weight:700; color:var(--roundsui-accent, #3355D8); font-size:0.95rem;",
                       paste0(curDomain(), state$imgIdx, " \u2014 ", curSet()$imageTitles[state$imgIdx])),
             prev_badge),
-          tags$span(style = "font-size:0.75rem; color:#9e9e9e;",
+          tags$span(style = "font-size:0.75rem; color:var(--roundsui-ink-faint, #8991A0);",
                     paste0(curSet()$title))
         ),
         # Milestone image (cap at 55vh so score row is always visible) +
@@ -330,7 +330,7 @@ mod_miles_rating_server <- function(id, period,
           div(style = "max-height:55vh; overflow:auto; border-radius:4px;",
               uiOutput(ns("milestoneImage"))),
           # Label
-          div(style = "font-size:0.78rem; color:#546e7a; margin:10px 0 2px;",
+          div(style = "font-size:0.78rem; color:var(--roundsui-ink-muted, #5B6472); margin:10px 0 2px;",
               "Your rating \u2014 click the number that best matches your level:"),
           # Sticky button row: stays pinned at the bottom of the viewport so
           # entering scores never requires scrolling.
@@ -338,7 +338,7 @@ mod_miles_rating_server <- function(id, period,
               style = "position:sticky; bottom:0; z-index:10;
                        background:rgba(255,255,255,0.96);
                        backdrop-filter:blur(4px);
-                       border-top:1px solid #e0e0e0;
+                       border-top:1px solid var(--roundsui-border, #E2E5EC);
                        padding:8px 0;
                        width:100%; height:64px;",
               score_btns)
@@ -359,7 +359,7 @@ mod_miles_rating_server <- function(id, period,
       img_src <- paste0("milestones/", img_file)
 
       tags$img(src = img_src,
-               style = "width:100%; max-width:1140px; border-radius:4px; border:1px solid #e0e0e0;",
+               style = "width:100%; max-width:1140px; border-radius:4px; border:1px solid var(--roundsui-border, #E2E5EC);",
                alt  = paste("Milestone grid:", img_file))
     })
 
@@ -383,8 +383,8 @@ mod_miles_rating_server <- function(id, period,
       # the surrounding Shiny form (which was causing the "gray flash").
       tags$form(onsubmit = "return false;",
         div(class = "mt-2 p-2",
-            style = "background:#fff3e0; border-left:3px solid #e65100; border-radius:4px;",
-          tags$p(style = "font-size:0.78rem; color:#bf360c; margin:0 0 5px;",
+            style = "background:var(--roundsui-warning-tint, #FBF0DF); border-left:3px solid var(--roundsui-warning, #C2760A); border-radius:4px;",
+          tags$p(style = "font-size:0.78rem; color:var(--roundsui-warning, #C2760A); margin:0 0 5px;",
                  tags$i(class = "bi bi-info-circle me-1"),
                  "This rating is higher than typical for your training level. ",
                  "Please briefly justify it before moving on."),
@@ -539,12 +539,12 @@ milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600
         # height from the flexbox algorithm, instead of a % height resolving
         # against an auto-height parent (which plotly's resize observer then
         # fights with — the "vibrating"/undersized chart bug this replaces).
-        style = paste0("height: ", height, "; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 5px; display: flex; flex-direction: column;"),
+        style = paste0("height: ", height, "; border: 1px solid var(--roundsui-border, #E2E5EC); border-radius: 8px; padding: 15px; margin: 5px; display: flex; flex-direction: column;"),
 
         # Module header
         div(class = "dashboard-header",
-            style = "flex: 0 0 auto; text-align: center; margin-bottom: 15px; border-bottom: 2px solid #2c3e50; padding-bottom: 10px;",
-            h4(module_title, style = "color: #2c3e50; margin: 0; font-weight: bold;")
+            style = "flex: 0 0 auto; text-align: center; margin-bottom: 15px; border-bottom: 2px solid var(--roundsui-ink, #13161F); padding-bottom: 10px;",
+            h4(module_title, style = "color: var(--roundsui-ink, #13161F); margin: 0; font-weight: bold;")
         ),
 
         # Loading indicator
@@ -591,7 +591,7 @@ milestone_dashboard_ui <- function(id, milestone_type = "program", height = "600
         
         # Error/no data message
         div(id = ns("error_message"),
-            style = "display: none; text-align: center; padding: 50px; color: #e74c3c;",
+            style = "display: none; text-align: center; padding: 50px; color: var(--roundsui-danger, #D33A2C);",
             icon("exclamation-triangle"), 
             p("No milestone data available for the selected criteria.")
         )
@@ -709,7 +709,7 @@ milestone_dashboard_server <- function(id, milestone_results, record_id, period,
                  plotly::add_annotations(
                    text = "Select a milestone above to view progression", 
                    x = 0.5, y = 0.5, showarrow = FALSE,
-                   font = list(size = 14, color = "#666")
+                   font = list(size = 14, color = roundsui::roundsui_colors()$ink_muted)
                  ))
       }
       

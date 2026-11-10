@@ -154,8 +154,8 @@ format_goals_html <- function(goals_list) {
     goal <- goals_list[[domain]]
     if (is.null(goal)) next
     
-    output <- paste0(output, "<div class='goal-domain' style='margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #0072B2; border-radius: 4px;'>")
-    output <- paste0(output, "<h5 style='color: #0072B2; margin-top: 0;'>", domain_names[domain], "</h5>")
+    output <- paste0(output, "<div class='goal-domain' style='margin-bottom: 20px; padding: 15px; background-color: var(--roundsui-surface-2, #FBFBFD); border-left: 4px solid var(--roundsui-accent, #3355D8); border-radius: 4px;'>")
+    output <- paste0(output, "<h5 style='color: var(--roundsui-accent, #3355D8); margin-top: 0;'>", domain_names[domain], "</h5>")
     
     if (!is.na(goal$subcompetency) && nzchar(as.character(goal$subcompetency))) {
       output <- paste0(output, "<p><strong>Subcompetency:</strong> ", goal$subcompetency, "</p>")

@@ -109,16 +109,16 @@ mod_grad_plan_display_server <- function(id,
         class = "d-flex align-items-start mb-2",
         if (!is.null(icon)) shiny::tags$i(
           class = paste0("bi ", icon, " me-2 mt-1"),
-          style = if (is.null(icon_style)) "color:#6c757d;" else icon_style
+          style = if (is.null(icon_style)) "color:var(--roundsui-ink-muted, #5B6472);" else icon_style
         ),
         shiny::tags$div(
           shiny::tags$div(
             style = paste(
               "font-size:0.72rem; text-transform:uppercase; letter-spacing:.06em;",
-              "font-weight:700; color:#6c757d;"),
+              "font-weight:700; color:var(--roundsui-ink-muted, #5B6472);"),
             label
           ),
-          shiny::tags$div(style = "color:#212529;", value)
+          shiny::tags$div(style = "color:var(--roundsui-ink, #13161F);", value)
         )
       )
     }
@@ -127,11 +127,11 @@ mod_grad_plan_display_server <- function(id,
     .yn_row <- function(label, yn_value, icon = NULL) {
       if (is.null(yn_value) || is.na(yn_value) || !nzchar(trimws(yn_value))) return(NULL)
       pill_style <- if (identical(yn_value, "Yes")) {
-        "background:#d1fae5; color:#065f46; border:1px solid #6ee7b7;"
+        "background:var(--roundsui-success-tint, #E7F6EC); color:var(--roundsui-success, #16A34A); border:1px solid var(--roundsui-success, #16A34A);"
       } else if (identical(yn_value, "No")) {
-        "background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;"
+        "background:var(--roundsui-surface-2, #FBFBFD); color:var(--roundsui-ink-muted, #5B6472); border:1px solid var(--roundsui-border, #E2E5EC);"
       } else {
-        "background:#e2e8f0; color:#1e293b; border:1px solid #94a3b8;"
+        "background:var(--roundsui-surface-2, #FBFBFD); color:var(--roundsui-ink, #13161F); border:1px solid var(--roundsui-border-strong, #CBD0DB);"
       }
       pill <- shiny::tags$span(
         style = paste("display:inline-block; padding:2px 10px; border-radius:999px;",
@@ -144,10 +144,10 @@ mod_grad_plan_display_server <- function(id,
           class = "d-flex align-items-center",
           if (!is.null(icon)) shiny::tags$i(
             class = paste0("bi ", icon, " me-2"),
-            style = "color:#6c757d;"
+            style = "color:var(--roundsui-ink-muted, #5B6472);"
           ),
           shiny::tags$span(
-            style = "font-size:0.85rem; color:#334155;",
+            style = "font-size:0.85rem; color:var(--roundsui-ink-muted, #5B6472);",
             label
           )
         ),
@@ -155,17 +155,17 @@ mod_grad_plan_display_server <- function(id,
       )
     }
 
-    .section <- function(title, ..., border = "#cbd5e1") {
+    .section <- function(title, ..., border = "var(--roundsui-border, #E2E5EC)") {
       kids <- list(...); kids <- kids[!vapply(kids, is.null, logical(1))]
       if (!length(kids)) return(NULL)
       shiny::div(
         style = paste0(
-          "background:#ffffff; border:1px solid ", border, "; border-radius:8px;",
+          "background:var(--roundsui-surface, #FFFFFF); border:1px solid ", border, "; border-radius:8px;",
           " padding:14px 16px; margin-bottom:12px;"),
         shiny::tags$div(
           style = paste(
             "font-size:0.7rem; text-transform:uppercase; letter-spacing:.08em;",
-            "font-weight:700; color:#64748b; margin-bottom:10px;"),
+            "font-weight:700; color:var(--roundsui-ink-muted, #5B6472); margin-bottom:10px;"),
           title
         ),
         kids
@@ -210,16 +210,16 @@ mod_grad_plan_display_server <- function(id,
       # status as a pill on the right when applicable.
       hero <- shiny::div(
         style = paste(
-          "background:linear-gradient(135deg,#6610f2 0%,#4338ca 100%);",
-          "color:#ffffff; border-radius:10px; padding:18px 20px;",
-          "margin-bottom:14px; box-shadow:0 2px 6px rgba(102,16,242,0.18);",
+          "background:var(--roundsui-accent-tint, #EAEFFC); border:1px solid var(--roundsui-border, #E2E5EC);",
+          "color:var(--roundsui-ink, #13161F); border-radius:10px; padding:18px 20px;",
+          "margin-bottom:14px; box-shadow:none;",
           "display:flex; align-items:center; justify-content:space-between;",
           "flex-wrap:wrap; gap:12px;"),
         shiny::div(
           shiny::div(
             style = paste(
               "font-size:0.7rem; text-transform:uppercase; letter-spacing:.1em;",
-              "font-weight:700; color:#e0e7ff; margin-bottom:4px;"),
+              "font-weight:700; color:var(--roundsui-ink-muted, #5B6472); margin-bottom:4px;"),
             shiny::tags$i(class = "bi bi-signpost-split me-1"),
             "Post-residency path"
           ),
@@ -227,18 +227,18 @@ mod_grad_plan_display_server <- function(id,
             style = "font-size:1.4rem; font-weight:700; line-height:1.2;",
             if (!is.null(path_lbl) && !is.na(path_lbl) && nzchar(path_lbl))
               path_lbl
-            else shiny::tags$em(style = "color:#e0e7ff; font-weight:500;",
+            else shiny::tags$em(style = "color:var(--roundsui-ink-faint, #8991A0); font-weight:500;",
                                 "Not specified")
           )
         ),
         if (!is.null(chief_lbl) && !is.na(chief_lbl) && nzchar(chief_lbl))
           shiny::div(
             style = paste(
-              "background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.35);",
-              "color:#fff; padding:6px 14px; border-radius:999px;",
+              "background:var(--roundsui-surface, #FFFFFF); border:1px solid var(--roundsui-border, #E2E5EC);",
+              "color:var(--roundsui-ink, #13161F); padding:6px 14px; border-radius:999px;",
               "font-size:0.82rem; font-weight:600;"),
             shiny::tags$i(class = "bi bi-star-fill me-1",
-                          style = "color:#fde68a;"),
+                          style = "color:var(--roundsui-warning, #C2760A);"),
             "Chief Resident: ", chief_lbl
           )
       )
@@ -247,10 +247,10 @@ mod_grad_plan_display_server <- function(id,
       plans_block <- .section(
         "Plans",
         .row("Fellowship specialty", spec_lbl,
-             icon = "bi-mortarboard", icon_style = "color:#6610f2;"),
+             icon = "bi-mortarboard", icon_style = "color:var(--roundsui-accent, #3355D8);"),
         .row("Position / Practice", alumni_pos,
-             icon = "bi-briefcase", icon_style = "color:#0d6efd;"),
-        border = "#e9d5ff"
+             icon = "bi-briefcase", icon_style = "color:var(--roundsui-accent, #3355D8);"),
+        border = "var(--roundsui-border, #E2E5EC)"
       )
 
       # Section: Practice details (yes/no pills)
@@ -261,17 +261,17 @@ mod_grad_plan_display_server <- function(id,
         .yn_row("Practicing in Missouri",     mo_lbl,    icon = "bi-geo-alt"),
         .yn_row("Rural practice setting",     rural_lbl, icon = "bi-tree"),
         .yn_row("Underserved / urban",        urban_lbl, icon = "bi-buildings"),
-        border = "#bae6fd"
+        border = "var(--roundsui-border, #E2E5EC)"
       )
 
       # Section: Contact
       contact_block <- .section(
         "Contact",
         .row("Email", email,
-             icon = "bi-envelope", icon_style = "color:#0d6efd;"),
+             icon = "bi-envelope", icon_style = "color:var(--roundsui-accent, #3355D8);"),
         .row("Phone", phone,
-             icon = "bi-telephone", icon_style = "color:#0d6efd;"),
-        border = "#bbf7d0"
+             icon = "bi-telephone", icon_style = "color:var(--roundsui-accent, #3355D8);"),
+        border = "var(--roundsui-border, #E2E5EC)"
       )
 
       shiny::div(

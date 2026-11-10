@@ -4,6 +4,11 @@
 #' @name milestone_functions
 NULL
 
+# Chart colors below are literal hex because plotly can't read CSS variables.
+# They mirror roundsui::roundsui_colors() ("Ward Notes"): resident = accent
+# #3355D8, program median = ink_faint #8991A0, national benchmark = ink_muted
+# #5B6472 (series are told apart by dash + marker shape), text = ink #13161F.
+
 # ============================================================================
 # CORE DATA PROCESSING FUNCTIONS
 # ============================================================================
@@ -474,9 +479,9 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
     r = as.numeric(individual_scores[1,]),
     theta = categories,
     name = resident_name,
-    line = list(color = '#1f77b4', width = 2),
-    marker = list(size = 8, color = '#1f77b4'),
-    fillcolor = 'rgba(31, 119, 180, 0.2)'
+    line = list(color = '#3355D8', width = 2),
+    marker = list(size = 8, color = '#3355D8'),
+    fillcolor = 'rgba(51, 85, 216, 0.15)'
   )
   
   # Add median scores if available
@@ -485,8 +490,8 @@ create_milestone_spider_plot_final <- function(milestone_data, median_data, resi
       r = as.numeric(median_scores[1,]),
       theta = categories,
       name = "Program Median",
-      line = list(color = '#ff7f0e', width = 2, dash = 'dash'),
-      marker = list(size = 6, color = '#ff7f0e')
+      line = list(color = '#8991A0', width = 2, dash = 'dash'),
+      marker = list(size = 6, color = '#8991A0')
     )
   }
   
@@ -903,7 +908,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
                text = paste("No", milestone_type, "milestone columns found"), 
                x = 0.5, y = 0.5,
                showarrow = FALSE,
-               font = list(size = 16, color = "red")
+               font = list(size = 16, color = "#5B6472")
              ))
   }
   
@@ -947,7 +952,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
                text = paste("No milestone data available for", period_text), 
                x = 0.5, y = 0.5,
                showarrow = FALSE,
-               font = list(size = 16, color = "orange")
+               font = list(size = 16, color = "#5B6472")
              ))
   }
   
@@ -989,7 +994,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
                text = "No median data available for this period", 
                x = 0.5, y = 0.5,
                showarrow = FALSE,
-               font = list(size = 16, color = "orange")
+               font = list(size = 16, color = "#5B6472")
              ))
   }
   
@@ -1018,18 +1023,18 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   
   # Create enhanced hover text with full milestone descriptions
   individual_hover <- paste0(
-    "<b style='color: #2E86AB; font-size: 16px;'>", full_labels, "</b><br>",
+    "<b style='color: #3355D8; font-size: 16px;'>", full_labels, "</b><br>",
     "<span style='font-size: 14px;'><b>", resident_name, ":</b> ", individual_values, "</span><br>",
-    "<span style='color: #A23B72;'>Program Median: ", median_values, "</span><br>",
-    "<span style='color: #666;'>Period: ", period_text, "</span>",
+    "<span style='color: #8991A0;'>Program Median: ", median_values, "</span><br>",
+    "<span style='color: #5B6472;'>Period: ", period_text, "</span>",
     "<extra></extra>"
   )
   
   median_hover <- paste0(
-    "<b style='color: #A23B72; font-size: 16px;'>", full_labels, "</b><br>",
+    "<b style='color: #8991A0; font-size: 16px;'>", full_labels, "</b><br>",
     "<span style='font-size: 14px;'><b>Program Median:</b> ", median_values, "</span><br>",
-    "<span style='color: #2E86AB;'>", resident_name, ": ", individual_values, "</span><br>",
-    "<span style='color: #666;'>Period: ", period_text, "</span>",
+    "<span style='color: #3355D8;'>", resident_name, ": ", individual_values, "</span><br>",
+    "<span style='color: #5B6472;'>Period: ", period_text, "</span>",
     "<extra></extra>"
   )
   
@@ -1042,17 +1047,17 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
     theta = short_labels,
     name = paste("🎯", resident_name),
     line = list(
-      color = '#2E86AB', 
+      color = '#3355D8', 
       width = 4,
       shape = 'spline'
     ),
     marker = list(
-      color = '#2E86AB', 
+      color = '#3355D8', 
       size = 10,
       line = list(color = 'white', width = 2),
       symbol = 'circle'
     ),
-    fillcolor = 'rgba(46, 134, 171, 0.15)',
+    fillcolor = 'rgba(51, 85, 216, 0.15)',
     hovertemplate = individual_hover
   )
   
@@ -1062,18 +1067,18 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
     theta = short_labels,
     name = "📊 Program Median",
     line = list(
-      color = '#A23B72', 
+      color = '#8991A0', 
       width = 3, 
       dash = 'dash',
       shape = 'spline'
     ),
     marker = list(
-      color = '#A23B72', 
+      color = '#8991A0', 
       size = 8,
       symbol = 'diamond',
       line = list(color = 'white', width = 2)
     ),
-    fillcolor = 'rgba(162, 59, 114, 0.08)',
+    fillcolor = 'rgba(137, 145, 160, 0.08)',
     hovertemplate = median_hover
   )
   
@@ -1091,7 +1096,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       ),
       showlegend = FALSE,
       hovertemplate = paste0(
-        "<b style='color: #2c3e50; font-size: 14px;'>", full_labels[i], "</b>",
+        "<b style='color: #13161F; font-size: 14px;'>", full_labels[i], "</b>",
         "<extra></extra>"
       ),
       name = ""
@@ -1108,7 +1113,7 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
   
   fig <- fig %>% plotly::layout(
     title = list(
-      text = paste0("<span style='font-size: 12px; color: #7f8c8d;'>", period_text, "</span>"),
+      text = paste0("<span style='font-size: 12px; color: #5B6472;'>", period_text, "</span>"),
       font = list(family = "Arial, sans-serif"),
       x = 0.5
     ),
@@ -1125,16 +1130,16 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
         tickmode = 'array',
         tickvals = c(1, 3, 5, 7, 9),
         ticktext = c('<b>1</b><br>Novice', '<b>3</b><br>Adv. Beginner', '<b>5</b><br>Competent', '<b>7</b><br>Proficient', '<b>9</b><br>Expert'),
-        tickfont = list(size = 11, family = "Arial, sans-serif", color = "#2c3e50"),
-        gridcolor = 'rgba(52, 73, 94, 0.2)',
-        linecolor = 'rgba(52, 73, 94, 0.3)'
+        tickfont = list(size = 11, family = "Arial, sans-serif", color = "#13161F"),
+        gridcolor = 'rgba(19, 22, 31, 0.2)',
+        linecolor = 'rgba(19, 22, 31, 0.3)'
       ),
       angularaxis = list(
-        tickfont = list(size = 12, family = "Arial, sans-serif", color = "#2c3e50"),
+        tickfont = list(size = 12, family = "Arial, sans-serif", color = "#13161F"),
         rotation = 90,
         direction = "clockwise",
-        gridcolor = 'rgba(52, 73, 94, 0.15)',
-        linecolor = 'rgba(52, 73, 94, 0.2)'
+        gridcolor = 'rgba(19, 22, 31, 0.15)',
+        linecolor = 'rgba(19, 22, 31, 0.2)'
       )
     ),
     
@@ -1153,9 +1158,9 @@ create_enhanced_milestone_spider_plot <- function(milestone_data, median_data, r
       x = 0.5,
       xanchor = "center",
       y = -0.1,
-      font = list(size = 13, family = "Arial, sans-serif", color = "#2c3e50"),
+      font = list(size = 13, family = "Arial, sans-serif", color = "#13161F"),
       bgcolor = 'rgba(255, 255, 255, 0.9)',
-      bordercolor = 'rgba(52, 73, 94, 0.2)',
+      bordercolor = 'rgba(19, 22, 31, 0.2)',
       borderwidth = 1
     )
   ) %>%
@@ -1200,7 +1205,7 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
              plotly::add_annotations(
                text = paste("No", milestone_type, milestone_system, "data available"), 
                x = 0.5, y = 0.5, showarrow = FALSE,
-               font = list(size = 16, color = "red")
+               font = list(size = 16, color = "#5B6472")
              ))
   }
   
@@ -1227,7 +1232,7 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
              plotly::add_annotations(
                text = paste("Milestone", milestone_col, "not found in data"), 
                x = 0.5, y = 0.5, showarrow = FALSE,
-               font = list(size = 16, color = "orange")
+               font = list(size = 16, color = "#5B6472")
              ))
   }
   
@@ -1344,21 +1349,21 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
       type = 'scatter',
       mode = 'lines+markers',
       line = list(
-        color = '#2E86AB', 
+        color = '#3355D8', 
         width = 4,
         shape = 'spline'
       ),
       marker = list(
-        color = '#2E86AB', 
+        color = '#3355D8', 
         size = 12,
         line = list(color = 'white', width = 2),
         symbol = 'circle'
       ),
       hovertemplate = paste0(
-        "<b style='color: #2E86AB;'>", resident_name, "</b><br>",
+        "<b style='color: #3355D8;'>", resident_name, "</b><br>",
         "<span style='font-size: 14px;'>Period: %{x}</span><br>",
         "<span style='font-size: 16px; font-weight: bold;'>Score: %{y}</span><br>",
-        "<span style='color: #666;'>", milestone_label, "</span>",
+        "<span style='color: #5B6472;'>", milestone_label, "</span>",
         "<extra></extra>"
       )
     )
@@ -1372,23 +1377,23 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
         type = 'scatter',
         mode = 'lines+markers',
         line = list(
-          color = '#A23B72', 
+          color = '#8991A0', 
           width = 3, 
           dash = 'dash',
           shape = 'spline'
         ),
         marker = list(
-          color = '#A23B72', 
+          color = '#8991A0', 
           size = 10,
           symbol = 'diamond',
           line = list(color = 'white', width = 2)
         ),
         connectgaps = FALSE,  # Don't connect across missing data points
         hovertemplate = paste0(
-          "<b style='color: #A23B72;'>Program Median</b><br>",
+          "<b style='color: #8991A0;'>Program Median</b><br>",
           "<span style='font-size: 14px;'>Period: %{x}</span><br>",
           "<span style='font-size: 16px; font-weight: bold;'>Score: %{y}</span><br>",
-          "<span style='color: #666;'>", milestone_label, "</span>",
+          "<span style='color: #5B6472;'>", milestone_label, "</span>",
           "<extra></extra>"
         )
       )
@@ -1403,21 +1408,21 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
         type = 'scatter',
         mode = 'lines+markers',
         line = list(
-          color = '#F18F01', 
+          color = '#5B6472', 
           width = 4, 
           dash = 'longdash'
         ),
         marker = list(
-          color = '#F18F01', 
+          color = '#5B6472', 
           size = 14, 
           symbol = 'square',
-          line = list(color = '#E85A00', width = 3)
+          line = list(color = '#5B6472', width = 3)
         ),
         hovertemplate = paste0(
-          "<b style='color: #F18F01;'>National Benchmark</b><br>",
+          "<b style='color: #5B6472;'>National Benchmark</b><br>",
           "<span style='font-size: 14px;'>Period: %{x}</span><br>",
           "<span style='font-size: 16px; font-weight: bold;'>Score: %{y}</span><br>",
-          "<span style='color: #666;'>ACGME 2024-2025 Internal Medicine Data</span>",
+          "<span style='color: #5B6472;'>ACGME 2024-2025 Internal Medicine Data</span>",
           "<extra></extra>"
         )
       )
@@ -1428,8 +1433,8 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
     plotly::layout(
       title = list(
         text = paste0(
-          "<b style='font-size: 22px; color: #2c3e50;'>📈 ", milestone_label, "</b><br>",
-          "<span style='font-size: 16px; color: #34495e;'>", resident_name, " Progress Over Time</span>"
+          "<b style='font-size: 22px; color: #13161F;'>📈 ", milestone_label, "</b><br>",
+          "<span style='font-size: 16px; color: #5B6472;'>", resident_name, " Progress Over Time</span>"
         ),
         font = list(family = "Arial, sans-serif"),
         x = 0.5
@@ -1437,25 +1442,25 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
       xaxis = list(
         title = list(
           text = "<b>Training Period</b>",
-          font = list(size = 16, color = "#2c3e50", family = "Arial, sans-serif")
+          font = list(size = 16, color = "#13161F", family = "Arial, sans-serif")
         ),
-        tickfont = list(size = 13, color = "#34495e", family = "Arial, sans-serif"),
+        tickfont = list(size = 13, color = "#5B6472", family = "Arial, sans-serif"),
         tickangle = -45,
-        gridcolor = 'rgba(52, 73, 94, 0.1)',
-        linecolor = 'rgba(52, 73, 94, 0.2)'
+        gridcolor = 'rgba(19, 22, 31, 0.1)',
+        linecolor = 'rgba(19, 22, 31, 0.2)'
       ),
       yaxis = list(
         title = list(
           text = "<b>Milestone Score</b>",
-          font = list(size = 16, color = "#2c3e50", family = "Arial, sans-serif")
+          font = list(size = 16, color = "#13161F", family = "Arial, sans-serif")
         ),
         range = c(0.5, 9.5),
         tickmode = 'array',
         tickvals = c(1, 3, 5, 7, 9),
         ticktext = c('<b>1</b><br>Novice', '<b>3</b><br>Adv. Beginner', '<b>5</b><br>Competent', '<b>7</b><br>Proficient', '<b>9</b><br>Expert'),
-        tickfont = list(size = 12, color = "#34495e", family = "Arial, sans-serif"),
-        gridcolor = 'rgba(52, 73, 94, 0.15)',
-        linecolor = 'rgba(52, 73, 94, 0.2)',
+        tickfont = list(size = 12, color = "#5B6472", family = "Arial, sans-serif"),
+        gridcolor = 'rgba(19, 22, 31, 0.15)',
+        linecolor = 'rgba(19, 22, 31, 0.2)',
         zeroline = FALSE
       ),
       showlegend = TRUE,
@@ -1464,9 +1469,9 @@ create_enhanced_milestone_progression <- function(milestone_results, resident_id
         x = 0.5,
         xanchor = "center",
         y = -0.25,
-        font = list(size = 13, family = "Arial, sans-serif", color = "#2c3e50"),
+        font = list(size = 13, family = "Arial, sans-serif", color = "#13161F"),
         bgcolor = 'rgba(255, 255, 255, 0.9)',
-        bordercolor = 'rgba(52, 73, 94, 0.2)',
+        bordercolor = 'rgba(19, 22, 31, 0.2)',
         borderwidth = 1
       ),
       paper_bgcolor = 'white',

@@ -24,9 +24,9 @@ mod_assessment_detail_custom_ui <- function(id) {
           box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
         .assessment-category-btn.active {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: var(--roundsui-accent, #3355D8);
           color: white;
-          border-color: #667eea;
+          border-color: var(--roundsui-accent, #3355D8);
         }
         .assessment-obs-btn {
           margin: 3px;
@@ -37,9 +37,9 @@ mod_assessment_detail_custom_ui <- function(id) {
           transform: scale(1.05);
         }
         .assessment-obs-btn.active {
-          background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+          background: var(--roundsui-accent, #3355D8);
           color: white;
-          border-color: #17a2b8;
+          border-color: var(--roundsui-accent, #3355D8);
         }
         .assessment-viz-container {
           background: white;
@@ -72,7 +72,7 @@ mod_assessment_detail_custom_ui <- function(id) {
 
         # Category buttons
         tags$p(
-          style = "font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#6c757d; margin-bottom:6px;",
+          style = "font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:var(--roundsui-ink-muted, #5B6472); margin-bottom:6px;",
           tags$i(class="bi bi-hand-index me-1"), "Select a category:"
         ),
         uiOutput(ns("category_buttons")),
@@ -378,7 +378,7 @@ mod_assessment_detail_custom_server <- function(id, rdm_data, record_id, data_di
 
       div(
         class = "obs-subtype-container animate__animated animate__fadeInDown",
-        style = "margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 8px;",
+        style = "margin: 15px 0; padding: 10px; background: var(--roundsui-surface-2, #FBFBFD); border-radius: 8px;",
         h6(class = "mb-2", icon("stethoscope"), "Select Observation Type:"),
         div(class = "d-flex flex-wrap gap-2", buttons)
       )
@@ -783,7 +783,7 @@ create_observation_viz_data <- function(data, type_info) {
       y = ~reorder(field_label, mean_score),
       type = "bar",
       orientation = "h",
-      marker = list(color = "#17a2b8"),
+      marker = list(color = roundsui::roundsui_colors()$accent),
       text = ~paste0("Mean: ", round(mean_score, 2),
                     "<br>Median: ", round(median_score, 2),
                     "<br>N: ", n_assessments),

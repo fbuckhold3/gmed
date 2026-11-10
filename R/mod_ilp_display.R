@@ -53,10 +53,10 @@ mod_ilp_display_ui <- function(id,
       class = "mb-4",
       shiny::tags$h5(
         m$header,
-        style = "color:#34495e; margin-top:10px;"
+        style = "color:var(--roundsui-ink, #13161F); margin-top:10px;"
       ),
       if (nzchar(m$subhead))
-        shiny::tags$p(m$subhead, style = "color:#7f8c8d; font-size:1.05rem;") else NULL,
+        shiny::tags$p(m$subhead, style = "color:var(--roundsui-ink-muted, #5B6472); font-size:1.05rem;") else NULL,
       shiny::wellPanel(
         style = m$panel_style,
         shiny::uiOutput(ns(s))
@@ -247,22 +247,22 @@ mod_ilp_display_server <- function(id,
     prev_coach = list(
       header = "Previous Coach ILP Summary",
       subhead = "Comments and ILP summary from the prior coaching review.",
-      panel_style = "background-color:#e8f4f8; border-left:4px solid #3498db;"
+      panel_style = "background-color:var(--roundsui-surface-2, #FBFBFD); border:1px solid var(--roundsui-border, #E2E5EC);"
     ),
     compare = list(
       header = "Goals: Last Period vs This Period",
       subhead = "Per-domain comparison: prior goal and whether it was met on the left, current goal on the right.",
-      panel_style = "background-color:#f8f9fa; border-left:4px solid #3498db;"
+      panel_style = "background-color:var(--roundsui-surface-2, #FBFBFD); border:1px solid var(--roundsui-border, #E2E5EC);"
     ),
     prev_goals = list(
       header = "Previous Period Goals & Achievement",
       subhead = "Goals the resident set last period and their reflection on whether they met them.",
-      panel_style = "background-color:#f8f9fa; border-left:4px solid #27ae60;"
+      panel_style = "background-color:var(--roundsui-surface-2, #FBFBFD); border:1px solid var(--roundsui-border, #E2E5EC);"
     ),
     current = list(
       header = "Current Period Goals",
       subhead = "Goals the resident has set for this period.",
-      panel_style = "background-color:#fff8e1; border-left:4px solid #f39c12;"
+      panel_style = "background-color:var(--roundsui-surface-2, #FBFBFD); border:1px solid var(--roundsui-border, #E2E5EC);"
     )
   )
 }
@@ -282,7 +282,7 @@ mod_ilp_display_server <- function(id,
       prior      = "prior_goal_pcmk",
       review_no  = "review_q_pcmk",
       review_yes = "review_q2_pcmk",
-      color      = "#0d6efd"
+      color      = "var(--roundsui-accent, #3355D8)"
     ),
     sbppbl = list(
       goal       = "goal_sbppbl",
@@ -292,7 +292,7 @@ mod_ilp_display_server <- function(id,
       prior      = "prior_goal_sbppbl",
       review_no  = "review_q_sbppbl",
       review_yes = "review_q2_sbppbl",
-      color      = "#198754"
+      color      = "var(--roundsui-accent, #3355D8)"
     ),
     profics = list(
       goal       = "goal_subcomp_profics",
@@ -302,7 +302,7 @@ mod_ilp_display_server <- function(id,
       prior      = "prior_goal_profics",
       review_no  = "review_q_profics",
       review_yes = "review_q2_profics",
-      color      = "#6f42c1"
+      color      = "var(--roundsui-accent, #3355D8)"
     ),
     NULL
   )
@@ -381,9 +381,9 @@ mod_ilp_display_server <- function(id,
 .ilp_text_block <- function(label, txt) {
   shiny::div(
     class = "mb-3",
-    shiny::tags$h6(label, style = "color:#3498db; margin-bottom:6px;"),
+    shiny::tags$h6(label, style = "color:var(--roundsui-accent, #3355D8); margin-bottom:6px;"),
     shiny::div(
-      style = "padding:10px 12px; background:#fff; border-radius:4px; white-space:pre-wrap;",
+      style = "padding:10px 12px; background:var(--roundsui-surface, #FFFFFF); border-radius:4px; white-space:pre-wrap;",
       txt
     )
   )
@@ -398,16 +398,16 @@ mod_ilp_display_server <- function(id,
   if (!nzchar(code) || code == "NA") return(NULL)
 
   shiny::div(
-    style = sprintf(paste("margin-bottom:20px; padding:15px; background:#fff;",
+    style = sprintf(paste("margin-bottom:20px; padding:15px; background:var(--roundsui-surface, #FFFFFF);",
                           "border-radius:4px; border-left:4px solid %s;"), fm$color),
-    shiny::tags$h5(domain_name, style = "color:#e67e22; margin-top:0;"),
+    shiny::tags$h5(domain_name, style = "color:var(--roundsui-ink, #13161F); margin-top:0;"),
     shiny::tags$p(shiny::tags$strong("Selected Goal: "), .ilp_subcomp_label(domain, code)),
     shiny::tags$p(shiny::tags$strong("Target Milestone Level: "),
                   .ilp_level_text(domain, code, lvl, data_dict, row)),
     if (nzchar(how) && !is.na(how))
       shiny::tagList(
         shiny::tags$p(shiny::tags$strong("How to achieve:")),
-        shiny::tags$p(style = "padding-left:15px; color:#34495e; white-space:pre-wrap;", how)
+        shiny::tags$p(style = "padding-left:15px; color:var(--roundsui-ink, #13161F); white-space:pre-wrap;", how)
       )
   )
 }
@@ -442,7 +442,7 @@ mod_ilp_display_server <- function(id,
   else if (!has_answer) {
     shiny::div(
       class = "mt-3 p-3",
-      style = "background:#f8f9fa; border:1px dashed #adb5bd; border-radius:8px;",
+      style = "background:var(--roundsui-surface-2, #FBFBFD); border:1px dashed var(--roundsui-border-strong, #CBD0DB); border-radius:8px;",
       shiny::tags$div(class = "fw-bold text-uppercase text-muted mb-1",
                       style = "letter-spacing:.06em; font-size:0.9rem;",
                       "Did the resident meet this goal?"),
@@ -451,11 +451,11 @@ mod_ilp_display_server <- function(id,
                       "Resident has not yet reflected on this goal.")
     )
   } else {
-    bg     <- if (goal_met) "#d1f4dd" else "#fff3cd"
-    border <- if (goal_met) "#198754" else "#dc7d1f"
+    bg     <- if (goal_met) "var(--roundsui-success-tint, #E7F6EC)" else "var(--roundsui-warning-tint, #FBF0DF)"
+    border <- if (goal_met) "var(--roundsui-success, #16A34A)" else "var(--roundsui-warning, #C2760A)"
     icon   <- if (goal_met) "bi-check-circle-fill" else "bi-x-octagon-fill"
     txt    <- if (goal_met) "Yes \u2014 goal met" else "No \u2014 goal not met"
-    color  <- if (goal_met) "#0f5132" else "#7a4500"
+    color  <- if (goal_met) "var(--roundsui-success, #16A34A)" else "var(--roundsui-warning, #C2760A)"
     why_label <- if (goal_met) "Why? (what helped, what they learned)"
                  else "Why not? (barriers, what's next)"
 
@@ -480,7 +480,7 @@ mod_ilp_display_server <- function(id,
                           why_label),
           shiny::tags$div(
             class = "mt-1",
-            style = "background:rgba(255,255,255,0.7); padding:8px 12px; border-radius:6px; white-space:pre-wrap; color:#212529;",
+            style = "background:rgba(255,255,255,0.7); padding:8px 12px; border-radius:6px; white-space:pre-wrap; color:var(--roundsui-ink, #13161F);",
             reflection
           )
         )
@@ -495,30 +495,30 @@ mod_ilp_display_server <- function(id,
     shiny::tagList(
       shiny::div(
         class = "p-2 mb-2",
-        style = "background:#f8fafc; border-radius:6px;",
+        style = "background:var(--roundsui-surface-2, #FBFBFD); border-radius:6px;",
         shiny::tags$div(class = "text-uppercase fw-bold text-muted mb-1",
                         style = "letter-spacing:.05em; font-size:0.9rem;",
                         "Subcompetency"),
-        shiny::tags$div(style = "font-size:1.3rem; font-weight:600; color:#2c3e50;",
+        shiny::tags$div(style = "font-size:1.3rem; font-weight:600; color:var(--roundsui-ink, #13161F);",
                         .ilp_subcomp_label(domain, code))
       ),
       shiny::div(
         class = "p-2 mb-2",
-        style = "background:#f8fafc; border-radius:6px;",
+        style = "background:var(--roundsui-surface-2, #FBFBFD); border-radius:6px;",
         shiny::tags$div(class = "text-uppercase fw-bold text-muted mb-1",
                         style = "letter-spacing:.05em; font-size:0.9rem;",
                         "Target Milestone Level"),
-        shiny::tags$div(style = "color:#34495e; font-size:1.15rem;",
+        shiny::tags$div(style = "color:var(--roundsui-ink, #13161F); font-size:1.15rem;",
                         .ilp_level_text(domain, code, lvl, data_dict, row))
       ),
       if (nzchar(how))
         shiny::div(
           class = "p-2",
-          style = "background:#f8fafc; border-radius:6px;",
+          style = "background:var(--roundsui-surface-2, #FBFBFD); border-radius:6px;",
           shiny::tags$div(class = "small text-uppercase fw-bold text-muted mb-1",
                           style = "letter-spacing:.05em;",
                           "How they'll get there"),
-          shiny::tags$div(style = "color:#34495e; white-space:pre-wrap; font-size:1.1rem;", how)
+          shiny::tags$div(style = "color:var(--roundsui-ink, #13161F); white-space:pre-wrap; font-size:1.1rem;", how)
         )
     )
   }
@@ -540,7 +540,7 @@ mod_ilp_display_server <- function(id,
   pane_header <- function(label, color, icon) {
     shiny::div(
       class = "px-3 py-2 d-flex align-items-center",
-      style = sprintf("background:%s; color:#fff; font-weight:700; letter-spacing:.05em;", color),
+      style = sprintf("background:%s; color:var(--roundsui-accent-ink, #FFFFFF); font-weight:700; letter-spacing:.05em;", color),
       shiny::tags$i(class = paste0("bi ", icon, " me-2")),
       shiny::tags$span(class = "text-uppercase small", label)
     )
@@ -548,15 +548,14 @@ mod_ilp_display_server <- function(id,
 
   shiny::div(
     class = "mb-4 shadow-sm",
-    style = sprintf(paste("border:1px solid #e9ecef; border-top:5px solid %s;",
-                          "border-radius:8px; background:#fff; overflow:hidden;"),
+    style = sprintf(paste("border:1px solid var(--roundsui-border, #E2E5EC); border-top:5px solid %s;",
+                          "border-radius:8px; background:var(--roundsui-surface, #FFFFFF); overflow:hidden;"),
                     fm$color),
     # Domain header bar
     shiny::div(
       class = "px-3 py-2",
-      style = sprintf("background:%s10; border-bottom:1px solid #e9ecef;",
-                      substr(fm$color, 1, 7)),
-      shiny::tags$h5(class = "mb-0", style = "color:#2c3e50; font-weight:700;",
+      style = "background:var(--roundsui-accent-tint, #EAEFFC); border-bottom:1px solid var(--roundsui-border, #E2E5EC);",
+      shiny::tags$h5(class = "mb-0", style = "color:var(--roundsui-ink, #13161F); font-weight:700;",
                      domain_name)
     ),
     shiny::div(
@@ -564,15 +563,15 @@ mod_ilp_display_server <- function(id,
       # LEFT: Last period
       shiny::div(
         class = "col-md-6",
-        style = "border-right:1px solid #e9ecef;",
-        pane_header("Last Period", "#6c757d", "bi-clock-history"),
+        style = "border-right:1px solid var(--roundsui-border, #E2E5EC);",
+        pane_header("Last Period", "var(--roundsui-ink-muted, #5B6472)", "bi-clock-history"),
         shiny::div(class = "p-3", prev_pane)
       ),
       # RIGHT: This period
       shiny::div(
         class = "col-md-6",
         pane_header("This Period", fm$color, "bi-arrow-right-circle-fill"),
-        shiny::div(class = "p-3", style = "background:#fffdf7;", cur_pane)
+        shiny::div(class = "p-3", style = "background:var(--roundsui-surface, #FFFFFF);", cur_pane)
       )
     )
   )
@@ -593,23 +592,23 @@ mod_ilp_display_server <- function(id,
   if (!nzchar(code) || code == "NA") return(NULL)
 
   goal_met <- nzchar(achv) && (achv == "1" || tolower(achv) == "yes")
-  border   <- if (goal_met) "#27ae60" else "#e67e22"
+  border   <- if (goal_met) "var(--roundsui-success, #16A34A)" else "var(--roundsui-warning, #C2760A)"
   badge    <- if (goal_met)
-    shiny::tags$span(style = "color:#27ae60; font-weight:600;",
+    shiny::tags$span(style = "color:var(--roundsui-success, #16A34A); font-weight:600;",
                      shiny::tags$i(class = "bi bi-check-circle-fill me-1"), "Goal Met")
   else if (nzchar(achv))
-    shiny::tags$span(style = "color:#e67e22; font-weight:600;",
+    shiny::tags$span(style = "color:var(--roundsui-warning, #C2760A); font-weight:600;",
                      shiny::tags$i(class = "bi bi-exclamation-circle-fill me-1"), "Goal Not Yet Met")
   else
-    shiny::tags$span(style = "color:#7f8c8d; font-style:italic;",
+    shiny::tags$span(style = "color:var(--roundsui-ink-muted, #5B6472); font-style:italic;",
                      "Resident has not yet reflected on this goal.")
 
   reflection <- if (goal_met) ryes else rno
 
   shiny::div(
-    style = sprintf(paste("margin-bottom:20px; padding:15px; background:#fff;",
+    style = sprintf(paste("margin-bottom:20px; padding:15px; background:var(--roundsui-surface, #FFFFFF);",
                           "border-radius:4px; border-left:4px solid %s;"), border),
-    shiny::tags$h5(domain_name, style = "color:#2980b9; margin-top:0;"),
+    shiny::tags$h5(domain_name, style = "color:var(--roundsui-ink, #13161F); margin-top:0;"),
     shiny::div(style = "margin-bottom:10px;", badge),
     shiny::tags$p(shiny::tags$strong("Selected Goal: "), .ilp_subcomp_label(domain, code)),
     shiny::tags$p(shiny::tags$strong("Target Milestone Level: "),
@@ -617,14 +616,14 @@ mod_ilp_display_server <- function(id,
     if (nzchar(how) && !is.na(how))
       shiny::tagList(
         shiny::tags$p(shiny::tags$strong("How to achieve:")),
-        shiny::tags$p(style = "padding-left:15px; color:#34495e; white-space:pre-wrap;", how)
+        shiny::tags$p(style = "padding-left:15px; color:var(--roundsui-ink, #13161F); white-space:pre-wrap;", how)
       ),
     if (nzchar(trimws(reflection)))
       shiny::tagList(
-        shiny::tags$hr(style = "margin:10px 0; border-top:1px solid #ecf0f1;"),
+        shiny::tags$hr(style = "margin:10px 0; border-top:1px solid var(--roundsui-border, #E2E5EC);"),
         shiny::tags$p(shiny::tags$strong("Resident's reflection:"),
-                      style = "color:#7f8c8d; margin-bottom:4px;"),
-        shiny::tags$p(style = "padding-left:15px; font-style:italic; color:#555; white-space:pre-wrap;",
+                      style = "color:var(--roundsui-ink-muted, #5B6472); margin-bottom:4px;"),
+        shiny::tags$p(style = "padding-left:15px; font-style:italic; color:var(--roundsui-ink-muted, #5B6472); white-space:pre-wrap;",
                       reflection)
       )
   )

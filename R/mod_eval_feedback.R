@@ -427,11 +427,11 @@ mod_eval_feedback_server <- function(id, assessment_data, record_id, data_dict) 
       all_chip <- tags$span(
         style = paste0(
           "display:inline-flex; align-items:center; gap:5px;",
-          "background:", if (all_active) "#0c5860" else "#e8edf2", ";",
-          "color:", if (all_active) "white" else "#0c5860", ";",
+          "background:", if (all_active) "var(--roundsui-accent, #3355D8)" else "var(--roundsui-accent-tint, #EAEFFC)", ";",
+          "color:", if (all_active) "var(--roundsui-accent-ink, #FFFFFF)" else "var(--roundsui-accent, #3355D8)", ";",
           "border-radius:20px; padding:5px 14px; font-size:0.78rem;",
           "font-weight:600; margin:3px; cursor:pointer;",
-          "border:2px solid #0c5860;"
+          "border:2px solid var(--roundsui-accent, #3355D8);"
         ),
         onclick = sprintf(
           "Shiny.setInputValue('%s', '', {priority:'event'})",

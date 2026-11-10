@@ -119,7 +119,7 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
       if (!is.null(form_mode())) return(NULL)
       shiny::div(class = "mb-3",
         shiny::actionButton(ns("btn_add"), "+ Add Entry", class = "btn btn-sm",
-          style = "background:var(--gmed-primary); color:#fff; border:none; padding:4px 14px; font-size:0.85rem;"))
+          style = "background:var(--roundsui-accent, #3355D8); color:var(--roundsui-accent-ink, #FFFFFF); border:none; padding:4px 14px; font-size:0.85rem;"))
     })
 
     # ── entry form ─────────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
       }
 
       lbl <- function(text)
-        tags$label(text, class = "form-label fw-semibold", style = "font-size:0.92rem; color:var(--gmed-text-primary);")
+        tags$label(text, class = "form-label fw-semibold", style = "font-size:0.92rem; color:var(--roundsui-ink, #13161F);")
       txt <- function(fid, ph = "")
         tags$input(type = "text", id = ns(fid), class = "form-control",
                    style = "font-size:0.92rem;", placeholder = ph, value = iv(fid))
@@ -154,9 +154,9 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
 
       div(class = "card border-0 shadow-sm mb-3", style = "border-radius:8px;",
         div(class = "card-header border-0 d-flex align-items-center gap-2",
-            style = "background:#f8fafc; border-radius:8px 8px 0 0; padding:12px 18px;",
-          tags$i(class = "bi bi-plus-circle-fill", style = "color:var(--gmed-primary); font-size:1rem;"),
-          tags$span(style = "font-weight:700; color:var(--gmed-primary); font-size:0.95rem;", hdr)),
+            style = "background:var(--roundsui-surface-2, #FBFBFD); border-radius:8px 8px 0 0; padding:12px 18px;",
+          tags$i(class = "bi bi-plus-circle-fill", style = "color:var(--roundsui-accent, #3355D8); font-size:1rem;"),
+          tags$span(style = "font-weight:700; color:var(--roundsui-accent, #3355D8); font-size:0.95rem;", hdr)),
         div(class = "card-body",
           if (fm$mode == "recategorize" && nzchar(fm$ref %||% ""))
             div(class = "alert alert-secondary py-2 px-3 mb-3", style = "font-size:0.85rem;",
@@ -214,7 +214,7 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
 
           conditionalPanel(c_event, ns = ns,
             div(class = "alert alert-light py-2 px-3 mb-3",
-                style = "font-size:0.85rem; border-left:3px solid #6f42c1;",
+                style = "font-size:0.85rem; border-left:3px solid var(--roundsui-accent, #3355D8);",
               tags$i(class = "bi bi-info-circle me-1"),
               "Presentations ", tags$strong("within the program count too"),
               " — e.g., noon conference, grand rounds, morning report, or research day."),
@@ -241,13 +241,13 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
             tags$input(type = "checkbox", class = "form-check-input", id = ns("schol_meaningful"),
                        checked = if (identical(iv("schol_meaningful"), "1")) NA else NULL),
             tags$label(class = "form-check-label", `for` = ns("schol_meaningful"),
-                       style = "font-size:0.9rem; color:var(--gmed-text-primary);",
+                       style = "font-size:0.9rem; color:var(--roundsui-ink, #13161F);",
                        "Mark as one of my ", tags$strong("most meaningful"), " works (max 3)")),
 
           div(class = "d-flex align-items-center gap-2 mt-3",
             actionButton(ns("btn_save"), if (fm$mode == "new") "Save Entry" else "Save Changes",
               class = "btn btn-sm",
-              style = "background:var(--gmed-primary); color:#fff; border:none; padding:6px 18px;"),
+              style = "background:var(--roundsui-accent, #3355D8); color:var(--roundsui-accent-ink, #FFFFFF); border:none; padding:6px 18px;"),
             actionButton(ns("btn_cancel"), "Cancel",
               class = "btn btn-sm btn-outline-secondary", style = "padding:6px 14px;"),
             uiOutput(ns("save_status")))

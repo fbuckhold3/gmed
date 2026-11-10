@@ -26,13 +26,12 @@ library(plotly)
 #' }
 assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
   ns <- NS(id)
-  colors <- gmed_colors()
   
   tagList(
     tags$head(
       tags$style(HTML(paste0("
         .assessment-viz-container {
-          background: linear-gradient(135deg, ", colors$light_gray, " 0%, #e9ecef 100%);
+          background: var(--roundsui-ground, #F6F7FA);
           border-radius: 16px;
           padding: 1.5rem;
           animation: containerFadeIn 0.6s ease-out;
@@ -44,10 +43,10 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
         }
         
         .viz-card {
-          background: white;
-          border: none;
+          background: var(--roundsui-surface, #FFFFFF);
+          border: 1px solid var(--roundsui-border, #E2E5EC);
           border-radius: 12px;
-          box-shadow: 0 4px 16px rgba(0, 61, 92, 0.08);
+          box-shadow: var(--roundsui-shadow);
           margin-bottom: 1rem;
           transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
           transform-origin: center;
@@ -65,12 +64,13 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
         
         .viz-card:hover {
           transform: translateY(-4px) scale(1.01);
-          box-shadow: 0 12px 32px rgba(0, 61, 92, 0.15);
+          box-shadow: var(--roundsui-shadow);
         }
         
         .viz-card-header {
-          background: linear-gradient(135deg, ", colors$primary, " 0%, ", colors$secondary, " 100%);
-          color: white;
+          background: var(--roundsui-surface-2, #FBFBFD);
+          border-bottom: 1px solid var(--roundsui-border, #E2E5EC);
+          color: var(--roundsui-ink, #13161F);
           padding: 1rem 1.5rem;
           border-radius: 12px 12px 0 0;
           font-weight: 600;
@@ -97,7 +97,7 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
         }
         
         .questions-display {
-          background: linear-gradient(135deg, ", colors$accent_blue, " 0%, ", colors$light_blue, " 100%);
+          background: var(--roundsui-accent, #3355D8);
           color: white;
           border-radius: 12px;
           padding: 2rem;
@@ -110,7 +110,7 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
           animation: questionsSlideIn 1s ease-out 0.6s forwards, questionsPulse 3s ease-in-out 2s infinite;
           opacity: 0;
           transform: translateX(30px);
-          box-shadow: 0 8px 24px rgba(33, 150, 243, 0.2);
+          box-shadow: 0 8px 24px rgba(51, 85, 216, 0.18);
           transition: all 0.3s ease;
         }
         
@@ -178,13 +178,13 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
         }
         
         @keyframes questionsPulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 8px 24px rgba(33, 150, 243, 0.2); }
-          50% { transform: scale(1.02); box-shadow: 0 12px 32px rgba(33, 150, 243, 0.3); }
+          0%, 100% { transform: scale(1); box-shadow: 0 8px 24px rgba(51, 85, 216, 0.18); }
+          50% { transform: scale(1.02); box-shadow: 0 12px 32px rgba(51, 85, 216, 0.18); }
         }
         
         .questions-display:hover {
           transform: scale(1.03);
-          box-shadow: 0 16px 40px rgba(33, 150, 243, 0.4);
+          box-shadow: 0 16px 40px rgba(51, 85, 216, 0.18);
         }
         
         .questions-big-number {
@@ -230,12 +230,12 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
         
         .js-plotly-plot:hover {
           transform: scale(1.01);
-          box-shadow: 0 4px 16px rgba(0, 61, 92, 0.1);
+          box-shadow: var(--roundsui-shadow);
         }
         
         /* Loading shimmer for charts */
         .chart-loading {
-          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background: linear-gradient(90deg, var(--roundsui-surface-2, #FBFBFD) 25%, var(--roundsui-border, #E2E5EC) 50%, var(--roundsui-surface-2, #FBFBFD) 75%);
           background-size: 200% 100%;
           animation: loading 1.5s infinite;
           border-radius: 8px;
@@ -260,7 +260,7 @@ assessment_viz_ui <- function(id, title = "Assessment Dashboard") {
     ),
     
     div(class = "assessment-viz-container",
-        h3(title, style = paste0("color: ", colors$primary, "; font-weight: 600; margin-bottom: 1.5rem; animation: titleSlide 0.8s ease-out;")),
+        h3(title, style = paste0("color: var(--roundsui-ink, #13161F); font-weight: 600; margin-bottom: 1.5rem; animation: titleSlide 0.8s ease-out;")),
         
         fluidRow(
           # Left column: Charts (3/4 width)

@@ -27,7 +27,7 @@ mod_cc_completion_ui <- function(id) {
         class = "card-body",
         p(class = "text-muted mb-3",
           "Track your continuity clinic assessments. Four per academic year are expected.",
-          tags$small(class = "d-block mt-1", style = "color:#6c757d;",
+          tags$small(class = "d-block mt-1", style = "color:var(--roundsui-ink-muted, #5B6472);",
                      "Click a completed quarter to see details.")),
 
         uiOutput(ns("completion_display"))
@@ -38,26 +38,26 @@ mod_cc_completion_ui <- function(id) {
     tags$head(
       tags$style(HTML("
         .quarter-card {
-          border: 2px solid #dee2e6;
+          border: 2px solid var(--roundsui-border, #E2E5EC);
           border-radius: 8px;
           padding: 1rem;
           margin-bottom: 1rem;
           transition: all 0.3s ease;
         }
         .quarter-card.completed {
-          background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-          border-color: #28a745;
+          background: var(--roundsui-success-tint, #E7F6EC);
+          border-color: var(--roundsui-success, #16A34A);
         }
         .quarter-card.pending {
-          background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-          border-color: #ffc107;
+          background: var(--roundsui-warning-tint, #FBF0DF);
+          border-color: var(--roundsui-warning, #C2760A);
         }
         .quarter-card-clickable {
           cursor: pointer;
           transition: box-shadow 0.2s, transform 0.15s;
         }
         .quarter-card-clickable:hover {
-          box-shadow: 0 4px 12px rgba(0,102,161,0.18);
+          box-shadow: var(--roundsui-shadow);
           transform: translateY(-2px);
         }
         .quarter-header {
@@ -73,7 +73,7 @@ mod_cc_completion_ui <- function(id) {
         }
         .quarter-details {
           font-size: 0.9rem;
-          color: #6c757d;
+          color: var(--roundsui-ink-muted, #5B6472);
         }
       "))
     )
@@ -226,7 +226,7 @@ mod_cc_completion_server <- function(id, rdm_data, record_id, resident_data = NU
                 div(class = "quarter-details",
                     paste0(quarter$faculty, " \u00b7 ",
                            format(as.Date(quarter$date), "%b %d, %Y"))),
-                tags$small(style = "color:#0f8a94; font-size:0.72rem;",
+                tags$small(style = "color:var(--roundsui-accent, #3355D8); font-size:0.72rem;",
                            "View details \u203a")
               ),
               # ── Collapsible detail ───────────────────────────
@@ -234,7 +234,7 @@ mod_cc_completion_server <- function(id, rdm_data, record_id, resident_data = NU
                 id    = collapse_id,
                 class = "collapse",
                 div(
-                  style = "background:#f0f6fb; border-top:1px solid #c8dff0; padding:10px 14px;",
+                  style = "background:var(--roundsui-accent-tint, #EAEFFC); border-top:1px solid var(--roundsui-border, #E2E5EC); padding:10px 14px;",
                   div(class = "row g-2",
                     div(class = "col-6",
                       tags$small(class = "text-muted d-block", "DATE"),
