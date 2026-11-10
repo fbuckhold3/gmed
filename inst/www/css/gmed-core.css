@@ -12,33 +12,42 @@
    BRAND COLORS & TYPOGRAPHY
    ============================================================================ */
 :root {
-  /* gmed Primary Colors */
-  --gmed-primary: #0c5860;
-  --gmed-secondary: #0f8a94;
-  --gmed-light: #4fb3bc;
-  --gmed-accent: #e2543f;
+  /* ---- DEPRECATED: --gmed-* now bridges to roundsui ("Ward Notes") ----
+     The gmed palette is being retired in favor of roundsui's --roundsui-*
+     tokens. Until every app has migrated its own var(--gmed-*) references,
+     each old token resolves to its roundsui equivalent (fallback = the
+     roundsui hex, so it's right even where roundsui's CSS isn't loaded).
+     New code: use var(--roundsui-*) directly, never --gmed-*.
+     The old teal/cyan/coral palette (primary, secondary, light, accent)
+     collapses onto roundsui's single accent. */
+  --gmed-primary: var(--roundsui-accent, #3355D8);
+  --gmed-secondary: var(--roundsui-accent, #3355D8);
+  --gmed-light: var(--roundsui-accent, #3355D8);
+  --gmed-accent: var(--roundsui-accent, #3355D8);
 
   /* Legacy Coaching Colors (kept for backward compatibility; unreferenced elsewhere) */
   --coach-primary: var(--gmed-secondary);
   --coach-secondary: var(--gmed-light);
 
   /* Status Colors */
-  --gmed-success-green: #1a9e5c;
-  --gmed-warning-orange: #d97706;
-  --gmed-error-red: #dc2626;
-  --gmed-neutral-gray: #5b6b70;
-  --gmed-light-gray: #f4f7f8;
+  --gmed-success-green: var(--roundsui-success, #16A34A);
+  --gmed-warning-orange: var(--roundsui-warning, #C2760A);
+  --gmed-error-red: var(--roundsui-danger, #D33A2C);
+  --gmed-neutral-gray: var(--roundsui-ink-muted, #5B6472);
+  --gmed-light-gray: var(--roundsui-surface-2, #FBFBFD);
+  /* Stays literal white: used both as a panel background and as text on
+     accent-filled buttons, and roundsui's surface flips in dark mode. */
   --gmed-white: #ffffff;
 
   /* Text Colors */
-  --gmed-text-primary: #1b2528;
-  --gmed-text-secondary: #4d5f64;
-  --gmed-text-muted: #6b7d82;
+  --gmed-text-primary: var(--roundsui-ink, #13161F);
+  --gmed-text-secondary: var(--roundsui-ink-muted, #5B6472);
+  --gmed-text-muted: var(--roundsui-ink-faint, #8991A0);
 
   /* Layout */
-  --gmed-bg: #f5f7f8;
-  --gmed-border: #dde5e7;
-  --gmed-border-input: #cdd0d6;
+  --gmed-bg: var(--roundsui-ground, #F6F7FA);
+  --gmed-border: var(--roundsui-border, #E2E5EC);
+  --gmed-border-input: var(--roundsui-border-strong, #CBD0DB);
 
   /* ---- Deprecated --ssm-* aliases ----
      Several apps (imslu.ind.dash, imslu.at.noon, resident.assessment,
@@ -92,7 +101,7 @@ body {
   background: var(--gmed-white);
   border: none;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(12, 88, 96, 0.08);
+  box-shadow: 0 8px 32px rgba(19, 22, 31, 0.08);
   padding: 2rem;
   margin-bottom: 1.5rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -166,12 +175,12 @@ body {
   border-radius: 12px;
   font-weight: 600;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(12, 88, 96, 0.2);
+  box-shadow: 0 4px 16px rgba(19, 22, 31, 0.2);
 }
 
 .btn-gmed-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(12, 88, 96, 0.3);
+  box-shadow: 0 8px 24px rgba(19, 22, 31, 0.3);
   color: var(--gmed-white);
 }
 
@@ -203,7 +212,7 @@ body {
 }
 
 .gmed-form-control {
-  border: 2px solid #e9ecef;
+  border: 2px solid var(--gmed-border);
   border-radius: 8px;
   padding: 0.75rem 1rem;
   font-size: 1rem;
@@ -212,7 +221,7 @@ body {
 
 .gmed-form-control:focus {
   border-color: var(--gmed-secondary);
-  box-shadow: 0 0 0 0.2rem rgba(15, 138, 148, 0.25);
+  box-shadow: 0 0 0 0.2rem rgba(51, 85, 216, 0.25);
 }
 
 /* ============================================================================

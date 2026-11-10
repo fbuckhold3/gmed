@@ -63,7 +63,7 @@ body {
 .btn-gmed-primary:hover {
   background: var(--gmed-primary);
   transform: none;
-  box-shadow: 0 2px 8px rgba(12, 88, 96, 0.15);
+  box-shadow: 0 2px 8px rgba(19, 22, 31, 0.15);
 }
 
 .btn-gmed-secondary {

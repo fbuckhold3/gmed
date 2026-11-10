@@ -201,9 +201,9 @@ mod_faculty_eval_ui <- function(id) {
           var b = document.getElementById(qId + '_b' + i);
           if (!b) continue;
           var on = (i === val);
-          b.style.background  = on ? 'var(--gmed-secondary)' : 'white';
+          b.style.background  = on ? 'var(--roundsui-accent, #3355D8)' : 'white';
           b.style.color       = on ? 'white'   : '#2d3748';
-          b.style.borderColor = on ? 'var(--gmed-secondary)' : 'var(--gmed-border)';
+          b.style.borderColor = on ? 'var(--roundsui-accent, #3355D8)' : 'var(--roundsui-border, #E2E5EC)';
         }
         var h = document.getElementById(qId);
         if (h) h.value = val;
@@ -243,7 +243,7 @@ mod_faculty_eval_ui <- function(id) {
       div(class = "gmed-card",
         div(class = "card-body",
           tags$p(class = "fw-semibold mb-3",
-                 style = "font-size:0.9rem; color:var(--ssm-primary-blue);",
+                 style = "font-size:0.9rem; color:var(--roundsui-accent, #3355D8);",
                  tags$i(class = "bi bi-pencil-square me-2"),
                  "Submit a Faculty Evaluation"),
           uiOutput(ns("eval_form"))
@@ -348,21 +348,21 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
       } else 0L
 
       pct <- if (goal > 0L) round(n / goal * 100) else 0L
-      col <- if (n >= goal)      "var(--ssm-success-green)"
-             else if (pct >= 60) "var(--ssm-secondary-blue)"
-             else                "var(--ssm-warning-orange)"
+      col <- if (n >= goal)      "var(--roundsui-success, #16A34A)"
+             else if (pct >= 60) "var(--roundsui-accent, #3355D8)"
+             else                "var(--roundsui-warning, #C2760A)"
 
-      stat <- function(value, label, icon, color = "var(--ssm-primary-blue)") {
+      stat <- function(value, label, icon, color = "var(--roundsui-accent, #3355D8)") {
         div(class = "col-sm-4",
           div(class = "card text-center border-0 shadow-sm py-3 px-2",
               style = "background:#fff; border-radius:8px;",
               tags$i(class = paste0("bi bi-", icon),
                      style = paste0("font-size:1.5rem; color:", color, "; opacity:.85;")),
               tags$p(class = "mb-0 mt-2",
-                     style = "font-size:1.8rem; font-weight:700; color:var(--ssm-primary-blue); line-height:1.1;",
+                     style = "font-size:1.8rem; font-weight:700; color:var(--roundsui-accent, #3355D8); line-height:1.1;",
                      value),
               tags$p(class = "mb-0 mt-1",
-                     style = "font-size:0.72rem; color:var(--ssm-text-muted); text-transform:uppercase; letter-spacing:.07em;",
+                     style = "font-size:0.72rem; color:var(--roundsui-ink-faint, #8991A0); text-transform:uppercase; letter-spacing:.07em;",
                      label)
           )
         )
@@ -374,7 +374,7 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
                if (!is.na(pgy)) paste0("PGY", pgy, " Goal (", goal, ")") else "Goal",
                "bullseye", col),
           stat(n30, "Last 30 Days", "calendar-check-fill",
-               if (n30 > 0) "var(--ssm-secondary-blue)" else "var(--ssm-text-muted)")
+               if (n30 > 0) "var(--roundsui-accent, #3355D8)" else "var(--roundsui-ink-faint, #8991A0)")
       )
     })
 
@@ -470,12 +470,12 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
       div(lapply(nms, function(nm) {
         cnt <- sum(df$fac_fell_name == nm, na.rm = TRUE)
         tags$span(
-          style = "display:inline-block; background:#e5eef0; color:var(--gmed-primary);
+          style = "display:inline-block; background:#e5eef0; color:var(--roundsui-accent, #3355D8);
                    border-radius:20px; padding:4px 14px; font-size:0.8rem;
                    font-weight:600; margin:3px;",
           nm,
           if (cnt > 1) tags$span(
-            style = "margin-left:5px; background:#a8d4d8; color:var(--gmed-primary);
+            style = "margin-left:5px; background:#a8d4d8; color:var(--roundsui-accent, #3355D8);
                      border-radius:10px; padding:1px 7px;
                      font-size:0.68rem; font-weight:700; vertical-align:middle;",
             paste0(cnt, "×")
@@ -688,7 +688,7 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
         }
         return(tagList(
           tags$h6("Teaching Evaluation — Part 1",
-                  style = "font-weight:700; color:var(--ssm-primary-blue); margin-bottom:16px;"),
+                  style = "font-weight:700; color:var(--roundsui-accent, #3355D8); margin-bottom:16px;"),
           qs,
           div(class = "d-flex gap-2 mt-2",
               actionButton(ns("back_to_form1"), "Back",
@@ -702,7 +702,7 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
       if (step == "form3") {
         return(tagList(
           tags$h6("Teaching Evaluation — Part 2",
-                  style = "font-weight:700; color:var(--ssm-primary-blue); margin-bottom:16px;"),
+                  style = "font-weight:700; color:var(--roundsui-accent, #3355D8); margin-bottom:16px;"),
 
           if (!is_short)
             div(class = "mb-3",
@@ -745,7 +745,7 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
         return(div(
           class = "text-center py-4",
           tags$i(class = "bi bi-check-circle-fill",
-                 style = "font-size:3rem; color:var(--ssm-success-green);"),
+                 style = "font-size:3rem; color:var(--roundsui-success, #16A34A);"),
           tags$h5(class = "mt-3 mb-1", "Evaluation Submitted!"),
           tags$p(class = "text-muted mb-4", style = "font-size:0.88rem;",
                  "Thank you for your feedback."),

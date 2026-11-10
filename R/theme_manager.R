@@ -39,58 +39,60 @@ apply_gmed_style <- function(element, style = "gmed-card") {
   element
 }
 
-#' GMED Color Palette ("Clinical Instrument", Restrained)
+#' GMED Color Palette (deprecated; bridges to roundsui)
 #'
-#' Institution-neutral color palette for gmed applications — a cyan primary
-#' (a vitals-monitor trace, not generic SaaS blue) with a warm coral accent
-#' reserved for actions and emphasis, so semantic status colors
-#' (success/warning/danger) don't compete with the accent for attention.
+#' gmed's own palette is being retired in favor of roundsui's "Ward Notes"
+#' tokens. This keeps the old field names so existing callers keep working,
+#' but every value now comes from \code{roundsui::roundsui_colors()}: the
+#' old teal/cyan/coral brand colors all map to the single roundsui accent,
+#' status and neutral fields map to their roundsui equivalents. New code
+#' should call \code{roundsui::roundsui_colors()} directly.
 #'
-#' Field names are unchanged from the previous SSM-branded palette (only
-#' `accent_blue` becomes `accent`, since it's no longer blue) so existing
-#' call sites keep working with just a new function name. See
-#' \code{\link{ssm_colors}} for the deprecated SSM-branded alias.
-#'
-#' @return Named list of gmed brand colors
+#' @return Named list of colors (old gmed field names, roundsui values)
 #'
 #' @examples
 #' \dontrun{
 #' colors <- gmed_colors()
-#' colors$primary  # "#0c5860"
+#' colors$primary  # "#3355D8" (roundsui accent)
 #' }
 gmed_colors <- function() {
+  # DEPRECATED palette: gmed is retiring its own colors in favor of
+  # roundsui ("Ward Notes"). Field names are kept so existing callers don't
+  # break, but every value now comes from roundsui::roundsui_colors().
+  # New code should call roundsui::roundsui_colors() directly.
+  rc <- roundsui::roundsui_colors()
   list(
-    # Primary Brand Colors
-    primary = "#0c5860",           # Deep teal — headings, high-contrast text/icons
-    secondary = "#0f8a94",         # Main interactive cyan — buttons, links, active states
-    light_blue = "#4fb3bc",        # Lighter cyan — hover states, secondary accents
-    accent = "#e2543f",            # Warm coral — CTAs, emphasis, "pop" moments
-    accent_blue = "#e2543f",       # Deprecated alias for `accent` (kept for callers reading this field directly)
+    # Primary Brand Colors (old teal/cyan/coral all collapse onto the accent)
+    primary = rc$accent,
+    secondary = rc$accent,
+    light_blue = rc$accent,
+    accent = rc$accent,
+    accent_blue = rc$accent,       # Deprecated alias for `accent`
 
     # Legacy Coaching Colors (kept for backward compatibility; unreferenced elsewhere)
-    coach_primary = "#0f8a94",
-    coach_secondary = "#4fb3bc",
+    coach_primary = rc$accent,
+    coach_secondary = rc$accent,
 
     # Status Colors
-    success = "#1a9e5c",
-    warning = "#d97706",
-    danger = "#dc2626",
-    info = "#0f8a94",              # Reuses secondary cyan
+    success = rc$success,
+    warning = rc$warning,
+    danger = rc$danger,
+    info = rc$accent,
 
-    # Neutral Colors (cool-tinted, not pure gray)
-    neutral_gray = "#5b6b70",
-    light_gray = "#f4f7f8",
+    # Neutral Colors
+    neutral_gray = rc$ink_muted,
+    light_gray = rc$surface_2,
     white = "#ffffff",
 
     # Text Colors
-    text_primary = "#1b2528",
-    text_secondary = "#4d5f64",
-    text_muted = "#6b7d82",
+    text_primary = rc$ink,
+    text_secondary = rc$ink_muted,
+    text_muted = rc$ink_faint,
 
     # Background Colors
-    bg_primary = "#f5f7f8",
-    bg_secondary = "#e9eff0",
-    bg_dark = "#162325"
+    bg_primary = rc$ground,
+    bg_secondary = rc$surface_2,
+    bg_dark = rc$ink
   )
 }
 

@@ -23,7 +23,7 @@ create_combined_assessment_chart <- function(data, record_id, resident_name = NU
   }
   
   # Get colors
-  colors <- gmed_colors()
+  colors <- roundsui::roundsui_colors()
   
   # Filter assessment data
   assessment_data <- data %>%
@@ -102,7 +102,7 @@ create_combined_assessment_chart <- function(data, record_id, resident_name = NU
       marker = list(
         color = case_when(
           progress_data$status == "Complete" ~ colors$success,
-          progress_data$status == "On Track" ~ colors$info, 
+          progress_data$status == "On Track" ~ colors$accent, 
           progress_data$status == "Behind" ~ colors$warning,
           TRUE ~ colors$danger
         )
@@ -190,7 +190,7 @@ create_combined_faculty_chart <- function(data, record_id, resident_name = NULL)
   }
   
   # Get colors
-  colors <- gmed_colors()
+  colors <- roundsui::roundsui_colors()
   
   # Filter faculty data
   faculty_data <- data %>%
@@ -264,7 +264,7 @@ create_combined_faculty_chart <- function(data, record_id, resident_name = NULL)
       marker = list(
         color = case_when(
           progress_data$status == "Complete" ~ colors$success,
-          progress_data$status == "On Track" ~ colors$info, 
+          progress_data$status == "On Track" ~ colors$accent, 
           progress_data$status == "Behind" ~ colors$warning,
           TRUE ~ colors$danger
         )

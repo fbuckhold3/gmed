@@ -491,7 +491,7 @@ create_questions_summary_display <- function(data, record_id, resident_name = NU
         x = 0.5, y = 0.7,
         text = "<b>0</b>",
         showarrow = FALSE,
-        font = list(size = 80, color = gmed_colors()$accent_blue),
+        font = list(size = 80, color = roundsui::roundsui_colors()$accent),
         xref = "paper", yref = "paper"
       ) %>%
       add_annotations(
@@ -527,7 +527,7 @@ create_questions_summary_display <- function(data, record_id, resident_name = NU
       x = 0.5, y = 0.7,
       text = paste0("<b>", big_number, "</b>"),
       showarrow = FALSE,
-      font = list(size = 80, color = gmed_colors()$accent_blue),
+      font = list(size = 80, color = roundsui::roundsui_colors()$accent),
       xref = "paper", yref = "paper"
     ) %>%
     add_annotations(

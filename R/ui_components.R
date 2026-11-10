@@ -36,7 +36,7 @@ gmed_selector_container <- function(label = NULL, style = NULL, class = "", ...)
       shiny::tags$label(
         label,
         class = "form-label text-center mb-3",
-        style = "font-size: 1.25rem; font-weight: 600; color: var(--ssm-primary-blue); display: block;"
+        style = "font-size: 1.25rem; font-weight: 600; color: var(--roundsui-accent, #3355D8); display: block;"
       )
     },
     

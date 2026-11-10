@@ -6,7 +6,7 @@
 #' @export
 mod_questions_viz_ui <- function(id, title = "Conference Attendance by Rotation") {
   ns <- NS(id)
-  colors <- gmed_colors()
+  colors <- roundsui::roundsui_colors()
   
   tagList(
     tags$head(
@@ -18,14 +18,14 @@ mod_questions_viz_ui <- function(id, title = "Conference Attendance by Rotation"
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         .questions-header {
-          background: linear-gradient(135deg, ", colors$info, " 0%, ", colors$primary, " 100%);
+          background: ", colors$accent, ";
           color: white;
           padding: 1.5rem;
           border-radius: 8px;
           margin-bottom: 1.5rem;
         }
         .summary-card {
-          background: ", colors$light_gray, ";
+          background: ", colors$surface_2, ";
           border-left: 4px solid ", colors$success, ";
           padding: 1rem;
           border-radius: 6px;
@@ -34,21 +34,21 @@ mod_questions_viz_ui <- function(id, title = "Conference Attendance by Rotation"
         .summary-number {
           font-size: 2.5rem;
           font-weight: bold;
-          color: ", colors$primary, ";
+          color: ", colors$accent, ";
         }
         .rotation-selector {
           margin: 1rem 0;
         }
         .metric-card {
           background: white;
-          border: 2px solid ", colors$light_gray, ";
+          border: 2px solid ", colors$border, ";
           border-radius: 8px;
           padding: 1rem;
           margin: 0.5rem 0;
           transition: all 0.3s;
         }
         .metric-card:hover {
-          border-color: ", colors$primary, ";
+          border-color: ", colors$accent, ";
           box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         .metric-label {
@@ -59,7 +59,7 @@ mod_questions_viz_ui <- function(id, title = "Conference Attendance by Rotation"
         .metric-value {
           font-size: 1.5rem;
           font-weight: bold;
-          color: ", colors$primary, ";
+          color: ", colors$accent, ";
         }
       ")))
     ),
@@ -239,7 +239,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
       rotation_summary <- questions_data() %>%
         dplyr::count(rotation_label, sort = TRUE)
       
-      colors <- gmed_colors()
+      colors <- roundsui::roundsui_colors()
       
       plot_ly(
         data = rotation_summary,
@@ -248,8 +248,8 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         type = "bar",
         orientation = "h",
         marker = list(
-          color = colors$info,
-          line = list(color = colors$primary, width = 1)
+          color = colors$accent,
+          line = list(color = colors$accent, width = 1)
         ),
         text = ~n,
         textposition = "outside",
@@ -280,7 +280,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         ) %>%
         dplyr::arrange(week)
 
-      colors <- gmed_colors()
+      colors <- roundsui::roundsui_colors()
 
       plot_ly(
         data = weekly_data,
@@ -290,7 +290,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         mode = "lines+markers",
         line = list(color = colors$success, width = 3),
         marker = list(
-          color = colors$primary,
+          color = colors$accent,
           size = 8,
           line = list(color = "white", width = 2)
         ),
@@ -335,7 +335,7 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
           month_label = format(month, "%b %Y")
         )
 
-      colors <- gmed_colors()
+      colors <- roundsui::roundsui_colors()
 
       plot_ly(
         data = monthly_data,
@@ -343,8 +343,8 @@ mod_questions_viz_server <- function(id, rdm_data, record_id, data_dict) {
         y = ~questions,
         type = "bar",
         marker = list(
-          color = colors$accent_blue,
-          line = list(color = colors$primary, width = 1)
+          color = colors$accent,
+          line = list(color = colors$accent, width = 1)
         ),
         text = ~questions,
         textposition = "outside",
