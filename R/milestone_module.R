@@ -50,11 +50,18 @@ mod_miles_rating_ui <- function(id) {
 #'                       completed self-eval and see their prior selections.
 #' @param initial_descs  optional reactive returning a named list of item key →
 #'                       description text to prefill alongside \code{initial_scores}.
+#' @param trajectory optional reactive returning \code{list(spread, history)}:
+#'                   \code{spread} from \code{milestone_spread()} (or the cached
+#'                   copy) and \code{history} from \code{milestone_history()} for
+#'                   this resident. When supplied, a progression chart
+#'                   (\code{milestone_trajectory_svg()}) is shown above each
+#'                   milestone. Defaults to \code{reactive(NULL)} (no chart).
 #' @export
 mod_miles_rating_server <- function(id, period,
                                     prev_scores    = shiny::reactive(NULL),
                                     initial_scores = shiny::reactive(NULL),
-                                    initial_descs  = shiny::reactive(NULL)) {
+                                    initial_descs  = shiny::reactive(NULL),
+                                    trajectory     = shiny::reactive(NULL)) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -312,6 +319,19 @@ mod_miles_rating_server <- function(id, period,
                   paste0("Last self-eval: ", prev_v))
       else NULL
 
+      # Progression chart: past ACGME + self ratings against the program band
+      trajectory_ui <- tryCatch({
+        tr <- trajectory()
+        if (is.list(tr)) {
+          per_code <- c("Entering Residency" = "7", "Mid Intern" = "1",
+                        "End Intern" = "2", "Mid PGY2" = "3", "End PGY2" = "4",
+                        "Mid PGY3" = "5", "Graduating" = "6")[[pv]]
+          sc <- unname(get_milestone_field_mapping_rdm2("acgme_miles")[[key]])
+          milestone_trajectory_svg(sub("^acgme_", "", sc), tr$spread, tr$history,
+                                   per_code)
+        } else NULL
+      }, error = function(e) NULL)
+
       div(
         # Header: domain + item title
         div(class = "d-flex align-items-baseline justify-content-between mb-2",
@@ -322,6 +342,8 @@ mod_miles_rating_server <- function(id, period,
           tags$span(style = "font-size:0.75rem; color:var(--roundsui-ink-faint, #8991A0);",
                     paste0(curSet()$title))
         ),
+        # Progression chart for this milestone (when the app supplies data)
+        trajectory_ui,
         # Milestone image (cap at 55vh so score row is always visible) +
         # STICKY score row pinned to bottom of viewport so users never have to
         # scroll to reach the rating buttons.

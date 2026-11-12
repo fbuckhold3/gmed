@@ -9,7 +9,8 @@ mod_miles_rating_server(
   period,
   prev_scores = shiny::reactive(NULL),
   initial_scores = shiny::reactive(NULL),
-  initial_descs = shiny::reactive(NULL)
+  initial_descs = shiny::reactive(NULL),
+  trajectory = shiny::reactive(NULL)
 )
 }
 \arguments{
@@ -32,6 +33,13 @@ completed self-eval and see their prior selections.}
 
 \item{initial_descs}{optional reactive returning a named list of item key →
 description text to prefill alongside \code{initial_scores}.}
+
+\item{trajectory}{optional reactive returning \code{list(spread, history)}:
+\code{spread} from \code{milestone_spread()} (or the cached
+copy) and \code{history} from \code{milestone_history()} for
+this resident. When supplied, a progression chart
+(\code{milestone_trajectory_svg()}) is shown above each
+milestone. Defaults to \code{reactive(NULL)} (no chart).}
 }
 \description{
 Presents all 22 ACGME milestones one at a time with a clickable dot-map
