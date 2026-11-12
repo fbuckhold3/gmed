@@ -210,7 +210,7 @@ mod_miles_rating_server <- function(id, period,
           style = "background:var(--roundsui-success-tint, #E7F6EC); border-radius:8px; border:1px solid var(--roundsui-success, #16A34A);",
           tags$i(class = "bi bi-check-circle-fill", style = "color:var(--roundsui-success, #16A34A); font-size:1.1rem;"),
           tags$span(style = "font-weight:700; color:var(--roundsui-success, #16A34A); font-size:0.88rem;",
-                    "All 22 milestones rated \u2014 your scores have been auto-saved.")
+                    paste0("All ", length(allKeys), " milestones rated \u2014 your scores have been auto-saved."))
         ))
       }
 
