@@ -412,7 +412,8 @@ mod_ilp_display_server <- function(id,
   )
 }
 
-.ilp_compare_row <- function(domain, domain_name, prev_data, cur_data, data_dict) {
+.ilp_compare_row <- function(domain, domain_name, prev_data, cur_data, data_dict,
+                             prev_extra = NULL) {
   fm <- .ilp_domain_fields(domain); if (is.null(fm)) return(NULL)
 
   fld <- function(row, name) {
@@ -527,7 +528,7 @@ mod_ilp_display_server <- function(id,
     shiny::div(class = "text-muted fst-italic small p-3",
                "No goal recorded for last period.")
   } else {
-    shiny::tagList(.goal_info(prev_code, prev_lvl, prev_row, prev_how), achievement_box)
+    shiny::tagList(.goal_info(prev_code, prev_lvl, prev_row, prev_how), achievement_box, prev_extra)
   }
 
   cur_pane <- if (!nzchar(cur_code)) {
@@ -575,6 +576,35 @@ mod_ilp_display_server <- function(id,
       )
     )
   )
+}
+
+#' One ILP domain: last period's goal beside this period's goal
+#'
+#' The per-domain card from [mod_ilp_display_ui()]'s `"compare"` section,
+#' exported so an app can lay the three domains out itself (e.g. with a
+#' coach note box under each domain's goals).
+#'
+#' @param domain One of `"pcmk"`, `"sbppbl"`, `"profics"`.
+#' @param prev_ilp,cur_ilp One-row data frames from the previous / current
+#'   period's `ilp` form (or NULL).
+#' @param data_dict Optional REDCap data dictionary, for milestone-level text.
+#' @param prev_extra Optional tags appended to the "Last Period" pane.
+#' @param domain_name Header text; defaults to the domain's full name.
+#' @return A `shiny::div`.
+#' @family ilp_display
+#' @export
+ilp_compare_row_ui <- function(domain, prev_ilp, cur_ilp, data_dict = NULL,
+                               prev_extra = NULL, domain_name = NULL) {
+  names_map <- c(pcmk    = "Patient Care / Medical Knowledge",
+                 sbppbl  = "Systems-Based / Practice-Based Learning",
+                 profics = "Professionalism / Interpersonal Communication")
+  .ok <- function(x) if (is.data.frame(x) && nrow(x) > 0) x else NULL
+  .ilp_compare_row(domain      = domain,
+                   domain_name = domain_name %||% unname(names_map[domain]),
+                   prev_data   = .ok(prev_ilp),
+                   cur_data    = .ok(cur_ilp),
+                   data_dict   = data_dict,
+                   prev_extra  = prev_extra)
 }
 
 .ilp_prev_goal_block <- function(domain, domain_name, prev_data, cur_data, data_dict) {

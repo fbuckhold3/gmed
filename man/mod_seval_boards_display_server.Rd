@@ -10,7 +10,8 @@ mod_seval_boards_display_server(
   resident_info = NULL,
   test_data = NULL,
   pgy = NULL,
-  data_dict = NULL
+  data_dict = NULL,
+  mksap_progress = NULL
 )
 }
 \arguments{
@@ -32,6 +33,12 @@ plotted on the nomogram if present).}
 \item{data_dict}{Optional reactive returning the REDCap data dictionary
 data frame. When supplied, used to translate the \code{s_e_mksap_comp} raw
 code to its human-readable label.}
+
+\item{mksap_progress}{Optional reactive returning this resident's rows from
+the \code{mksap_progress} form (the program's MKSAP import). When supplied,
+the MKSAP card shows the latest import (questions done, percent complete
+and correct, as-of date) instead of the self-reported \code{s_e_mksap_comp},
+which residents are no longer asked (2026-11).}
 }
 \value{
 Invisibly NULL.

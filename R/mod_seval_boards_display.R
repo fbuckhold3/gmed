@@ -107,6 +107,11 @@ mod_seval_boards_display_ui <- function(id,
 #' @param data_dict Optional reactive returning the REDCap data dictionary
 #'   data frame. When supplied, used to translate the `s_e_mksap_comp` raw
 #'   code to its human-readable label.
+#' @param mksap_progress Optional reactive returning this resident's rows from
+#'   the `mksap_progress` form (the program's MKSAP import). When supplied,
+#'   the MKSAP card shows the latest import (questions done, percent complete
+#'   and correct, as-of date) instead of the self-reported `s_e_mksap_comp`,
+#'   which residents are no longer asked (2026-11).
 #'
 #' @return Invisibly NULL.
 #' @family seval_display
@@ -117,7 +122,8 @@ mod_seval_boards_display_server <- function(id,
                                             resident_info = NULL,
                                             test_data     = NULL,
                                             pgy           = NULL,
-                                            data_dict     = NULL) {
+                                            data_dict     = NULL,
+                                            mksap_progress = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
 
     .pull <- function(r) {
@@ -321,6 +327,7 @@ mod_seval_boards_display_server <- function(id,
 
     # ----------------------------------------------------------- MKSAP ---
     output$mksap <- shiny::renderUI({
+      if (!is.null(mksap_progress)) return(.mksap_import_ui(.pull(mksap_progress)))
       sr <- .pull(current_s_eval)
       mksap_comp_raw <- .field(sr, "s_e_mksap_comp")
 
@@ -366,4 +373,33 @@ mod_seval_boards_display_server <- function(id,
 
     invisible(NULL)
   })
+}
+
+# Latest MKSAP import row (mksap_progress form) rendered for the boards card.
+#' @keywords internal
+.mksap_import_ui <- function(df) {
+  none <- shiny::tags$div(class = "fst-italic text-muted", style = "font-size:0.95rem;",
+                          "No MKSAP progress has been imported for this resident yet.")
+  if (is.null(df) || !is.data.frame(df) || nrow(df) == 0 || !"mk_export_date" %in% names(df)) return(none)
+  if ("redcap_repeat_instrument" %in% names(df))
+    df <- df[!is.na(df$redcap_repeat_instrument) & df$redcap_repeat_instrument == "mksap_progress", , drop = FALSE]
+  d <- suppressWarnings(as.Date(as.character(df$mk_export_date)))
+  if (!any(!is.na(d))) return(none)
+  r <- df[which.max(d), , drop = FALSE]
+  num <- function(f) if (f %in% names(r)) suppressWarnings(as.numeric(as.character(r[[f]][1]))) else NA_real_
+  fmt <- function(x, suf = "") if (is.na(x)) "—" else paste0(format(round(x, 1), big.mark = ","), suf)
+  n <- num("mk_n_complete"); tot <- num("mk_total_questions")
+  pc <- num("mk_pct_complete"); pk <- num("mk_pct_correct")
+  bar <- if (is.na(pc)) 0 else max(0, min(100, pc))
+  shiny::tagList(
+    shiny::div(style = "font-size:0.95rem;",
+      shiny::tags$span(class = "fw-semibold", fmt(pc, "%"), " complete"),
+      " · ", fmt(n), if (!is.na(tot)) paste0(" of ", fmt(tot)), " questions",
+      if (!is.na(pk)) paste0(" · ", fmt(pk, "%"), " correct")),
+    shiny::div(class = "progress my-1", style = "height:6px; max-width:420px;",
+      shiny::div(class = "progress-bar", role = "progressbar",
+                 style = paste0("width:", bar, "%; background:var(--roundsui-accent, #3355D8);"))),
+    shiny::div(style = "font-size:0.8rem; color:var(--roundsui-ink-faint, #8991A0);",
+               paste0("From the program's MKSAP import, as of ",
+                      trimws(format(max(d, na.rm = TRUE), "%B %e, %Y")), ".")))
 }

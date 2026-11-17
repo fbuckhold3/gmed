@@ -294,14 +294,14 @@ milestone_trajectory_svg <- function(subcomp, spread = NULL, history = NULL,
   # Grid + y labels (odd ratings = milestone levels)
   for (v in c(1, 3, 5, 7, 9)) {
     el[[length(el) + 1]] <- sprintf(
-      '<line x1="%d" x2="%d" y1="%s" y2="%s" stroke="var(--roundsui-border, #E2E5EC)" stroke-width="1"/><text x="%d" y="%s" text-anchor="end" dominant-baseline="middle" font-size="11" fill="var(--roundsui-ink-faint, #8991A0)">%d</text>',
+      '<line x1="%d" x2="%d" y1="%s" y2="%s" stroke="var(--roundsui-border, #E2E5EC)" stroke-width="1"/><text x="%d" y="%s" text-anchor="end" dominant-baseline="middle" font-size="11" style="font-size:11px" fill="var(--roundsui-ink-faint, #8991A0)">%d</text>',
       ml, W - mr, f(ys(v)), f(ys(v)), ml - 8, f(ys(v)), v)
   }
   # X labels
   for (i in seq_len(nrow(P))) {
     is_cur <- isTRUE(P$chron[i] == cur_chron)
     el[[length(el) + 1]] <- sprintf(
-      '<text x="%s" y="%d" text-anchor="middle" font-size="11" font-weight="%s" fill="%s">%s</text>',
+      '<text x="%s" y="%d" text-anchor="middle" font-size="11" style="font-size:11px" font-weight="%s" fill="%s">%s</text>',
       f(xs(P$chron[i])), H - 10, if (is_cur) "700" else "400",
       if (is_cur) "var(--roundsui-accent, #3355D8)" else "var(--roundsui-ink-muted, #5B6472)",
       if (is_cur) paste0(P$short[i], " (now)") else P$short[i])
@@ -368,7 +368,7 @@ milestone_trajectory_svg <- function(subcomp, spread = NULL, history = NULL,
       # Direct label on the latest point only
       last <- h[nrow(h), ]
       el[[length(el) + 1]] <- sprintf(
-        '<text x="%s" y="%s" text-anchor="middle" font-size="11" font-weight="600" fill="var(--roundsui-ink, #13161F)">%s</text>',
+        '<text x="%s" y="%s" text-anchor="middle" font-size="11" style="font-size:11px" font-weight="600" fill="var(--roundsui-ink, #13161F)">%s</text>',
         f(xs(last$chron) + dx), f(ys(last$rating) + if (src == "self") 17 else -10), num(last$rating))
     }
   }

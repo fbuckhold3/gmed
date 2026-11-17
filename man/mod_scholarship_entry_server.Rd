@@ -10,7 +10,13 @@ mod_scholarship_entry_server(
   existing_data,
   edit_req = shiny::reactive(NULL),
   redcap_url,
-  rdm_token
+  rdm_token,
+  mode_out = NULL,
+  delete_req = NULL,
+  pending_review = shiny::reactive(0),
+  close_req = shiny::reactive(NULL),
+  add_prompt = NULL,
+  prominent = FALSE
 )
 }
 \arguments{
@@ -28,6 +34,25 @@ the form in edit / recategorize mode prefilled from \code{row}.}
 \item{redcap_url}{REDCap API base URL.}
 
 \item{rdm_token}{REDCap API token (test or prod — caller's choice).}
+
+\item{mode_out}{Optional reactiveVal; set to list(mode, instance) while the
+form is open and NULL when closed, so a host can place the form.}
+
+\item{delete_req}{Optional reactiveVal; when supplied, edit / recategorize
+forms get a "Delete this entry" button that sets it to
+list(action = "delete", instance, nonce). The host confirms and deletes.}
+
+\item{pending_review}{Optional reactive() -> number of older entries still
+needing review; when > 0 a note above "+ Add Entry" asks the resident to
+review those first (the button stays usable).}
+
+\item{close_req}{Optional reactive(); each new non-NULL value closes the
+form (e.g. after the host deletes the entry that was open).}
+
+\item{add_prompt}{Optional text shown above "+ Add Entry" (e.g. asking
+whether there is anything new to add).}
+
+\item{prominent}{TRUE renders "+ Add Entry" as a full-size button.}
 }
 \value{
 reactive() -> saved row (data.frame incl. redcap_repeat_instance).

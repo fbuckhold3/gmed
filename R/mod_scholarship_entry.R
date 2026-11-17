@@ -25,6 +25,9 @@
 #   schol_pub_status/pub_date (1,3), schol_volume/issue/pages (1,3 + Published),
 #   schol_url/pmid (1,3), schol_event_name/date/city/state/country/url/abstract_url
 #   (4,5), schol_collection, schol_meaningful.
+#   Type 6 "Ongoing project (no output yet)" (added 2026-11) uses schol_title
+#   plus schol_proj_kind / proj_desc / proj_mentor / proj_status instead of
+#   the author and venue fields.
 
 #' @importFrom shiny NS tagList uiOutput renderUI reactiveValues reactiveVal observeEvent req actionButton div tags conditionalPanel selectInput selectizeInput dateInput radioButtons moduleServer reactive
 NULL
@@ -38,6 +41,26 @@ mod_scholarship_entry_ui <- function(id) {
   )
 }
 
+#' Scholarship entry: the "+ Add Entry" button (and its note) only
+#'
+#' For hosts that place the form somewhere else, e.g. inline under the entry
+#' being edited (see `mod_scholarship_entry_form_ui()` and the view's
+#' `inline_form` argument). Use instead of `mod_scholarship_entry_ui()`.
+#' @param id Module id.
+#' @export
+mod_scholarship_entry_button_ui <- function(id) {
+  shiny::uiOutput(shiny::NS(id)("add_button_panel"))
+}
+
+#' Scholarship entry: the form only (see `mod_scholarship_entry_button_ui()`)
+#'
+#' Render it in exactly one place at a time.
+#' @param id Module id.
+#' @export
+mod_scholarship_entry_form_ui <- function(id) {
+  shiny::uiOutput(shiny::NS(id)("add_form_panel"))
+}
+
 #' Scholarship entry form module server
 #'
 #' @param id Module id.
@@ -49,11 +72,28 @@ mod_scholarship_entry_ui <- function(id) {
 #'   the form in edit / recategorize mode prefilled from `row`.
 #' @param redcap_url REDCap API base URL.
 #' @param rdm_token REDCap API token (test or prod — caller's choice).
+#' @param mode_out Optional reactiveVal; set to list(mode, instance) while the
+#'   form is open and NULL when closed, so a host can place the form.
+#' @param delete_req Optional reactiveVal; when supplied, edit / recategorize
+#'   forms get a "Delete this entry" button that sets it to
+#'   list(action = "delete", instance, nonce). The host confirms and deletes.
+#' @param pending_review Optional reactive() -> number of older entries still
+#'   needing review; when > 0 a note above "+ Add Entry" asks the resident to
+#'   review those first (the button stays usable).
+#' @param close_req Optional reactive(); each new non-NULL value closes the
+#'   form (e.g. after the host deletes the entry that was open).
+#' @param add_prompt Optional text shown above "+ Add Entry" (e.g. asking
+#'   whether there is anything new to add).
+#' @param prominent TRUE renders "+ Add Entry" as a full-size button.
 #' @return reactive() -> saved row (data.frame incl. redcap_repeat_instance).
 #' @export
 mod_scholarship_entry_server <- function(id, resident_id, existing_data,
                                          edit_req = shiny::reactive(NULL),
-                                         redcap_url, rdm_token) {
+                                         redcap_url, rdm_token,
+                                         mode_out = NULL, delete_req = NULL,
+                                         pending_review = shiny::reactive(0),
+                                         close_req = shiny::reactive(NULL),
+                                         add_prompt = NULL, prominent = FALSE) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -73,7 +113,8 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
                   "schol_issue","schol_pages","schol_url","schol_pmid","schol_event_name",
                   "schol_event_date","schol_event_city","schol_event_state",
                   "schol_event_country","schol_event_url","schol_abstract_url",
-                  "schol_collection","schol_meaningful")
+                  "schol_collection","schol_meaningful","schol_proj_kind",
+                  "schol_proj_desc","schol_proj_mentor","schol_proj_status")
         list(initial = setNames(lapply(eras, function(f) gv(row, f)), eras), ref = "")
       } else {
         # recategorize: pull every legacy field we can into the ERAS form so the
@@ -87,6 +128,21 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
         if (!nzchar(ps) && gv(row, "schol_pub") == "1") ps <- "3"    # legacy "published" flag
         venue <- gv(row, "schol_venue")
         cit   <- gv(row, "schol_citation"); if (!nzchar(cit)) cit <- gv(row, "schol_cit")
+        # Old research / QI project with no citation and no output type ->
+        # ongoing project, with its description, mentor and status carried over.
+        proj_txt <- gv(row, "schol_res"); if (!nzchar(proj_txt)) proj_txt <- gv(row, "schol_qi")
+        if (!nzchar(wt) && !nzchar(cit) && nzchar(proj_txt)) {
+          kind <- if (nzchar(gv(row, "schol_res"))) "1" else "2"
+          st   <- unname(c("3" = "5", "4" = "6")[gv(row, "schol_res_status")]); if (is.na(st)) st <- ""
+          return(list(initial = list(
+            schol_work_type   = "6",
+            schol_title       = gv(row, "schol_title"),
+            schol_proj_kind   = kind,
+            schol_proj_desc   = proj_txt,
+            schol_proj_mentor = gv(row, "schol_res_mentor"),
+            schol_proj_status = st,
+            schol_meaningful  = "0"), ref = proj_txt))
+        }
         init <- list(
           schol_work_type   = wt,
           schol_title       = gv(row, "schol_title"),
@@ -106,6 +162,15 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
       form_mode(list(mode = mode, instance = instance, initial = p$initial, ref = p$ref))
       ss$save <- NULL
     }
+    if (!is.null(mode_out)) shiny::observe({
+      fm <- form_mode()
+      mode_out(if (is.null(fm)) NULL else list(mode = fm$mode, instance = fm$instance))
+    })
+    shiny::observeEvent(close_req(), { form_mode(NULL); ss$save <- NULL }, ignoreNULL = TRUE)
+    if (!is.null(delete_req)) shiny::observeEvent(input$btn_delete, {
+      fm <- form_mode(); shiny::req(fm, !identical(fm$mode, "new"))
+      delete_req(list(action = "delete", instance = as.character(fm$instance), nonce = as.numeric(Sys.time())))
+    })
 
     shiny::observeEvent(input$btn_add,    open_for("new"))
     shiny::observeEvent(input$btn_cancel, { form_mode(NULL); ss$save <- NULL })
@@ -117,9 +182,25 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
     # ── add button (hidden while a form is open) ───────────────────────────────
     output$add_button_panel <- shiny::renderUI({
       if (!is.null(form_mode())) return(NULL)
+      n_pend <- suppressWarnings(as.integer(tryCatch(pending_review(), error = function(e) 0)))
       shiny::div(class = "mb-3",
-        shiny::actionButton(ns("btn_add"), "+ Add Entry", class = "btn btn-sm",
-          style = "background:var(--roundsui-accent, #3355D8); color:var(--roundsui-accent-ink, #FFFFFF); border:none; padding:4px 14px; font-size:0.85rem;"))
+        if (length(n_pend) == 1 && !is.na(n_pend) && n_pend > 0)
+          shiny::div(class = "mb-2 py-2 px-3",
+            style = "font-size:0.85rem; background:#fff3cd; color:#664d03; border-left:4px solid #e0a800; border-radius:4px;",
+            tags$i(class = "bi bi-exclamation-triangle me-1"),
+            tags$strong(sprintf("Please review your %d older entr%s above first. ", n_pend, if (n_pend == 1) "y" else "ies")),
+            "Click each one to update it into the new format, or delete it if it's a repeat. ",
+            "Then add anything new here."),
+        if (!is.null(add_prompt))
+          shiny::div(class = "mb-2", style = "font-weight:600; font-size:0.92rem;",
+                     tags$i(class = "bi bi-plus-square me-1"), add_prompt),
+        if (isTRUE(prominent))
+          shiny::actionButton(ns("btn_add"), tagList(tags$i(class = "bi bi-plus-circle me-1"), "Add new entry"),
+            class = "btn",
+            style = "background:var(--roundsui-accent, #3355D8); color:var(--roundsui-accent-ink, #FFFFFF); border:none; padding:8px 22px; font-size:0.95rem; font-weight:600;")
+        else
+          shiny::actionButton(ns("btn_add"), "+ Add Entry", class = "btn btn-sm",
+            style = "background:var(--roundsui-accent, #3355D8); color:var(--roundsui-accent-ink, #FFFFFF); border:none; padding:4px 14px; font-size:0.85rem;"))
     })
 
     # ── entry form ─────────────────────────────────────────────────────────────
@@ -131,15 +212,18 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
 
       # Existing collection/project labels this resident has already used, so a
       # new work can be attached to one without retyping it.
+      # Ongoing-project titles are offered too, so an output can be linked to
+      # the project it came from.
       existing_colls <- {
         df <- tryCatch(existing_data(), error = function(e) NULL)
-        if (!is.null(df) && "schol_collection" %in% names(df))
-          sort(unique(df$schol_collection[nzchar(df$schol_collection %||% "") & !is.na(df$schol_collection)]))
-        else character(0)
+        cl <- if (!is.null(df) && "schol_collection" %in% names(df)) as.character(df$schol_collection) else character(0)
+        pj <- if (!is.null(df) && all(c("schol_work_type", "schol_title") %in% names(df)))
+                as.character(df$schol_title[as.character(df$schol_work_type) %in% "6"]) else character(0)
+        v <- trimws(c(cl, pj)); sort(unique(v[!is.na(v) & nzchar(v)]))
       }
 
       lbl <- function(text)
-        tags$label(text, class = "form-label fw-semibold", style = "font-size:0.92rem; color:var(--roundsui-ink, #13161F);")
+        tags$label(text, class = "form-label fw-semibold", style = "font-size:0.92rem;")
       txt <- function(fid, ph = "")
         tags$input(type = "text", id = ns(fid), class = "form-control",
                    style = "font-size:0.92rem;", placeholder = ph, value = iv(fid))
@@ -148,6 +232,8 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
       c_pub    <- "input.schol_work_type=='1'||input.schol_work_type=='3'"
       c_pubd   <- "(input.schol_work_type=='1'||input.schol_work_type=='3')&&input.schol_pub_status=='3'"
       c_event  <- "input.schol_work_type=='4'||input.schol_work_type=='5'"
+      c_proj   <- "input.schol_work_type=='6'"
+      c_output <- "input.schol_work_type!='6'"
 
       hdr <- switch(fm$mode, edit = "Edit Scholarly Work",
                     recategorize = "Recategorize Older Entry", "Add Scholarly Work")
@@ -163,7 +249,10 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
               div(tags$span(style = "font-weight:600;", "Original entry: "), fm$ref),
               tags$div(class = "text-muted mt-1", style = "font-size:0.8rem;",
                 tags$i(class = "bi bi-arrow-down me-1"),
-                "This text is pre-filled into Authors below — split it into Title / Authors / Journal and set the type.")),
+                if (identical(iv("schol_work_type"), "6"))
+                  "This looks like a project without a poster or paper yet, so it's pre-filled as an ongoing project. Add a short title; change the type if it did produce an output."
+                else
+                  "This text is pre-filled into Authors below — split it into Title / Authors / Journal and set the type.")),
           tags$p(class = "text-muted mb-3", style = "font-size:0.88rem;",
                  "Fields mirror the ERAS scholarly-work categories, so entries copy straight into your application."),
 
@@ -174,12 +263,38 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
                           "Book Chapter (peer reviewed)"     = "2",
                           "Journal Abstract (peer reviewed)" = "3",
                           "Oral Presentation"                = "4",
-                          "Poster Presentation"              = "5"),
+                          "Poster Presentation"              = "5",
+                          "Ongoing project (no output yet)"  = "6"),
               selected = iv("schol_work_type"), selectize = FALSE, width = "100%")),
 
           div(class = "mb-3", lbl("Title of work"),
             txt("schol_title", "Title only — not the full citation")),
 
+          conditionalPanel(c_proj, ns = ns,
+            div(class = "alert alert-light py-2 px-3 mb-3",
+                style = "font-size:0.85rem; border-left:3px solid var(--roundsui-accent, #3355D8);",
+              tags$i(class = "bi bi-info-circle me-1"),
+              "For a project still under way. When it produces a poster, talk or paper, add that ",
+              "as its own entry and give both the same collection name below."),
+            div(class = "mb-3", lbl("What kind of project is this?"),
+              selectInput(ns("schol_proj_kind"), label = NULL,
+                choices = c("-- select --" = "", "Research" = "1", "Quality improvement" = "2",
+                            "Patient safety" = "3", "Case report" = "4",
+                            "Medical education" = "5", "Other" = "6"),
+                selected = iv("schol_proj_kind"), selectize = FALSE, width = "100%")),
+            div(class = "mb-3", lbl("Describe the project: the question, what you are doing, and your role"),
+              tags$textarea(id = ns("schol_proj_desc"), class = "form-control",
+                rows = 4, style = "font-size:0.92rem; resize:vertical;",
+                iv("schol_proj_desc"))),
+            div(class = "row g-2 mb-3",
+              div(class = "col-7", lbl("Faculty mentor(s)"), txt("schol_proj_mentor")),
+              div(class = "col-5", lbl("Where is the project now?"),
+                selectInput(ns("schol_proj_status"), label = NULL,
+                  choices = c("-- select --" = "", "Planning / IRB" = "1", "Data collection" = "2",
+                              "Analysis" = "3", "Writing up" = "4", "On hold" = "5", "Stopped" = "6"),
+                  selected = iv("schol_proj_status"), selectize = FALSE, width = "100%")))),
+
+          conditionalPanel(c_output, ns = ns,
           div(class = "mb-3", lbl("Authors"),
             tags$textarea(id = ns("schol_authors"), class = "form-control",
               rows = 2, style = "font-size:0.92rem; resize:vertical;",
@@ -190,7 +305,7 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
             radioButtons(ns("schol_first_author"), label = NULL,
               choices = c("Yes" = "1", "No" = "0"),
               selected = if (nzchar(iv("schol_first_author"))) iv("schol_first_author") else character(0),
-              inline = TRUE)),
+              inline = TRUE))),
 
           conditionalPanel(c_source, ns = ns,
             div(class = "mb-3", lbl("Journal or book / publication name"),
@@ -230,12 +345,18 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
               div(class = "col-6", lbl("Event URL"),    txt("schol_event_url", "https://…")),
               div(class = "col-6", lbl("Abstract URL"), txt("schol_abstract_url", "https://…")))),
 
-          div(class = "mb-3", lbl("Scholarly collection / project (optional)"),
+          div(class = "mb-4", lbl("Scholarly collection / project (optional)"),
+            tags$div(class = "text-muted mb-1", style = "font-size:0.8rem;",
+              if (length(existing_colls))
+                "Pick one of your projects, or type a new name and press Enter. Entries with the same name are grouped together."
+              else
+                "Type a project name and press Enter. Give related entries (an ongoing project and its poster or paper) the same name to group them."),
             selectizeInput(ns("schol_collection"), label = NULL,
-              choices  = union(existing_colls, iv("schol_collection")),
+              choices  = c("", union(existing_colls, iv("schol_collection"))),
               selected = iv("schol_collection"),
               options  = list(create = TRUE,
-                              placeholder = "Select an existing project, or type a new one"),
+                              placeholder = if (length(existing_colls)) "Choose a project, or type a new one"
+                                            else "Type a project name, then press Enter"),
               width = "100%")),
           div(class = "mb-3 form-check",
             tags$input(type = "checkbox", class = "form-check-input", id = ns("schol_meaningful"),
@@ -250,6 +371,9 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
               style = "background:var(--roundsui-accent, #3355D8); color:var(--roundsui-accent-ink, #FFFFFF); border:none; padding:6px 18px;"),
             actionButton(ns("btn_cancel"), "Cancel",
               class = "btn btn-sm btn-outline-secondary", style = "padding:6px 14px;"),
+            if (!is.null(delete_req) && !identical(fm$mode, "new"))
+              actionButton(ns("btn_delete"), tagList(tags$i(class = "bi bi-trash me-1"), "Delete this entry"),
+                class = "btn btn-sm btn-outline-danger ms-auto", style = "padding:6px 14px;"),
             uiOutput(ns("save_status")))
         )
       )
@@ -281,6 +405,10 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
       if (!nzchar(type))  { ss$save <- list(success = FALSE, message = "Please select a type of work."); return() }
       if (!nzchar(title)) { ss$save <- list(success = FALSE, message = "Please enter a title."); return() }
 
+      is_proj    <- type == "6"
+      if (is_proj && !nzchar(fv("schol_proj_desc"))) {
+        ss$save <- list(success = FALSE, message = "Please describe the project."); return()
+      }
       is_pub     <- type %in% c("1", "3")
       is_pres    <- type %in% c("4", "5")
       has_source <- type %in% c("1", "2", "3")
@@ -304,8 +432,8 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
       fields <- list(
         schol_work_type     = type,
         schol_title         = title,
-        schol_authors       = fv("schol_authors"),
-        schol_first_author  = fv("schol_first_author"),
+        schol_authors       = if (is_proj) "" else fv("schol_authors"),
+        schol_first_author  = if (is_proj) "" else fv("schol_first_author"),
         schol_source_name   = if (has_source) fv("schol_source_name") else "",
         schol_pub_status    = if (is_pub) status else "",
         schol_pub_date      = if (is_pub) date_iso("schol_pub_date") else "",
@@ -322,7 +450,11 @@ mod_scholarship_entry_server <- function(id, resident_id, existing_data,
         schol_event_url     = if (is_pres) fv("schol_event_url")     else "",
         schol_abstract_url  = if (is_pres) fv("schol_abstract_url")  else "",
         schol_collection    = fv("schol_collection"),
-        schol_meaningful    = meaningful
+        schol_meaningful    = meaningful,
+        schol_proj_kind     = if (is_proj) fv("schol_proj_kind")   else "",
+        schol_proj_desc     = if (is_proj) fv("schol_proj_desc")   else "",
+        schol_proj_mentor   = if (is_proj) fv("schol_proj_mentor") else "",
+        schol_proj_status   = if (is_proj) fv("schol_proj_status") else ""
       )
 
       # Target instance: overwrite for edit/recategorize, next for new.

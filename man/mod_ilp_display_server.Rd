@@ -43,6 +43,7 @@ renders the requested display sections.
 \code{\link[=mod_ilp_display_ui]{mod_ilp_display_ui()}}
 
 Other ilp_display:
+\code{\link[=ilp_compare_row_ui]{ilp_compare_row_ui()}},
 \code{\link[=mod_ilp_display_ui]{mod_ilp_display_ui()}}
 }
 \concept{ilp_display}

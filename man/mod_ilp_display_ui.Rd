@@ -39,6 +39,7 @@ of this module — the consumer adds them around \code{mod_ilp_display_ui()}.
 \code{\link[=mod_ilp_display_server]{mod_ilp_display_server()}}
 
 Other ilp_display:
+\code{\link[=ilp_compare_row_ui]{ilp_compare_row_ui()}},
 \code{\link[=mod_ilp_display_server]{mod_ilp_display_server()}}
 }
 \concept{ilp_display}
