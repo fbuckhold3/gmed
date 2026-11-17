@@ -69,7 +69,7 @@ create_combined_assessment_chart <- function(data, record_id, resident_name = NU
         )
       ) %>%
       count(level, name = "actual") %>%
-      complete(level = c("Intern", "PGY2", "PGY3"), fill = list(actual = 0))
+      tidyr::complete(level = c("Intern", "PGY2", "PGY3"), fill = list(actual = 0))
     
     progress_data <- assessment_counts %>%
       mutate(
@@ -233,7 +233,7 @@ create_combined_faculty_chart <- function(data, record_id, resident_name = NULL)
         )
       ) %>%
       count(level, name = "actual") %>%
-      complete(level = c("Intern", "PGY2", "PGY3"), fill = list(actual = 0))
+      tidyr::complete(level = c("Intern", "PGY2", "PGY3"), fill = list(actual = 0))
     
     progress_data <- faculty_counts %>%
       mutate(
