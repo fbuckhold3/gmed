@@ -68,7 +68,7 @@ NULL
       record_id                   = as.character(resident_id),
       redcap_repeat_instrument    = "faculty_evaluation",
       redcap_repeat_instance      = as.character(next_inst),
-      fac_eval_date               = format(Sys.Date(), "%Y-%m-%d"),
+      fac_eval_date               = format(program_today(), "%Y-%m-%d"),
       fac_eval_level              = as.character(pgy),
       faculty_evaluation_complete = "2"
     ),
@@ -273,20 +273,34 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    # ── Local eval cache (seeded once from rdm_data) ──────────────────────────
-    local_evals <- reactiveVal(NULL)
+    # ── Eval list: saved rows from rdm_data + rows submitted this session ────
+    # rdm_data() can first arrive as an older copy (e.g. a full-cohort load
+    # cached when the app process started) and then be replaced by a fresh
+    # per-resident load. Re-read it every time it changes, so evaluations
+    # saved in an earlier session always show. Rows submitted in this
+    # session are kept separately and dropped once the loaded data has them
+    # (matched on repeat instance).
+    session_evals <- reactiveVal(data.frame())
 
-    observe({
+    saved_evals <- reactive({
       req(rdm_data(), resident_id())
-      if (!is.null(local_evals())) return()
-      fe   <- rdm_data()$all_forms$faculty_evaluation
-      mine <- if (!is.null(fe) && nrow(fe) > 0)
-                fe[fe$record_id == resident_id(), , drop = FALSE]
-              else data.frame()
-      local_evals(mine)
+      fe <- rdm_data()$all_forms$faculty_evaluation
+      if (is.null(fe) || nrow(fe) == 0) return(data.frame())
+      fe[as.character(fe$record_id) == as.character(resident_id()), , drop = FALSE]
     })
 
-    my_evals <- reactive({ local_evals() %||% data.frame() })
+    observeEvent(resident_id(), session_evals(data.frame()), ignoreInit = TRUE)
+
+    my_evals <- reactive({
+      saved <- saved_evals()
+      new   <- session_evals()
+      if (nrow(new) > 0 && nrow(saved) > 0 && "redcap_repeat_instance" %in% names(saved))
+        new <- new[!as.character(new$redcap_repeat_instance) %in%
+                     as.character(saved$redcap_repeat_instance), , drop = FALSE]
+      if (nrow(new) == 0) return(saved)
+      if (nrow(saved) == 0) return(new)
+      dplyr::bind_rows(dplyr::mutate(saved, dplyr::across(dplyr::everything(), as.character)), new)
+    })
 
     # ── PGY info ──────────────────────────────────────────────────────────────
     pgy_info <- reactive({
@@ -344,7 +358,7 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
 
       n30 <- if (n > 0 && "fac_eval_date" %in% names(df)) {
         dates <- suppressWarnings(as.Date(df$fac_eval_date))
-        sum(!is.na(dates) & dates >= Sys.Date() - 30)
+        sum(!is.na(dates) & dates >= program_today() - 30)
       } else 0L
 
       pct <- if (goal > 0L) round(n / goal * 100) else 0L
@@ -386,7 +400,7 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
       if (is.na(gy)) return(.fe_empty_plot("PGY year data unavailable"))
 
       goal  <- 25L
-      today <- Sys.Date()
+      today <- program_today()
       wins  <- lapply(1:3, function(p) list(
         pgy = p, label = paste0("PGY ", p),
         start = as.Date(paste0(gy - (4L - p), "-07-01")),
@@ -871,17 +885,18 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
           }
         }
 
-        .fe_submit_eval(rid, info$pgy, ed, redcap_url = redcap_url, rdm_token = rdm_token)
+        sent <- .fe_submit_eval(rid, info$pgy, ed, redcap_url = redcap_url, rdm_token = rdm_token)
 
-        # Update local cache so chart + chips refresh without full reload
+        # Show it right away, without a full reload
         new_row <- data.frame(
-          record_id     = as.character(rid),
-          fac_fell_name = fac$fac_name,
-          fac_eval_date = format(Sys.Date(), "%Y-%m-%d"),
-          att_or_fell   = if (etype == "attending") "1" else "2",
+          record_id              = as.character(rid),
+          redcap_repeat_instance = as.character(sent$redcap_repeat_instance),
+          fac_fell_name          = fac$fac_name,
+          fac_eval_date          = sent$fac_eval_date,
+          att_or_fell            = if (etype == "attending") "1" else "2",
           stringsAsFactors = FALSE
         )
-        local_evals(dplyr::bind_rows(local_evals() %||% data.frame(), new_row))
+        session_evals(dplyr::bind_rows(session_evals(), new_row))
 
         eval_step("done")
       }, error = function(e) {
