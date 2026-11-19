@@ -31,34 +31,41 @@ NULL
 # explicitly — were implicit via ind.dash's app_config global before this
 # promotion.
 
+# Next repeat instance of `instrument` on `record_id`. Stops on any API or
+# parse failure: guessing (the old fallback was 1) would overwrite an
+# existing instance. A record with no rows yet for the instrument is a real
+# answer, not a failure, and returns 1.
+.fe_lookup_next_instance <- function(record_id, instrument, redcap_url, token) {
+  resp <- httr::POST(
+    redcap_url,
+    body = list(
+      token = token, content = "record",
+      action = "export", format = "json", type = "flat",
+      records = as.character(record_id),
+      fields  = "record_id,redcap_repeat_instrument,redcap_repeat_instance",
+      rawOrLabel = "raw", rawOrLabelHeaders = "raw",
+      exportCheckboxLabel = "false", exportSurveyFields = "false",
+      exportDataAccessGroups = "false", returnFormat = "json"
+    ),
+    encode = "form"
+  )
+  if (httr::status_code(resp) != 200)
+    stop("Could not look up next ", instrument, " instance (REDCap ",
+         httr::status_code(resp), "): ",
+         substr(httr::content(resp, "text", encoding = "UTF-8"), 1, 200))
+  dat <- jsonlite::fromJSON(httr::content(resp, "text", encoding = "UTF-8"))
+  if (!is.data.frame(dat) || nrow(dat) == 0 ||
+      !"redcap_repeat_instrument" %in% names(dat))
+    return(1L)
+  rows <- dat[!is.na(dat$redcap_repeat_instrument) &
+                dat$redcap_repeat_instrument == instrument, , drop = FALSE]
+  inst <- suppressWarnings(as.numeric(rows$redcap_repeat_instance))
+  inst <- inst[!is.na(inst)]
+  if (length(inst) == 0) 1L else as.integer(max(inst)) + 1L
+}
+
 .fe_next_instance <- function(resident_id, redcap_url, rdm_token) {
-  tryCatch({
-    resp <- httr::POST(
-      redcap_url,
-      body = list(
-        token = rdm_token, content = "record",
-        action = "export", format = "json", type = "flat",
-        records    = as.character(resident_id),
-        fieldNames = "record_id,redcap_repeat_instrument,redcap_repeat_instance",
-        rawOrLabel = "raw", rawOrLabelHeaders = "raw",
-        exportCheckboxLabel = "false", exportSurveyFields = "false",
-        exportDataAccessGroups = "false", returnFormat = "json"
-      ),
-      encode = "form"
-    )
-    if (httr::status_code(resp) == 200) {
-      dat <- jsonlite::fromJSON(httr::content(resp, "text", encoding = "UTF-8"))
-      if (is.data.frame(dat) && nrow(dat) > 0) {
-        fe <- dat[!is.na(dat$redcap_repeat_instrument) &
-                    dat$redcap_repeat_instrument == "faculty_evaluation", ]
-        if (nrow(fe) > 0) {
-          inst <- suppressWarnings(as.numeric(fe$redcap_repeat_instance))
-          return(max(inst[!is.na(inst)], 0L) + 1L)
-        }
-      }
-    }
-    1L
-  }, error = function(e) 1L)
+  .fe_lookup_next_instance(resident_id, "faculty_evaluation", redcap_url, rdm_token)
 }
 
 .fe_submit_eval <- function(resident_id, pgy, eval_data, redcap_url, rdm_token) {
@@ -93,34 +100,16 @@ NULL
   invisible(full_data)
 }
 
+# Adds a "can't find this faculty member" name to the FAC pending queue
+# (repeating instrument on record 1). Before 2026-11, a return() inside the
+# instance lookup's tryCatch() exited this whole function whenever the queue
+# already had entries, so the import below never ran and no error was
+# raised: names typed since the standalone imslu.facultyeval app retired
+# (2026-11-01) never reached the queue. Success now requires REDCap to
+# confirm the saved record count, and every outcome is logged.
 .fe_submit_pending <- function(name, type_code, rot, redcap_url, fac_token) {
   if (!nzchar(fac_token)) stop("FAC_TOKEN not configured")
-  next_inst <- tryCatch({
-    r <- httr::POST(
-      redcap_url,
-      body = list(
-        token = fac_token, content = "record", action = "export",
-        format = "json", records = "1",
-        fieldNames = "record_id,redcap_repeat_instrument,redcap_repeat_instance",
-        rawOrLabel = "raw", rawOrLabelHeaders = "raw",
-        exportCheckboxLabel = "false", exportSurveyFields = "false",
-        exportDataAccessGroups = "false", returnFormat = "json"
-      ),
-      encode = "form"
-    )
-    if (httr::status_code(r) == 200) {
-      d <- jsonlite::fromJSON(httr::content(r, "text", encoding = "UTF-8"))
-      if (is.data.frame(d) && nrow(d) > 0) {
-        pq <- d[!is.na(d$redcap_repeat_instrument) &
-                  d$redcap_repeat_instrument == "pending_queue", ]
-        if (nrow(pq) > 0) {
-          inst <- suppressWarnings(as.numeric(pq$redcap_repeat_instance))
-          return(max(inst[!is.na(inst)], 0L) + 1L)
-        }
-      }
-    }
-    1L
-  }, error = function(e) 1L)
+  next_inst <- .fe_lookup_next_instance("1", "pending_queue", redcap_url, fac_token)
   rc_df <- data.frame(
     record_id = "1", redcap_repeat_instrument = "pending_queue",
     redcap_repeat_instance = as.character(next_inst),
@@ -135,9 +124,46 @@ NULL
     ),
     encode = "form"
   )
+  body <- httr::content(resp, "text", encoding = "UTF-8")
   if (httr::status_code(resp) != 200)
-    stop("Pending queue error: ", httr::content(resp, "text"))
-  invisible(TRUE)
+    stop("Pending queue error (REDCap ", httr::status_code(resp), "): ",
+         substr(body, 1, 200))
+  n_saved <- tryCatch(as.integer(jsonlite::fromJSON(body)$count),
+                      error = function(e) NA_integer_)
+  if (length(n_saved) != 1 || is.na(n_saved) || n_saved < 1L)
+    stop("Pending queue save not confirmed by REDCap: ", substr(body, 1, 200))
+  message("Pending queue: saved '", name, "' as instance ", next_inst)
+  invisible(next_inst)
+}
+
+# Tidy a typed faculty name: trim, collapse inner spaces, and fix the case
+# only when the whole name is one case ("taylor bastin" -> "Taylor Bastin").
+# Mixed-case names are left alone so BouDaher / McDonald stay as typed.
+.fe_clean_name <- function(x) {
+  x <- gsub("\\s+", " ", trimws(x %||% ""))
+  if (!nzchar(x) || !(x == tolower(x) || x == toupper(x))) return(x)
+  words <- strsplit(tolower(x), " ", fixed = TRUE)[[1]]
+  paste0(toupper(substr(words, 1, 1)), substring(words, 2), collapse = " ")
+}
+
+# Compare a typed name with the roster. "exact" = same apart from case and
+# spacing; "close" = within `max_dist` edits (typos such as "Philp Mar");
+# otherwise "none". Names under 5 characters are never fuzzy-matched.
+.fe_match_roster <- function(name, roster, max_dist = 2L) {
+  none <- list(type = "none", row = NULL)
+  if (is.null(roster) || nrow(roster) == 0 || !"fac_name" %in% names(roster))
+    return(none)
+  norm <- function(v) gsub("\\s+", " ", trimws(tolower(v)))
+  target <- norm(name)
+  names_n <- norm(roster$fac_name)
+  hit <- which(names_n == target)
+  if (length(hit) > 0) return(list(type = "exact", row = roster[hit[1], , drop = FALSE]))
+  if (nchar(target) < 5) return(none)
+  d <- as.vector(utils::adist(target, names_n))
+  best <- which(d == min(d))[1]
+  if (!is.na(best) && d[best] <= max_dist)
+    return(list(type = "close", row = roster[best, , drop = FALSE]))
+  none
 }
 
 # ── Rating question UI (namespaced for Shiny modules) ────────────────────────
@@ -905,12 +931,24 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
     }
 
     # ── Pending faculty ───────────────────────────────────────────────────────
-    observeEvent(input$add_pending, {
-      name <- trimws(input$pend_name %||% "")
-      type <- input$pend_type %||% ""
-      rot  <- trimws(input$pend_rot %||% "")
-      if (!nzchar(name)) { showNotification("Please enter a name", type = "warning"); return() }
-      if (!nzchar(type)) { showNotification("Please select Attending or Fellow", type = "warning"); return() }
+    # A typed name is checked against the roster first, so an existing
+    # faculty member isn't saved under a new spelling ("taylor bastin"):
+    # same name apart from case/spacing -> use the roster entry directly;
+    # a close typo -> ask; no match -> add to the FAC pending queue.
+    pend_candidate <- reactiveVal(NULL)
+
+    use_roster_faculty <- function(fac, type) {
+      sel_faculty(fac)
+      etype <- NULL
+      if ("fac_fell" %in% names(fac) && !is.na(fac$fac_fell)) {
+        ff <- suppressWarnings(as.integer(fac$fac_fell))
+        if (!is.na(ff)) etype <- if (ff == 1L) "attending" else if (ff == 2L) "fellow" else NULL
+      }
+      eval_type_rv(etype %||% (if (type == "1") "attending" else "fellow"))
+      eval_step("form1")
+    }
+
+    add_new_pending <- function(name, type, rot) {
       tryCatch({
         .fe_submit_pending(name, type, rot, redcap_url = redcap_url, fac_token = fac_token)
         showNotification(paste(name, "added for review"), type = "message")
@@ -922,8 +960,54 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
         eval_type_rv(if (type == "1") "attending" else "fellow")
         eval_step("form1")
       }, error = function(e) {
-        showNotification(paste("Error:", e$message), type = "error")
+        message("Pending queue FAILED for '", name, "': ", conditionMessage(e))
+        showNotification(paste("Error:", conditionMessage(e)), type = "error", duration = 8)
       })
+    }
+
+    observeEvent(input$add_pending, {
+      name <- .fe_clean_name(input$pend_name)
+      type <- input$pend_type %||% ""
+      rot  <- trimws(input$pend_rot %||% "")
+      if (!nzchar(name)) { showNotification("Please enter a name", type = "warning"); return() }
+      if (!nzchar(type)) { showNotification("Please select Attending or Fellow", type = "warning"); return() }
+
+      m <- .fe_match_roster(name, faculty_roster_r())
+      if (m$type == "exact") {
+        message("Pending name '", name, "' matched roster entry '", m$row$fac_name, "'")
+        showNotification(paste0("Using ", m$row$fac_name, " from the faculty list."),
+                         type = "message")
+        use_roster_faculty(m$row, type)
+      } else if (m$type == "close") {
+        pend_candidate(list(name = name, type = type, rot = rot, row = m$row))
+        shiny::showModal(shiny::modalDialog(
+          title = "Is this the same person?",
+          tags$p("You typed ", tags$strong(name), ". The faculty list has ",
+                 tags$strong(m$row$fac_name), "."),
+          footer = tagList(
+            actionButton(ns("pend_use_match"), paste("Use", m$row$fac_name),
+                         class = "btn btn-primary btn-sm"),
+            actionButton(ns("pend_add_new"), "No, add as new",
+                         class = "btn btn-outline-secondary btn-sm")
+          ),
+          easyClose = TRUE
+        ))
+      } else {
+        add_new_pending(name, type, rot)
+      }
+    })
+
+    observeEvent(input$pend_use_match, {
+      cand <- pend_candidate(); req(cand)
+      shiny::removeModal(); pend_candidate(NULL)
+      message("Pending name '", cand$name, "' -> roster entry '", cand$row$fac_name, "' (confirmed)")
+      use_roster_faculty(cand$row, cand$type)
+    })
+
+    observeEvent(input$pend_add_new, {
+      cand <- pend_candidate(); req(cand)
+      shiny::removeModal(); pend_candidate(NULL)
+      add_new_pending(cand$name, cand$type, cand$rot)
     })
 
     # ── Post-submission ───────────────────────────────────────────────────────

@@ -40,8 +40,12 @@ load_faculty_roster <- function(fac_token = NULL,
 
     dat <- jsonlite::fromJSON(httr::content(resp, "text", encoding = "UTF-8"))
     dat <- dat[!is.na(dat$fac_name) & nzchar(dat$fac_name), , drop = FALSE]
+    # Only archived == "1" hides someone. A blank value counts as active:
+    # the API returns "" (not NA) for unanswered fields, and new faculty
+    # records are created with it blank (38 active faculty were hidden
+    # from residents' search until 2026-11).
     if ("archived" %in% names(dat))
-      dat <- dat[is.na(dat$archived) | dat$archived == "0", , drop = FALSE]
+      dat <- dat[is.na(dat$archived) | dat$archived != "1", , drop = FALSE]
 
     message("Faculty roster loaded \u2014 ", nrow(dat), " active records")
     dat
