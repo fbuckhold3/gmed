@@ -982,8 +982,9 @@ mod_faculty_eval_server <- function(id, rdm_data, resident_id, faculty_roster_r,
         pend_candidate(list(name = name, type = type, rot = rot, row = m$row))
         shiny::showModal(shiny::modalDialog(
           title = "Is this the same person?",
-          tags$p("You typed ", tags$strong(name), ". The faculty list has ",
-                 tags$strong(m$row$fac_name), "."),
+          tags$p("You typed ", tags$strong(name, .noWS = "outside"),
+                 ". The faculty list has ",
+                 tags$strong(m$row$fac_name, .noWS = "outside"), "."),
           footer = tagList(
             actionButton(ns("pend_use_match"), paste("Use", m$row$fac_name),
                          class = "btn btn-primary btn-sm"),
